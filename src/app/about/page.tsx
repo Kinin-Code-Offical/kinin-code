@@ -9,8 +9,8 @@ export const metadata: Metadata = {
     "About Yamac, an Electrical & Electronics student building full-stack projects.",
 };
 
-export default function AboutPage() {
-  const cookieStore = cookies();
+export default async function AboutPage() {
+  const cookieStore = await cookies();
   const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
   const t = copy[language].pages.about;
 

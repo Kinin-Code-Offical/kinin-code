@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ServiceUnavailable() {
-  const cookieStore = cookies();
+export default async function ServiceUnavailable() {
+  const cookieStore = await cookies();
   const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
   const t = copy[language].errors.service;
 

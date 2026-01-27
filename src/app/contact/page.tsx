@@ -9,8 +9,8 @@ export const metadata: Metadata = {
   description: "Contact Yamac for projects and collaborations.",
 };
 
-export default function ContactPage() {
-  const cookieStore = cookies();
+export default async function ContactPage() {
+  const cookieStore = await cookies();
   const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
   const t = copy[language].pages.contact;
 

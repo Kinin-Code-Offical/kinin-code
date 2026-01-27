@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ProjectsPage() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
   const t = copy[language].pages.projects;
   const projects = await getGithubProjects();

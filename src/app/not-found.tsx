@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function NotFound() {
-  const cookieStore = cookies();
+export default async function NotFound() {
+  const cookieStore = await cookies();
   const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
   const t = copy[language].errors.notFound;
 
