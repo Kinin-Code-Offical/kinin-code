@@ -1,8 +1,10 @@
 steps:
-  - name: "gcr.io/cloud-builders/npm"
-    args: ["ci"]
-  - name: "gcr.io/cloud-builders/npm"
-    args: ["run", "build"]
+  - name: "node:24-bookworm"
+    entrypoint: "bash"
+    args: ["-lc", "npm ci"]
+  - name: "node:24-bookworm"
+    entrypoint: "bash"
+    args: ["-lc", "npm run build"]
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "build"
