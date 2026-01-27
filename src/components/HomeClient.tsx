@@ -65,21 +65,8 @@ export default function HomeClient({ content }: HomeClientProps) {
   const heroRef = useRef<HTMLElement>(null);
   const scrollProgress = useScrollProgress(heroRef);
   const isMobile = useMediaQuery("(max-width: 900px)");
-  const [devEnabled] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("dev") === "1" || process.env.NEXT_PUBLIC_DEVTOOLS === "1";
-  });
-  const [devSettings, setDevSettings] = useState<DevSettings>(() => {
-    try {
-      const raw = localStorage.getItem("devtools");
-      if (raw) {
-        return { ...defaultDevSettings, ...JSON.parse(raw) } as DevSettings;
-      }
-    } catch {
-      // ignore
-    }
-    return defaultDevSettings;
-  });
+  const [devEnabled, setDevEnabled] = useState(false);
+  const [devSettings, setDevSettings] = useState<DevSettings>(defaultDevSettings);
   const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
   const [terminalFocused, setTerminalFocused] = useState(false);
   const [debugInfo, setDebugInfo] = useState<SceneDebugInfo>({
@@ -87,6 +74,28 @@ export default function HomeClient({ content }: HomeClientProps) {
     screenMeshName: null,
     fallbackPlane: false,
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    setDevEnabled(params.get("dev") === "1" || process.env.NEXT_PUBLIC_DEVTOOLS === "1");
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const raw = localStorage.getItem("devtools");
+      if (raw) {
+        setDevSettings((prev) => ({ ...prev, ...JSON.parse(raw) } as DevSettings));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const projectsMd = useMemo(() => {
     return [
