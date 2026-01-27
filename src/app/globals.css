@@ -113,6 +113,7 @@ textarea {
   border-radius: 999px;
   border: 1px solid var(--stroke);
   background: var(--glass);
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
   position: sticky;
@@ -121,22 +122,36 @@ textarea {
 }
 
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.logo-mark {
+  font-family: var(--font-mono), monospace;
+  font-size: 16px;
+  color: var(--accent);
+  border: 1px solid rgba(126, 242, 178, 0.5);
+  border-radius: 10px;
+  padding: 4px 8px;
+  background: rgba(126, 242, 178, 0.08);
+  box-shadow: 0 0 16px rgba(126, 242, 178, 0.25);
+}
+
+.logo-text {
   font-family: var(--font-display), sans-serif;
   font-size: 18px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
-.logo::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px rgba(126, 242, 178, 0.8);
+.logo-sub {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
 }
 
 .nav-links {
@@ -566,6 +581,35 @@ textarea {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: center;
+}
+
+.simple-page {
+  min-height: 100vh;
+  padding: 80px 20px;
+  display: grid;
+  place-items: center;
+}
+
+.simple-card {
+  width: min(900px, 92vw);
+  display: grid;
+  gap: 18px;
+  border-radius: 28px;
+  border: 1px solid var(--stroke);
+  background: var(--glass);
+  box-shadow: var(--shadow);
+  padding: clamp(24px, 4vw, 36px);
+}
+
+.simple-text {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.simple-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .dev-console {

@@ -31,6 +31,18 @@ export const metadata: Metadata = {
     description:
       "Full-stack developer portfolio with 3D scene, selected projects, and contact form.",
     type: "website",
+    images: [
+      {
+        url: "/og.svg",
+        width: 1200,
+        height: 630,
+        alt: "Kinin Code — Yamaç portfolio",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og.svg"],
   },
 };
 

@@ -44,7 +44,11 @@ export default function HomeClient({ projects }: HomeClientProps) {
   return (
     <main className="site">
       <header className="top-nav">
-        <div className="logo">{site.name} Code</div>
+        <div className="logo">
+          <span className="logo-mark">~&gt;</span>
+          <span className="logo-text">{site.name}</span>
+          <span className="logo-sub">home / root / console</span>
+        </div>
         <nav className="nav-links">
           <a href="#services">{t.nav.services}</a>
           <a href="#projects">{t.nav.projects}</a>

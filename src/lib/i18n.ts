@@ -114,6 +114,45 @@ export const copy = {
       copyright: "©",
       role: "Elektrik Elektronik Öğrencisi",
     },
+    pages: {
+      about: {
+        eyebrow: "Hakkımda",
+        title: "Yamaç, Elektrik Elektronik Öğrencisi",
+        body:
+          "Elektronik ve yazılımı birlikte kullanarak projeler geliştiriyorum. Öğrencilik dönemimde üretime odaklı, hızlı prototiplenen uygulamalar ve cihaz entegrasyonları kuruyorum.",
+        primary: "Ana sayfa",
+        secondary: "Projeler",
+      },
+      projects: {
+        eyebrow: "GitHub",
+        title: "Projeler",
+        body:
+          "GitHub’da paylaştığım projelerin öne çıkanları. Detaylar ve güncellemeler için profili inceleyebilirsin.",
+        primary: "Ana sayfa",
+        secondary: "GitHub Profili",
+        empty: "GitHub projeleri yüklenemedi. Kullanıcı adı tanımla.",
+        noDescription: "Açıklama eklenmemiş.",
+      },
+      contact: {
+        eyebrow: "İletişim",
+        title: "Birlikte çalışalım",
+        body:
+          "Projenin detaylarını ve ihtiyaçlarını paylaş. En kısa sürede dönüş yapacağım.",
+        primary: "Ana sayfa",
+        form: {
+          nameLabel: "İsim",
+          namePlaceholder: "Adın",
+          emailLabel: "E-posta",
+          emailPlaceholder: "mail@adresin.com",
+          messageLabel: "Proje Notu",
+          messagePlaceholder: "Ne üzerinde çalışıyoruz?",
+          submit: "Mesaj Gönder",
+          sending: "Gönderiliyor...",
+          success: "Mesajın ulaştı. 24 saat içinde dönüş yapacağım.",
+          error: "Bir hata oluştu. Lütfen tekrar dene.",
+        },
+      },
+    },
     errors: {
       notFound: {
         title: "Sayfa bulunamadı",
@@ -243,6 +282,45 @@ export const copy = {
     footer: {
       copyright: "©",
       role: "Electrical & Electronics Student",
+    },
+    pages: {
+      about: {
+        eyebrow: "About",
+        title: "Yamaç, Electrical & Electronics Student",
+        body:
+          "I build projects where electronics meets software. During my studies I focus on fast prototyping, real-world integrations, and clean product execution.",
+        primary: "Home",
+        secondary: "Projects",
+      },
+      projects: {
+        eyebrow: "GitHub",
+        title: "Projects",
+        body:
+          "Highlights from my GitHub repositories. Visit the profile for details and updates.",
+        primary: "Home",
+        secondary: "GitHub Profile",
+        empty: "GitHub projects could not be loaded. Please set a username.",
+        noDescription: "No description provided.",
+      },
+      contact: {
+        eyebrow: "Contact",
+        title: "Let’s work together",
+        body:
+          "Share your project details and needs. I’ll get back to you as soon as possible.",
+        primary: "Home",
+        form: {
+          nameLabel: "Name",
+          namePlaceholder: "Your name",
+          emailLabel: "Email",
+          emailPlaceholder: "you@email.com",
+          messageLabel: "Project note",
+          messagePlaceholder: "What should we build?",
+          submit: "Send Message",
+          sending: "Sending...",
+          success: "Message received. I’ll get back to you within 24 hours.",
+          error: "Something went wrong. Please try again.",
+        },
+      },
     },
     errors: {
       notFound: {
