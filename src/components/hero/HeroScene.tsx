@@ -116,6 +116,9 @@ function ComputerModel({
       screenMeshRef.current = screenMesh;
     }
 
+    const screenMeshName: string | null =
+      (screenMesh as Mesh | null)?.name ?? null;
+
     if (!screenMesh) {
       const bounds = new Box3().setFromObject(scene);
       const size = bounds.getSize(new Vector3());
@@ -127,12 +130,12 @@ function ComputerModel({
       plane.name = "FallbackScreen";
       scene.add(plane);
       fallbackPlaneRef.current = plane;
-      onDebug({ meshNames, screenMeshName: null, fallbackPlane: true });
+      onDebug({ meshNames, screenMeshName, fallbackPlane: true });
       if (process.env.NEXT_PUBLIC_DEVTOOLS === "1") {
         console.info("screen mesh not found, using fallback plane");
       }
     } else {
-      onDebug({ meshNames, screenMeshName: screenMesh.name, fallbackPlane: false });
+      onDebug({ meshNames, screenMeshName, fallbackPlane: false });
     }
   }, [onDebug, scene]);
 
@@ -278,8 +281,10 @@ function SceneContent({
     const eased = scrollProgress * scrollProgress;
     camera.position.set(base.x, base.y - eased * 0.2, base.z + eased * 2.8);
     camera.lookAt(0, 0.2, 0);
-    camera.fov = base.fov;
-    camera.updateProjectionMatrix();
+    if ("fov" in camera) {
+      camera.fov = base.fov;
+      camera.updateProjectionMatrix();
+    }
 
     if (groupRef.current) {
       const tiltX = parallax.current.y * 0.04;

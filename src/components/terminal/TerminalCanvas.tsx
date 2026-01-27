@@ -32,7 +32,7 @@ type Theme = {
 
 type TerminalCanvasProps = {
   files: TerminalFile[];
-  introLines: string[];
+  introLines: readonly string[];
   prompt: string;
   helpText: string;
   theme: Theme;

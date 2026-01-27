@@ -35,7 +35,7 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function useScrollProgress(ref: RefObject<HTMLElement>) {
+function useScrollProgress(ref: RefObject<HTMLElement | null>) {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -266,7 +266,7 @@ function ProjectCard({
   project: {
     title: string;
     year: string;
-    tags: string[];
+    tags: readonly string[];
     summary: string;
     detailsMd?: string;
     links: {
