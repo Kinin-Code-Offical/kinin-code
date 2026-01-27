@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getGithubProjects } from "@/lib/github";
 import { copy } from "@/lib/i18n";
 import { site } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Projects — Yamac",
+  description: "Selected GitHub projects by Yamac.",
+};
 
 export default async function ProjectsPage() {
   const cookieStore = cookies();

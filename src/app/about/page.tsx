@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { copy } from "@/lib/i18n";
+
+export const metadata: Metadata = {
+  title: "About — Yamac",
+  description:
+    "About Yamac, an Electrical & Electronics student building full-stack projects.",
+};
 
 export default function AboutPage() {
   const cookieStore = cookies();

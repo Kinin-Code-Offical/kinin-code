@@ -22,27 +22,27 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kinin Code — Full-Stack Developer",
+  title: "Kinin Code — Yamac",
   description:
-    "Full-stack developer portfolio with 3D scene, selected projects, and contact form.",
+    "Electrical & Electronics student portfolio with 3D scene, selected projects, and contact form.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   openGraph: {
-    title: "Kinin Code — Full-Stack Developer",
+    title: "Kinin Code — Yamac",
     description:
-      "Full-stack developer portfolio with 3D scene, selected projects, and contact form.",
+      "Electrical & Electronics student portfolio with 3D scene, selected projects, and contact form.",
     type: "website",
     images: [
       {
-        url: "/og.svg",
+        url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Kinin Code — Yamaç portfolio",
+        alt: "Kinin Code — Yamac portfolio",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    images: ["/og.svg"],
+    images: ["/og.png"],
   },
 };
 

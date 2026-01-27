@@ -1,7 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import ContactForm from "@/components/ContactForm";
 import { copy } from "@/lib/i18n";
+
+export const metadata: Metadata = {
+  title: "Contact — Yamac",
+  description: "Contact Yamac for projects and collaborations.",
+};
 
 export default function ContactPage() {
   const cookieStore = cookies();

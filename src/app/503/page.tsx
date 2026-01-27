@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { copy } from "@/lib/i18n";
+
+export const metadata: Metadata = {
+  title: "503 — Service Unavailable",
+  description: "Temporary maintenance or high load.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function ServiceUnavailable() {
   const cookieStore = cookies();

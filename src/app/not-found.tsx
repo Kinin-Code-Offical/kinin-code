@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { copy } from "@/lib/i18n";
+
+export const metadata: Metadata = {
+  title: "404 — Not Found",
+  description: "The page you are looking for does not exist.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function NotFound() {
   const cookieStore = cookies();
