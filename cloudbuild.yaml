@@ -1,0 +1,36 @@
+steps:
+  - name: "gcr.io/cloud-builders/npm"
+    args: ["ci"]
+  - name: "gcr.io/cloud-builders/npm"
+    args: ["run", "build"]
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:$COMMIT_SHA"
+      - "."
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:$COMMIT_SHA"
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "kinin-code-dev"
+      - "--image"
+      - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:$COMMIT_SHA"
+      - "--region"
+      - "europe-west1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "2"
+      - "--memory"
+      - "512Mi"
+      - "--cpu"
+      - "1"

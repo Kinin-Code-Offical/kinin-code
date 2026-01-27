@@ -75,6 +75,43 @@ The dev panel lists:
 help, ls, cd, pwd, show <file.md>, show -all, echo <text>, hello, mkdir <name>, touch <name>
 ```
 
-## Deploy (Cloud Run + Cloudflare)
+## Deploy (GCP)
 
-See `docs/deploy.md` for setup steps and GitHub Actions secrets.
+Required APIs:
+- run.googleapis.com
+- cloudbuild.googleapis.com
+- artifactregistry.googleapis.com
+- cloudresourcemanager.googleapis.com
+- iam.googleapis.com
+- serviceusage.googleapis.com
+- firebase.googleapis.com
+- firebasehosting.googleapis.com
+
+Configured names:
+- Artifact Registry repo: `kinin-code`
+- Cloud Run service: `kinin-code-dev`
+
+Cloud Build Trigger:
+1) Cloud Build -> Triggers -> connect GitHub
+2) Select `main` and use `cloudbuild.yaml`
+
+Configured values:
+- Region: `europe-west1`
+- Project ID: `kinin-code`
+
+Firebase Hosting:
+```bash
+firebase deploy --only hosting
+```
+
+Cloudflare DNS:
+- Add the Firebase-provided DNS records in Cloudflare (DNS only recommended at first).
+
+Local test:
+```bash
+docker build -t kinin-code .
+docker run -e PORT=8080 -p 8080:8080 kinin-code
+firebase emulators:start
+```
+
+Note: `max-instances` caps cost.

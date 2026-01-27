@@ -18,9 +18,14 @@ ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 
+COPY package.json package-lock.json ./
+COPY --from=deps /app/node_modules ./node_modules
+RUN npm prune --omit=dev
+
+COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/src/content/pages ./src/content/pages
 
 EXPOSE 8080
-CMD ["node", "server.js"]
+CMD ["npm", "run", "start"]
