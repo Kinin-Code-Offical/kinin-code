@@ -44,6 +44,23 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     images: ["/og.png"],
   },
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
+  authors: [{ name: "Yamac" }],
+  creator: "Yamac",
+  category: "portfolio",
+  keywords: [
+    "Yamac",
+    "Kinin Code",
+    "Electrical Electronics",
+    "Student",
+    "Full-stack",
+    "Next.js",
+    "Three.js",
+  ],
 };
 
 export default function RootLayout({
