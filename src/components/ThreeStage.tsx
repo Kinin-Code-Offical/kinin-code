@@ -12,6 +12,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from "three";
+import type { DevSettings } from "@/lib/devtools";
 
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(false);
@@ -32,7 +33,7 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function Model({ url }: { url: string }) {
+function Model({ url, settings }: { url: string; settings: DevSettings["model"] }) {
   const { scene } = useGLTF(url);
 
   useLayoutEffect(() => {
@@ -48,12 +49,30 @@ function Model({ url }: { url: string }) {
     scene.position.sub(center);
   }, [scene]);
 
-  return <primitive object={scene} scale={1.35} />;
+  return (
+    <group
+      position={[settings.posX, settings.posY, settings.posZ]}
+      rotation={[settings.rotX, settings.rotY, settings.rotZ]}
+      scale={settings.scale}
+    >
+      <primitive object={scene} />
+    </group>
+  );
 }
 
-function Placeholder({ texture }: { texture: CanvasTexture | null }) {
+function Placeholder({
+  texture,
+  settings,
+}: {
+  texture: CanvasTexture | null;
+  settings: DevSettings["model"];
+}) {
   return (
-    <mesh rotation={[0.2, -0.4, 0]}>
+    <mesh
+      position={[settings.posX, settings.posY, settings.posZ]}
+      rotation={[settings.rotX, settings.rotY, settings.rotZ]}
+      scale={settings.scale}
+    >
       <boxGeometry args={[1.6, 1, 1.2]} />
       <meshStandardMaterial
         color="#6fd1ff"
@@ -75,7 +94,7 @@ function Loader() {
   );
 }
 
-export default function ThreeStage() {
+export default function ThreeStage({ devSettings }: { devSettings?: DevSettings }) {
   const [canLoadModel, setCanLoadModel] = useState(false);
   const isMobile = useMediaQuery("(max-width: 900px)");
   const texture = useMemo(() => {
@@ -131,39 +150,74 @@ export default function ThreeStage() {
     };
   }, []);
 
+  const camera = devSettings
+    ? devSettings.camera
+    : {
+        x: isMobile ? 0 : 0.2,
+        y: isMobile ? 0.6 : 0.9,
+        z: isMobile ? 3.2 : 3.6,
+        fov: isMobile ? 48 : 42,
+      };
+
+  const modelSettings = devSettings
+    ? devSettings.model
+    : {
+        scale: 1.35,
+        rotX: 0.2,
+        rotY: -0.4,
+        rotZ: 0,
+        posX: 0,
+        posY: 0,
+        posZ: 0,
+      };
+
+  const lights = devSettings
+    ? devSettings.lights
+    : {
+        ambient: 0.45,
+        hemi: 0.45,
+        directional: 1.1,
+        spotA: 0.8,
+        spotB: 0.35,
+      };
+
   return (
     <Canvas
       dpr={isMobile ? [1, 1.3] : [1, 1.8]}
       shadows
-      camera={{ position: isMobile ? [0, 0.6, 3.2] : [0.2, 0.9, 3.6], fov: isMobile ? 48 : 42 }}
+      camera={{ position: [camera.x, camera.y, camera.z], fov: camera.fov }}
       gl={{ antialias: !isMobile, powerPreference: "high-performance" }}
       style={{ width: "100%", height: isMobile ? 320 : 380 }}
     >
       <color attach="background" args={[new Color("#0b1110")]} />
-      <ambientLight intensity={0.45} />
-      <hemisphereLight args={["#bde9ff", "#0a1412", 0.45]} />
+      <ambientLight intensity={lights.ambient} />
+      <hemisphereLight args={["#bde9ff", "#0a1412", lights.hemi]} />
       <directionalLight
         position={[4, 6, 4]}
-        intensity={1.1}
+        intensity={lights.directional}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
       />
-      <spotLight position={[-4, 4, 3]} intensity={0.8} angle={0.4} penumbra={0.4} />
-      <spotLight position={[0, -3, 3]} intensity={0.35} angle={0.35} />
+      <spotLight position={[-4, 4, 3]} intensity={lights.spotA} angle={0.4} penumbra={0.4} />
+      <spotLight position={[0, -3, 3]} intensity={lights.spotB} angle={0.35} />
       <Suspense fallback={<Loader />}>
         <Float
           speed={isMobile ? 0.8 : 1.2}
           rotationIntensity={isMobile ? 0.25 : 0.4}
           floatIntensity={isMobile ? 0.4 : 0.6}
         >
-          {canLoadModel ? <Model url="/models/computer.glb" /> : <Placeholder texture={texture} />}
+          {canLoadModel ? (
+            <Model url="/models/computer.glb" settings={modelSettings} />
+          ) : (
+            <Placeholder texture={texture} settings={modelSettings} />
+          )}
         </Float>
       </Suspense>
       <Environment preset="city" />
       <OrbitControls
-        enableZoom={false}
-        enablePan={false}
+        enableZoom={Boolean(devSettings)}
+        enablePan={Boolean(devSettings)}
         enabled={!isMobile}
         autoRotate
         autoRotateSpeed={isMobile ? 0.4 : 0.8}

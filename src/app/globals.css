@@ -568,6 +568,105 @@ textarea {
   justify-content: center;
 }
 
+.dev-console {
+  position: fixed;
+  z-index: 9998;
+  width: 280px;
+  border-radius: 16px;
+  border: 1px solid var(--stroke);
+  background: rgba(10, 12, 12, 0.92);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  overflow: hidden;
+  transform: translateY(0);
+}
+
+.dev-console.top-left {
+  top: 20px;
+  left: 20px;
+}
+
+.dev-console.top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.dev-console.bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.dev-console.bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+.dev-toggle {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(126, 242, 178, 0.1);
+  border: none;
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dev-body {
+  display: none;
+  padding: 12px 14px 16px;
+  gap: 12px;
+}
+
+.dev-console.open .dev-body {
+  display: grid;
+}
+
+.dev-section {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--stroke);
+  padding-top: 10px;
+}
+
+.dev-section h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.dev-section label {
+  display: grid;
+  gap: 4px;
+}
+
+.dev-section input[type="range"] {
+  width: 100%;
+}
+
+.dev-positions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.dev-positions button,
+.dev-reset {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.dev-positions button.active {
+  border-color: rgba(126, 242, 178, 0.6);
+  background: rgba(126, 242, 178, 0.15);
+}
+
 @keyframes float {
   0%,
   100% {

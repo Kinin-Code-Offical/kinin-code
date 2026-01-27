@@ -11,6 +11,16 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+### Dev tools (camera + model console)
+
+PowerShell starter:
+
+```powershell
+.\scripts\dev.ps1
+```
+
+This opens `http://localhost:3000/?dev=1` and enables the live dev panel.
+
 ## 3D Model
 
 Export the Blender model to GLB and place it here:

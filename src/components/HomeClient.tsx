@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import ContactForm from "@/components/ContactForm";
+import DevConsole from "@/components/DevConsole";
 import ThreeStage from "@/components/ThreeStage";
 import { usePreferences } from "@/components/PreferencesProvider";
 import type { GithubProject } from "@/lib/github";
 import { copy, languages } from "@/lib/i18n";
 import { site } from "@/lib/site";
+import type { DevSettings } from "@/lib/devtools";
+import { defaultDevSettings } from "@/lib/devtools";
 
 type HomeClientProps = {
   projects: GithubProject[];
@@ -15,6 +19,27 @@ export default function HomeClient({ projects }: HomeClientProps) {
   const { language, setLanguage, theme, toggleTheme } = usePreferences();
   const t = copy[language];
   const hasGithubProjects = projects.length > 0;
+  const [devEnabled] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get("dev") === "1" || process.env.NEXT_PUBLIC_DEVTOOLS === "1";
+  });
+  const [devSettings, setDevSettings] = useState<DevSettings>(() => {
+    if (typeof window === "undefined") {
+      return defaultDevSettings;
+    }
+    try {
+      const raw = localStorage.getItem("devtools");
+      if (raw) {
+        return { ...defaultDevSettings, ...JSON.parse(raw) } as DevSettings;
+      }
+    } catch {
+      // ignore
+    }
+    return defaultDevSettings;
+  });
 
   return (
     <main className="site">
@@ -67,10 +92,14 @@ export default function HomeClient({ projects }: HomeClientProps) {
           </div>
         </div>
         <div className="hero-scene">
-          <ThreeStage />
+          <ThreeStage devSettings={devEnabled ? devSettings : undefined} />
           <small>{t.hero.modelNote}</small>
         </div>
       </section>
+
+      {devEnabled ? (
+        <DevConsole settings={devSettings} onChange={setDevSettings} />
+      ) : null}
 
       <section id="services" className="section">
         <div className="section-header">
