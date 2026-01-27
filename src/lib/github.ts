@@ -26,38 +26,48 @@ export async function getGithubProjects(): Promise<GithubProject[]> {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   }
 
-  const response = await fetch(
-    `https://api.github.com/users/${username}/repos?per_page=100&sort=pushed`,
-    {
-      headers,
-      next: { revalidate: REVALIDATE_SECONDS },
-    },
-  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
 
-  if (!response.ok) {
+  try {
+    const response = await fetch(
+      `https://api.github.com/users/${username}/repos?per_page=100&sort=pushed`,
+      {
+        headers,
+        next: { revalidate: REVALIDATE_SECONDS },
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const repos = (await response.json()) as Array<{
+      name: string;
+      description: string | null;
+      html_url: string;
+      updated_at: string;
+      language: string | null;
+      stargazers_count: number;
+      fork: boolean;
+      archived: boolean;
+    }>;
+
+    return repos
+      .filter((repo) => !repo.fork && !repo.archived)
+      .slice(0, 6)
+      .map((repo) => ({
+        name: repo.name,
+        description: repo.description,
+        url: repo.html_url,
+        updatedAt: repo.updated_at,
+        language: repo.language,
+        stars: repo.stargazers_count,
+      }));
+  } catch {
     return [];
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const repos = (await response.json()) as Array<{
-    name: string;
-    description: string | null;
-    html_url: string;
-    updated_at: string;
-    language: string | null;
-    stargazers_count: number;
-    fork: boolean;
-    archived: boolean;
-  }>;
-
-  return repos
-    .filter((repo) => !repo.fork && !repo.archived)
-    .slice(0, 6)
-    .map((repo) => ({
-      name: repo.name,
-      description: repo.description,
-      url: repo.html_url,
-      updatedAt: repo.updated_at,
-      language: repo.language,
-      stars: repo.stargazers_count,
-    }));
 }
