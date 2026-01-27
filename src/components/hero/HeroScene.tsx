@@ -304,7 +304,7 @@ function SceneContent({
       <hemisphereLight args={["#f2d3aa", "#120b06", lights.hemi]} />
       <directionalLight
         position={[5, 6, 3]}
-        intensity={lights.directional}
+        intensity={isMobile ? lights.directional * 0.7 : lights.directional}
         castShadow={!isMobile}
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
@@ -323,13 +323,13 @@ function SceneContent({
           <PlaceholderComputer devSettings={devSettings} terminalApi={terminalApi} />
         )}
       </group>
-      <Environment preset="city" />
+      {isMobile ? null : <Environment preset="city" />}
       <OrbitControls
         enableZoom={Boolean(devSettings)}
         enablePan={Boolean(devSettings)}
         enabled={!isMobile}
         autoRotate
-        autoRotateSpeed={isMobile ? 0.2 : 0.4}
+        autoRotateSpeed={isMobile ? 0.15 : 0.4}
       />
       <mesh
         onPointerDown={(event) => {
@@ -351,9 +351,10 @@ export default function HeroScene(props: HeroSceneProps) {
   const isMobile = useMediaQuery("(max-width: 900px)");
   return (
     <Canvas
-      dpr={isMobile ? [1, 1.2] : [1, 1.6]}
+      dpr={isMobile ? [1, 1.1] : [1, 1.6]}
       camera={{ position: [0.2, 0.8, 3.6], fov: 42 }}
       gl={{ antialias: !isMobile, powerPreference: "high-performance" }}
+      shadows={!isMobile}
       style={{ width: "100%", height: "100%" }}
     >
       <SceneContent {...props} />

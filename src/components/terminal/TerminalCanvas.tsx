@@ -152,6 +152,7 @@ export default function TerminalCanvas({
   const historyIndexRef = useRef(-1);
   const inputRef = useRef("");
   const scrollOffsetRef = useRef(0);
+  const lastDrawRef = useRef(0);
   const focusedRef = useRef(false);
   const cwdRef = useRef("/");
   const fsRef = useRef<FsNode>(buildFileTree(files));
@@ -538,12 +539,16 @@ export default function TerminalCanvas({
   useEffect(() => {
     let rafId = 0;
     const drawLoop = () => {
-      drawTerminal();
+      const now = performance.now();
+      if (!isMobile || now - lastDrawRef.current > 33) {
+        drawTerminal();
+        lastDrawRef.current = now;
+      }
       rafId = requestAnimationFrame(drawLoop);
     };
     drawLoop();
     return () => cancelAnimationFrame(rafId);
-  }, [drawTerminal]);
+  }, [drawTerminal, isMobile]);
 
   return <canvas ref={canvasRef} className="terminal-canvas" />;
 }

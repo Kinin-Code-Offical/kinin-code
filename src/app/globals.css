@@ -579,18 +579,36 @@ textarea {
 }
 
 @media (max-width: 960px) {
+  .hero-shell {
+    min-height: 170vh;
+  }
+
   .fixed-menu {
-    top: 16px;
-    left: 16px;
+    top: 14px;
+    left: 14px;
+  }
+
+  .menu-button {
+    width: 34px;
+    height: 34px;
+    font-size: 12px;
   }
 
   .hero-overlay {
-    left: 24px;
-    bottom: 24px;
+    left: 18px;
+    bottom: 18px;
   }
 
   .content-section {
-    padding: 80px 8vw 60px;
+    padding: 64px 8vw 52px;
+  }
+
+  .hero-name {
+    font-size: 22px;
+  }
+
+  .hero-role {
+    font-size: 10px;
   }
 }
 
