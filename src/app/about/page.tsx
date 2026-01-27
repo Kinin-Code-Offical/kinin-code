@@ -1,31 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { copy } from "@/lib/i18n";
+import Markdown from "@/components/Markdown";
+import { getContent } from "@/lib/content";
 
 export const metadata: Metadata = {
   title: "About — Yamac",
-  description:
-    "About Yamac, an Electrical & Electronics student building full-stack projects.",
+  description: "About Yamac and the work in electronics + software.",
 };
 
 export default async function AboutPage() {
-  const cookieStore = await cookies();
-  const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
-  const t = copy[language].pages.about;
-
+  const content = await getContent();
   return (
     <main className="simple-page">
       <section className="simple-card">
-        <p className="eyebrow">{t.eyebrow}</p>
-        <h1>{t.title}</h1>
-        <p className="simple-text">{t.body}</p>
+        <Markdown content={content.pages.about} />
         <div className="simple-actions">
-          <Link className="button primary" href="/">
-            {t.primary}
-          </Link>
-          <Link className="button ghost" href="/projects">
-            {t.secondary}
+          <Link className="button ghost" href="/">
+            Back
           </Link>
         </div>
       </section>

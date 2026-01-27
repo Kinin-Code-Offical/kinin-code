@@ -1,35 +1,75 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import type { CSSProperties, RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ContactForm from "@/components/ContactForm";
 import DevConsole from "@/components/DevConsole";
-import ThreeStage from "@/components/ThreeStage";
-import { usePreferences } from "@/components/PreferencesProvider";
-import type { GithubProject } from "@/lib/github";
-import { copy, languages } from "@/lib/i18n";
-import { site } from "@/lib/site";
+import Markdown from "@/components/Markdown";
+import TerminalCanvas, { TerminalApi } from "@/components/terminal/TerminalCanvas";
+import type { SceneDebugInfo } from "@/components/hero/HeroScene";
+import type { ContentData } from "@/lib/content";
 import type { DevSettings } from "@/lib/devtools";
 import { defaultDevSettings } from "@/lib/devtools";
 
+const HeroScene = dynamic(() => import("@/components/hero/HeroScene"), {
+  ssr: false,
+  loading: () => <div className="hero-loading">Loading scene...</div>,
+});
+
 type HomeClientProps = {
-  projects: GithubProject[];
+  content: ContentData;
 };
 
-export default function HomeClient({ projects }: HomeClientProps) {
-  const { language, setLanguage, theme, toggleTheme } = usePreferences();
-  const t = copy[language];
-  const hasGithubProjects = projects.length > 0;
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+
+  return matches;
+}
+
+function useScrollProgress(ref: RefObject<HTMLElement>) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const handle = () => {
+      if (!ref.current) {
+        return;
+      }
+      const rect = ref.current.getBoundingClientRect();
+      const total = rect.height - window.innerHeight;
+      const raw = total > 0 ? Math.min(Math.max(-rect.top / total, 0), 1) : 0;
+      setProgress(raw);
+    };
+    handle();
+    window.addEventListener("scroll", handle, { passive: true });
+    window.addEventListener("resize", handle);
+    return () => {
+      window.removeEventListener("scroll", handle);
+      window.removeEventListener("resize", handle);
+    };
+  }, [ref]);
+
+  return progress;
+}
+
+export default function HomeClient({ content }: HomeClientProps) {
+  const { profile, projects, theme, pages } = content;
+  const heroRef = useRef<HTMLElement>(null);
+  const scrollProgress = useScrollProgress(heroRef);
+  const isMobile = useMediaQuery("(max-width: 900px)");
   const [devEnabled] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
     const params = new URLSearchParams(window.location.search);
     return params.get("dev") === "1" || process.env.NEXT_PUBLIC_DEVTOOLS === "1";
   });
   const [devSettings, setDevSettings] = useState<DevSettings>(() => {
-    if (typeof window === "undefined") {
-      return defaultDevSettings;
-    }
     try {
       const raw = localStorage.getItem("devtools");
       if (raw) {
@@ -40,185 +80,226 @@ export default function HomeClient({ projects }: HomeClientProps) {
     }
     return defaultDevSettings;
   });
+  const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
+  const [terminalFocused, setTerminalFocused] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<SceneDebugInfo>({
+    meshNames: [],
+    screenMeshName: null,
+    fallbackPlane: false,
+  });
+
+  const projectsMd = useMemo(() => {
+    return [
+      "# Projects",
+      "",
+      ...projects.map(
+        (project) =>
+          `- ${project.title} (${project.year}): ${project.summary}`,
+      ),
+    ].join("\n");
+  }, [projects]);
+
+  const sectionLabels = useMemo(
+    () => Object.fromEntries(profile.menu.map((item) => [item.id, item.label])),
+    [profile.menu],
+  );
+
+  const files = useMemo(
+    () => [
+      { path: "/title/title.md", content: pages.title, section: "home" },
+      { path: "/about/about.md", content: pages.about, section: "about" },
+      { path: "/projects/projects.md", content: projectsMd, section: "projects" },
+      { path: "/contact/contact.md", content: pages.contact, section: "contact" },
+    ],
+    [pages, projectsMd],
+  );
+
+  const fade = Math.max(0, 1 - scrollProgress * 1.2);
+  const reveal = Math.min(1, scrollProgress * 1.2);
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   return (
-    <main className="site">
-      <header className="top-nav">
-        <div className="logo">
-          <span className="logo-mark">~&gt;</span>
-          <span className="logo-text">{site.name}</span>
-          <span className="logo-sub">home / root / console</span>
-        </div>
-        <nav className="nav-links">
-          <a href="#services">{t.nav.services}</a>
-          <a href="#projects">{t.nav.projects}</a>
-          <a href="#stack">{t.nav.stack}</a>
-          <a href="#timeline">{t.nav.timeline}</a>
-        </nav>
-        <div className="prefs">
-          <button className="toggle" type="button" onClick={toggleTheme}>
-            {t.prefs.theme}: {theme === "dark" ? t.prefs.dark : t.prefs.light}
+    <main
+      className="edh-shell"
+      style={
+        {
+          "--hero-fade": String(fade),
+          "--content-reveal": String(reveal),
+        } as CSSProperties
+      }
+    >
+      <header className="fixed-menu">
+        <div className="menu-stack">
+          <button
+            className="menu-button"
+            type="button"
+            onClick={() => scrollToSection("home")}
+            aria-label="Menu"
+          >
+            ≡
           </button>
-          <div className="toggle-group">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                className={`toggle ${language === lang.code ? "active" : ""}`}
-                type="button"
-                onClick={() => setLanguage(lang.code)}
-              >
-                {lang.label}
-              </button>
-            ))}
-          </div>
-          <a className="cta" href="#contact">
-            {t.nav.contact}
-          </a>
+          {profile.menu.map((item) => (
+            <button
+              key={item.id}
+              className="menu-button"
+              type="button"
+              onClick={() => scrollToSection(item.id)}
+            >
+              {item.label[0]}
+            </button>
+          ))}
+        </div>
+        <div className="menu-stack">
+          {profile.socials.map((social) => (
+            <a key={social.label} className="menu-button" href={social.href} target="_blank" rel="noreferrer">
+              {social.icon}
+            </a>
+          ))}
         </div>
       </header>
 
-      <section className="hero">
-        <div>
-          <p className="eyebrow">{t.hero.role}</p>
-          <h1>{t.hero.headline}</h1>
-          <p>{t.hero.intro}</p>
-          <div className="hero-actions">
-            <a className="button primary" href={`mailto:${site.email}`}>
-              {t.hero.primaryCta}
-            </a>
-            <a className="button ghost" href="#projects">
-              {t.hero.secondaryCta}
-            </a>
-          </div>
-          <div className="hero-meta">
-            <span className="chip">{t.hero.location}</span>
-            <span className="chip">{t.hero.availability}</span>
+      <section ref={heroRef} id="home" className={`hero-shell ${terminalFocused ? "focused" : ""}`}>
+        <div className="hero-sticky">
+          <HeroScene
+            devSettings={devEnabled ? devSettings : undefined}
+            terminalApi={terminalApi}
+            scrollProgress={scrollProgress}
+            onDebug={setDebugInfo}
+            onFocus={() => terminalApi?.focus()}
+            onBlur={() => terminalApi?.blur()}
+          />
+          <div className="hero-overlay">
+            <div className="hero-title">
+              <span className="hero-tag">~&gt;</span>
+              <div>
+                <p className="hero-name">{profile.name}</p>
+                <p className="hero-role">{profile.roles.join(" · ")}</p>
+              </div>
+            </div>
+            <p className="hero-hint">Scroll or type &quot;help&quot; to get started</p>
           </div>
         </div>
-        <div className="hero-scene">
-          <ThreeStage devSettings={devEnabled ? devSettings : undefined} />
-          <small>{t.hero.modelNote}</small>
-        </div>
+        <TerminalCanvas
+          files={files}
+          introLines={profile.introLines}
+          prompt={profile.terminal.prompt}
+          helpText={profile.terminal.helpText}
+          theme={theme}
+          isMobile={isMobile}
+          onNavigate={scrollToSection}
+          onReady={(api) => setTerminalApi(api)}
+          onFocusChange={(focused) => setTerminalFocused(focused)}
+        />
       </section>
 
       {devEnabled ? (
-        <DevConsole settings={devSettings} onChange={setDevSettings} />
+        <DevConsole settings={devSettings} onChange={setDevSettings} debug={debugInfo} />
       ) : null}
 
-      <section id="services" className="section">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">{t.services.title}</h2>
-            <p className="section-subtitle">{t.services.subtitle}</p>
-          </div>
-        </div>
-        <div className="cards">
-          {t.services.items.map((service) => (
-            <article className="card" key={service.title}>
-              <h3>{service.title}</h3>
-              <p>{service.description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="projects" className="section">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">{t.projects.title}</h2>
-            <p className="section-subtitle">{t.projects.subtitle}</p>
-          </div>
-          <a className="cta" href="#contact">
-            {t.projects.cta}
-          </a>
-        </div>
-        <div className="projects">
-          {hasGithubProjects
-            ? projects.map((project) => (
-                <article className="project" key={project.url}>
-                  <span>{new Date(project.updatedAt).getFullYear()}</span>
-                  <h4>
-                    <a href={project.url} target="_blank" rel="noreferrer">
-                      {project.name}
-                    </a>
-                  </h4>
-                  <p>{project.description || t.projects.noDescription}</p>
-                  <div className="tags">
-                    {project.language ? <span className="tag">{project.language}</span> : null}
-                    <span className="tag">★ {project.stars}</span>
-                  </div>
-                </article>
-              ))
-            : (
-                <p className="section-subtitle">{t.projects.empty}</p>
-              )}
-        </div>
-      </section>
-
-      <section id="stack" className="section">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">{t.stack.title}</h2>
-            <p className="section-subtitle">{t.stack.subtitle}</p>
-          </div>
-        </div>
-        <div className="stack-grid">
-          {t.stack.items.map((item) => (
-            <span className="stack-chip" key={item}>
-              {item}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <section id="timeline" className="section">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">{t.timeline.title}</h2>
-            <p className="section-subtitle">{t.timeline.subtitle}</p>
-          </div>
-        </div>
-        <div className="timeline">
-          {t.timeline.items.map((item) => (
-            <div className="timeline-item" key={item.title}>
-              <span>{item.year}</span>
-              <div>
-                <h4>{item.title}</h4>
-                <p>{item.detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section id="contact" className="section">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">{t.contact.title}</h2>
-            <p className="section-subtitle">{t.contact.subtitle}</p>
-          </div>
-        </div>
-        <div className="contact-card">
-          <ContactForm labels={t.contact.form} />
-          <div className="footer">
-            <span>{site.email}</span>
-            <div className="footer-links">
-              {site.socials.map((social) => (
-                <a key={social.label} href={social.href}>
-                  {social.label}
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <footer className="footer">
-        <span>
-          {t.footer.copyright} {new Date().getFullYear()} {site.name} Code
-        </span>
-        <span>{t.footer.role}</span>
-      </footer>
+      {profile.sections
+        .filter((section) => section !== "home")
+        .map((section) => {
+          if (section === "about") {
+            return (
+              <section key={section} id="about" className="content-section">
+                <div className="section-header">
+                  <span className="section-label">{sectionLabels.about ?? "About"}</span>
+                  <h2>{sectionLabels.about ?? "About"}</h2>
+                </div>
+                <Markdown content={pages.about} />
+              </section>
+            );
+          }
+          if (section === "projects") {
+            return (
+              <section key={section} id="projects" className="content-section">
+                <div className="section-header">
+                  <span className="section-label">{sectionLabels.projects ?? "Projects"}</span>
+                  <h2>{sectionLabels.projects ?? "Projects"}</h2>
+                </div>
+                <div className="project-grid">
+                  {projects.map((project) => (
+                    <ProjectCard key={project.title} project={project} />
+                  ))}
+                </div>
+              </section>
+            );
+          }
+          if (section === "contact") {
+            return (
+              <section key={section} id="contact" className="content-section">
+                <div className="section-header">
+                  <span className="section-label">{sectionLabels.contact ?? "Contact"}</span>
+                  <h2>{sectionLabels.contact ?? "Contact"}</h2>
+                </div>
+                <Markdown content={pages.contact} />
+                <div className="contact-form">
+                  <ContactForm labels={profile.contactForm} />
+                </div>
+              </section>
+            );
+          }
+          return null;
+        })}
     </main>
+  );
+}
+
+function ProjectCard({
+  project,
+}: {
+  project: {
+    title: string;
+    year: string;
+    tags: string[];
+    summary: string;
+    detailsMd?: string;
+    links: {
+      repo?: string;
+      live?: string;
+    };
+  };
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <article className="project-card">
+      <div className="project-header">
+        <span className="project-year">{project.year}</span>
+        <h3>{project.title}</h3>
+      </div>
+      <p className="project-summary">{project.summary}</p>
+      <div className="project-tags">
+        {project.tags.map((tag) => (
+          <span key={tag} className="project-tag">
+            {tag}
+          </span>
+        ))}
+      </div>
+      {project.detailsMd ? (
+        <button className="project-toggle" type="button" onClick={() => setOpen((prev) => !prev)}>
+          {open ? "hide" : "more..."}
+        </button>
+      ) : null}
+      {open && project.detailsMd ? <Markdown content={project.detailsMd} /> : null}
+      <div className="project-links">
+        {project.links.repo ? (
+          <a href={project.links.repo} target="_blank" rel="noreferrer">
+            repo
+          </a>
+        ) : null}
+        {project.links.live ? (
+          <a href={project.links.live} target="_blank" rel="noreferrer">
+            live
+          </a>
+        ) : null}
+      </div>
+    </article>
   );
 }

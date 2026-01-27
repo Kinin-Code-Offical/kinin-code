@@ -5,6 +5,7 @@ import "./globals.css";
 import LoadingBar from "@/components/LoadingBar";
 import { PreferencesProvider } from "@/components/PreferencesProvider";
 import type { Language } from "@/lib/i18n";
+import { theme as siteTheme } from "@/content/theme";
 
 const display = Unbounded({
   variable: "--font-display",
@@ -73,9 +74,26 @@ export default async function RootLayout({
   const langValue = cookieStore.get("lang")?.value;
   const language: Language = langValue === "en" ? "en" : "tr";
 
+  const themeVars = {
+    "--hero-bg": siteTheme.palette.heroBg,
+    "--hero-accent": siteTheme.palette.heroAccent,
+    "--hero-accent-soft": siteTheme.palette.heroAccentSoft,
+    "--terminal-bg": siteTheme.palette.terminalBg,
+    "--terminal-text": siteTheme.palette.terminalText,
+    "--terminal-dim": siteTheme.palette.terminalDim,
+    "--content-bg": siteTheme.palette.contentBg,
+    "--content-ink": siteTheme.palette.contentInk,
+    "--content-muted": siteTheme.palette.contentMuted,
+    "--content-border": siteTheme.palette.border,
+    "--chip-bg": siteTheme.palette.chip,
+  } as React.CSSProperties;
+
   return (
     <html lang={language} data-theme={theme} data-lang={language}>
-      <body className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <body
+        className={`${display.variable} ${body.variable} ${mono.variable}`}
+        style={themeVars}
+      >
         <PreferencesProvider initialTheme={theme} initialLanguage={language}>
           <LoadingBar />
           {children}

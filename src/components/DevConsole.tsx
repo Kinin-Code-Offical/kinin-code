@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { DevSettings } from "@/lib/devtools";
+import type { SceneDebugInfo } from "@/components/hero/HeroScene";
 import { defaultDevSettings } from "@/lib/devtools";
 
 const STORAGE_KEY = "devtools";
@@ -9,9 +10,11 @@ const STORAGE_KEY = "devtools";
 export default function DevConsole({
   onChange,
   settings,
+  debug,
 }: {
   settings: DevSettings;
   onChange: (value: DevSettings) => void;
+  debug?: SceneDebugInfo;
 }) {
   const [open, setOpen] = useState(true);
   const containerClass = useMemo(
@@ -255,6 +258,26 @@ export default function DevConsole({
             Reset to default
           </button>
         </div>
+
+        {debug ? (
+          <div className="dev-section">
+            <h4>Screen Mesh</h4>
+            <p className="dev-text">
+              {debug.screenMeshName
+                ? `Selected: ${debug.screenMeshName}`
+                : "Fallback plane active"}
+            </p>
+            <div className="dev-list">
+              {debug.meshNames.length ? (
+                debug.meshNames.map((name) => (
+                  <span key={name}>{name || "(unnamed)"}</span>
+                ))
+              ) : (
+                <span>No meshes yet</span>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

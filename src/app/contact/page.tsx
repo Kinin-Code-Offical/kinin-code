@@ -1,31 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import ContactForm from "@/components/ContactForm";
-import { copy } from "@/lib/i18n";
+import Markdown from "@/components/Markdown";
+import { getContent } from "@/lib/content";
 
 export const metadata: Metadata = {
   title: "Contact — Yamac",
-  description: "Contact Yamac for projects and collaborations.",
+  description: "Get in touch with Yamac.",
 };
 
 export default async function ContactPage() {
-  const cookieStore = await cookies();
-  const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
-  const t = copy[language].pages.contact;
+  const content = await getContent();
 
   return (
     <main className="simple-page">
       <section className="simple-card">
-        <p className="eyebrow">{t.eyebrow}</p>
-        <h1>{t.title}</h1>
-        <p className="simple-text">{t.body}</p>
-        <div className="contact-card">
-          <ContactForm labels={t.form} />
+        <Markdown content={content.pages.contact} />
+        <div className="contact-form">
+          <ContactForm labels={content.profile.contactForm} />
         </div>
         <div className="simple-actions">
           <Link className="button ghost" href="/">
-            {t.primary}
+            Back
           </Link>
         </div>
       </section>

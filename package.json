@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "validate-content": "tsx scripts/validate-content.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -15,7 +16,8 @@
     "next": "16.1.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "three": "^0.182.0"
+    "three": "^0.182.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -23,6 +25,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.5",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.0.18"
   }

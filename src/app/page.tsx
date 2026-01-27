@@ -1,7 +1,7 @@
 import HomeClient from "@/components/HomeClient";
-import { getGithubProjects } from "@/lib/github";
+import { getContent } from "@/lib/content";
 
 export default async function Home() {
-  const projects = await getGithubProjects();
-  return <HomeClient projects={projects} />;
+  const content = await getContent();
+  return <HomeClient content={content} />;
 }

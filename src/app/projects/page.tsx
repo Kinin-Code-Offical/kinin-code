@@ -1,58 +1,55 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { getGithubProjects } from "@/lib/github";
-import { copy } from "@/lib/i18n";
-import { site } from "@/lib/site";
+import Markdown from "@/components/Markdown";
+import { getContent } from "@/lib/content";
 
 export const metadata: Metadata = {
   title: "Projects — Yamac",
-  description: "Selected GitHub projects by Yamac.",
+  description: "Selected projects and experiments.",
 };
 
 export default async function ProjectsPage() {
-  const cookieStore = await cookies();
-  const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
-  const t = copy[language].pages.projects;
-  const projects = await getGithubProjects();
-  const github = site.socials.find((item) => item.label === "GitHub");
+  const content = await getContent();
 
   return (
     <main className="simple-page">
       <section className="simple-card">
-        <p className="eyebrow">{t.eyebrow}</p>
-        <h1>{t.title}</h1>
-        <p className="simple-text">{t.body}</p>
-        <div className="projects">
-          {projects.length > 0 ? (
-            projects.map((project) => (
-              <article className="project" key={project.url}>
-                <span>{new Date(project.updatedAt).getFullYear()}</span>
-                <h4>
-                  <a href={project.url} target="_blank" rel="noreferrer">
-                    {project.name}
+        <Markdown content="# Projects" />
+        <div className="project-grid">
+          {content.projects.map((project) => (
+            <article className="project-card" key={project.title}>
+              <div className="project-header">
+                <span className="project-year">{project.year}</span>
+                <h3>{project.title}</h3>
+              </div>
+              <p className="project-summary">{project.summary}</p>
+              <div className="project-tags">
+                {project.tags.map((tag) => (
+                  <span key={tag} className="project-tag">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              {project.detailsMd ? <Markdown content={project.detailsMd} /> : null}
+              <div className="project-links">
+                {project.links.repo ? (
+                  <a href={project.links.repo} target="_blank" rel="noreferrer">
+                    repo
                   </a>
-                </h4>
-                <p>{project.description || t.noDescription}</p>
-                <div className="tags">
-                  {project.language ? <span className="tag">{project.language}</span> : null}
-                  <span className="tag">★ {project.stars}</span>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="section-subtitle">{t.empty}</p>
-          )}
+                ) : null}
+                {project.links.live ? (
+                  <a href={project.links.live} target="_blank" rel="noreferrer">
+                    live
+                  </a>
+                ) : null}
+              </div>
+            </article>
+          ))}
         </div>
         <div className="simple-actions">
           <Link className="button ghost" href="/">
-            {t.primary}
+            Back
           </Link>
-          {github ? (
-            <a className="button primary" href={github.href} target="_blank" rel="noreferrer">
-              {t.secondary}
-            </a>
-          ) : null}
         </div>
       </section>
     </main>

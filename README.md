@@ -1,6 +1,6 @@
 # Kinin Code
 
-Portfolio + full-stack landing site built with Next.js and an optional 3D model.
+edh.dev-inspired portfolio with a 3D retro computer + CRT terminal hero and scroll transition into 2D sections.
 
 ## Development
 
@@ -21,15 +21,59 @@ PowerShell starter:
 
 This opens `http://localhost:3000/?dev=1` and enables the live dev panel.
 
-## 3D Model
+## Content (single source of truth)
 
-Export the Blender model to GLB and place it here:
+Edit these files:
+
+```
+src/content/profile.ts
+src/content/projects.ts
+src/content/theme.ts
+src/content/pages/about.md
+src/content/pages/contact.md
+src/content/pages/title.md
+```
+
+Validate content:
+
+```bash
+npm run validate-content
+```
+
+## 3D Model (GLB)
+
+Place the model here:
 
 ```
 public/models/computer.glb
 ```
 
 If the model is missing, the hero uses a placeholder mesh.
+
+### Screen mesh requirement
+
+For the CRT terminal texture to map correctly, the screen mesh **must** be a separate object and named:
+
+- `Screen`, `Display`, or `Monitor` (case-insensitive)
+
+If no screen mesh is found, a fallback plane is attached and the dev panel shows:
+
+```
+screen mesh not found, using fallback plane
+```
+
+### Debug (`?dev=1`)
+
+The dev panel lists:
+- All mesh names in the GLB
+- The selected screen mesh name
+- Whether fallback plane is used
+
+## Terminal commands
+
+```
+help, ls, cd, pwd, show <file.md>, show -all, echo <text>, hello, mkdir <name>, touch <name>
+```
 
 ## Deploy (Cloud Run + Cloudflare)
 
