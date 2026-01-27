@@ -10,11 +10,17 @@ steps:
       - "build"
       - "-t"
       - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:$COMMIT_SHA"
+      - "-t"
+      - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:latest"
       - "."
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "push"
       - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:$COMMIT_SHA"
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "europe-west1-docker.pkg.dev/$PROJECT_ID/kinin-code/kinin-code:latest"
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: "gcloud"
     args:
