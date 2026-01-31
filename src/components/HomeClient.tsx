@@ -424,6 +424,7 @@ export default function HomeClient({ content }: HomeClientProps) {
   );
   const [dockKeysVisible, setDockKeysVisible] = useState(true);
   const dockKeysVisibleRef = useRef(true);
+  const [virtualKeysOpen, setVirtualKeysOpen] = useState(false);
   const scrollProgressRef = useSmoothScrollProgress(heroRef, (value) => {
     if (!shellRef.current) {
       return;
@@ -462,6 +463,10 @@ export default function HomeClient({ content }: HomeClientProps) {
     if (dockKeysVisibleRef.current !== nextDockKeysVisible) {
       dockKeysVisibleRef.current = nextDockKeysVisible;
       setDockKeysVisible(nextDockKeysVisible);
+      // Close virtual keys when dock becomes hidden
+      if (!nextDockKeysVisible) {
+        setVirtualKeysOpen(false);
+      }
     }
   });
   const isMobile = useMediaQuery("(max-width: 900px)");
@@ -501,7 +506,6 @@ export default function HomeClient({ content }: HomeClientProps) {
     shift: false,
     alt: false,
   });
-  const [virtualKeysOpen, setVirtualKeysOpen] = useState(false);
   const mobileModifiersRef = useRef(mobileModifiers);
   const handleSceneReady = useCallback(() => {
     setSceneReady(true);
@@ -560,7 +564,7 @@ export default function HomeClient({ content }: HomeClientProps) {
     });
   }, []);
 
-  const showVirtualKeys = isMobile || (virtualKeysOpen && dockKeysVisible);
+  const showVirtualKeys = isMobile || virtualKeysOpen;
 
   const applyLanguage = (lang: "tr" | "en") => {
     setLanguage(lang);
