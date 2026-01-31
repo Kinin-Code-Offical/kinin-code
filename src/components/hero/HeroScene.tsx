@@ -292,7 +292,6 @@ function ComputerModel({
   onScreenMeshAction,
   onCameraRig,
   onContentReady,
-  isMobile,
   usePhoneRig,
   shadowsEnabled,
   allowTerminalTexture,
@@ -307,7 +306,6 @@ function ComputerModel({
   onScreenMeshAction?: (mesh: Mesh | null) => void;
   onCameraRig?: (rig: CameraRig) => void;
   onContentReady?: () => void;
-  isMobile: boolean;
   usePhoneRig: boolean;
   shadowsEnabled: boolean;
   allowTerminalTexture: boolean;
@@ -788,6 +786,7 @@ function ComputerModel({
     scene,
     setPlaneColor,
     usePhoneRig,
+    shadowsEnabled,
   ]);
 
   useEffect(() => {
@@ -1113,7 +1112,6 @@ function SceneContent({
   scrollProgressRef,
   noteTexts,
   onDebugAction,
-  onFocusAction,
   onScreenAspectAction,
   onReadyAction,
   interactionActive,
@@ -1627,7 +1625,6 @@ function SceneContent({
               onScreenMeshAction={handleScreenMesh}
               onCameraRig={handleCameraRig}
               onContentReady={handleContentReady}
-              isMobile={isMobile}
               usePhoneRig={usePhoneRig}
               shadowsEnabled={shadowsEnabled}
               allowTerminalTexture={true}
