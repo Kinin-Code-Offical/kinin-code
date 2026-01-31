@@ -424,6 +424,7 @@ export default function HomeClient({ content }: HomeClientProps) {
   );
   const [dockKeysVisible, setDockKeysVisible] = useState(true);
   const dockKeysVisibleRef = useRef(true);
+  const [virtualKeysOpen, setVirtualKeysOpen] = useState(false);
   const scrollProgressRef = useSmoothScrollProgress(heroRef, (value) => {
     if (!shellRef.current) {
       return;
@@ -462,6 +463,9 @@ export default function HomeClient({ content }: HomeClientProps) {
     if (dockKeysVisibleRef.current !== nextDockKeysVisible) {
       dockKeysVisibleRef.current = nextDockKeysVisible;
       setDockKeysVisible(nextDockKeysVisible);
+      if (!nextDockKeysVisible) {
+        setVirtualKeysOpen(false);
+      }
     }
   });
   const isMobile = useMediaQuery("(max-width: 900px)");
@@ -501,7 +505,6 @@ export default function HomeClient({ content }: HomeClientProps) {
     shift: false,
     alt: false,
   });
-  const [virtualKeysOpen, setVirtualKeysOpen] = useState(false);
   const mobileModifiersRef = useRef(mobileModifiers);
   const handleSceneReady = useCallback(() => {
     setSceneReady(true);
@@ -656,11 +659,7 @@ export default function HomeClient({ content }: HomeClientProps) {
     mobileModifiersRef.current = mobileModifiers;
   }, [mobileModifiers]);
 
-  useEffect(() => {
-    if (!dockKeysVisible && virtualKeysOpen) {
-      setVirtualKeysOpen(false);
-    }
-  }, [dockKeysVisible, virtualKeysOpen]);
+
 
   useEffect(() => {
     screenAspectRef.current = screenAspect;
@@ -1463,7 +1462,6 @@ export default function HomeClient({ content }: HomeClientProps) {
               scrollProgressRef={scrollProgressRef}
               noteTexts={{ red: t.hero.noteRed, blue: t.hero.noteBlue }}
               onDebugAction={handleSceneDebug}
-              onFocusAction={handleTerminalFocus}
               onScreenAspectAction={(aspect) => {
                 if (!screenAspectReady) {
                   setScreenAspect(aspect);
