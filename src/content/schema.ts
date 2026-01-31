@@ -1,16 +1,25 @@
 import { z } from "zod";
 
+const localizedString = z.object({
+  tr: z.string(),
+  en: z.string(),
+});
+
+const localizedStringArray = z.object({
+  tr: z.array(z.string()),
+  en: z.array(z.string()),
+});
+
 export const profileSchema = z.object({
   name: z.string(),
-  roles: z.array(z.string()),
-  location: z.string(),
-  introLines: z.array(z.string()),
-  menu: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string(),
-    }),
-  ),
+  fullName: z.string(),
+  asciiName: z.string(),
+  jobTitle: localizedString,
+  description: localizedString,
+  ogImage: z.string(),
+  roles: localizedStringArray,
+  location: localizedString,
+  introLines: localizedStringArray,
   socials: z.array(
     z.object({
       label: z.string(),
@@ -20,29 +29,20 @@ export const profileSchema = z.object({
   ),
   terminal: z.object({
     prompt: z.string(),
-    helpText: z.string(),
   }),
-  contactForm: z.object({
-    nameLabel: z.string(),
-    namePlaceholder: z.string(),
-    emailLabel: z.string(),
-    emailPlaceholder: z.string(),
-    messageLabel: z.string(),
-    messagePlaceholder: z.string(),
-    submit: z.string(),
-    sending: z.string(),
-    success: z.string(),
-    error: z.string(),
-  }),
+  latestProjectsCount: z.number().optional(),
   sections: z.array(z.string()),
 });
 
 export const projectSchema = z.object({
   title: z.string(),
   year: z.string(),
+  createdAt: z.string().optional(),
+  featured: z.boolean().optional(),
+  order: z.number().optional(),
   tags: z.array(z.string()),
-  summary: z.string(),
-  detailsMd: z.string().optional(),
+  summary: localizedString,
+  detailsMd: localizedString.optional(),
   media: z.array(z.string()).optional(),
   links: z.object({
     live: z.string().optional(),
@@ -81,8 +81,18 @@ export const themeSchema = z.object({
   }),
 });
 
+export const capabilitySchema = z.object({
+  id: z.string(),
+  icon: z.string(),
+  title: localizedString,
+  body: localizedString,
+  bullets: localizedStringArray.optional(),
+  tags: z.array(z.string()).optional(),
+});
+
 export const contentSchema = z.object({
   profile: profileSchema,
   projects: z.array(projectSchema),
+  capabilities: z.array(capabilitySchema),
   theme: themeSchema,
 });

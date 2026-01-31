@@ -1,9 +1,31 @@
 type MarkdownProps = {
   content: string;
+  caret?: boolean;
+  caretClassName?: string;
 };
 
-export default function Markdown({ content }: MarkdownProps) {
+export default function Markdown({
+  content,
+  caret = false,
+  caretClassName = "typing-caret",
+}: MarkdownProps) {
   const blocks = content.split("\n");
+  const lastRenderableIndex = (() => {
+    for (let i = blocks.length - 1; i >= 0; i -= 1) {
+      const trimmed = blocks[i].trim();
+      if (!trimmed) {
+        continue;
+      }
+      if (/^<!--\s*more\s*-->$/i.test(trimmed)) {
+        continue;
+      }
+      if (trimmed.startsWith("```")) {
+        continue;
+      }
+      return i;
+    }
+    return -1;
+  })();
   const renderInline = (text: string) => {
     const parts: Array<string | { label: string; href: string }> = [];
     const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
@@ -35,13 +57,22 @@ export default function Markdown({ content }: MarkdownProps) {
     <div className="markdown">
       {blocks.map((line, index) => {
         const trimmed = line.trim();
+        if (/^<!--\s*more\s*-->$/i.test(trimmed)) {
+          return null;
+        }
         if (!trimmed) {
           return <div key={index} className="markdown-spacer" />;
+        }
+        if (trimmed.startsWith("```")) {
+          return null;
         }
         if (trimmed.startsWith("###")) {
           return (
             <h3 key={index} className="markdown-h3">
               {trimmed.replace(/^###\s*/, "")}
+              {caret && index === lastRenderableIndex ? (
+                <span className={caretClassName} aria-hidden="true" />
+              ) : null}
             </h3>
           );
         }
@@ -49,6 +80,9 @@ export default function Markdown({ content }: MarkdownProps) {
           return (
             <h2 key={index} className="markdown-h2">
               {trimmed.replace(/^##\s*/, "")}
+              {caret && index === lastRenderableIndex ? (
+                <span className={caretClassName} aria-hidden="true" />
+              ) : null}
             </h2>
           );
         }
@@ -56,6 +90,9 @@ export default function Markdown({ content }: MarkdownProps) {
           return (
             <h1 key={index} className="markdown-h1">
               {trimmed.replace(/^#\s*/, "")}
+              {caret && index === lastRenderableIndex ? (
+                <span className={caretClassName} aria-hidden="true" />
+              ) : null}
             </h1>
           );
         }
@@ -64,12 +101,18 @@ export default function Markdown({ content }: MarkdownProps) {
             <p key={index} className="markdown-li">
               <span>•</span>
               {renderInline(trimmed.replace(/^-+\s*/, ""))}
+              {caret && index === lastRenderableIndex ? (
+                <span className={caretClassName} aria-hidden="true" />
+              ) : null}
             </p>
           );
         }
         return (
           <p key={index} className="markdown-p">
             {renderInline(trimmed)}
+            {caret && index === lastRenderableIndex ? (
+              <span className={caretClassName} aria-hidden="true" />
+            ) : null}
           </p>
         );
       })}

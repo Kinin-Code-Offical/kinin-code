@@ -13,16 +13,17 @@ function LoadingBarInner() {
   const [progress, setProgress] = useState(0);
   const timerRef = useRef<number | null>(null);
   const doneRef = useRef<number | null>(null);
+  const barRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     timerRef.current = window.setInterval(() => {
-      setProgress((prev) => (prev < 85 ? prev + Math.random() * 12 : prev));
-    }, 120);
+      setProgress((prev) => (prev < 82 ? prev + Math.random() * 8 : prev));
+    }, 150);
 
     doneRef.current = window.setTimeout(() => {
       setProgress(100);
-      window.setTimeout(() => setVisible(false), 280);
-    }, 650);
+      window.setTimeout(() => setVisible(false), 480);
+    }, 1200);
 
     return () => {
       if (timerRef.current) {
@@ -34,9 +35,16 @@ function LoadingBarInner() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!barRef.current) {
+      return;
+    }
+    barRef.current.style.transform = `scaleX(${progress / 100})`;
+  }, [progress]);
+
   return (
     <div className={`loading-bar ${visible ? "is-visible" : ""}`}>
-      <span style={{ transform: `scaleX(${progress / 100})` }} />
+      <span ref={barRef} />
     </div>
   );
 }

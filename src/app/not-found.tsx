@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { copy } from "@/lib/i18n";
+import { translations } from "@/i18n/translations";
+import { resolveLanguage } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "404 — Not Found",
-  description: "The page you are looking for does not exist.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const cookieStore = await cookies();
+  const language = resolveLanguage(cookieStore.get("lang")?.value);
+  const t = translations[language].errors.notFound;
+  return {
+    title: t.title,
+    description: t.text,
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function NotFound() {
   const cookieStore = await cookies();
-  const language = cookieStore.get("lang")?.value === "en" ? "en" : "tr";
-  const t = copy[language].errors.notFound;
+  const language = resolveLanguage(cookieStore.get("lang")?.value);
+  const t = translations[language].errors.notFound;
 
   return (
     <main className="error-shell">

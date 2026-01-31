@@ -1,19 +1,40 @@
 export const profile = {
   name: "Yamac",
-  roles: ["Electrical & Electronics Student", "Full-stack Builder"],
-  location: "Ankara, Türkiye",
-  introLines: [
-    "Booting ED-Linux 1.0 LTS...",
-    "Loading user profile: Yamac",
-    "Mounting /home/yamac",
-    "Type \"help\" to see commands.",
-  ],
-  menu: [
-    { id: "home", label: "Home" },
-    { id: "about", label: "About" },
-    { id: "projects", label: "Projects" },
-    { id: "contact", label: "Contact" },
-  ],
+  fullName: "Yamaç Gürsel",
+  asciiName: "Yamac Gursel",
+  jobTitle: {
+    tr: "Full-Stack Geliştirici",
+    en: "Full-Stack Builder",
+  },
+  description: {
+    tr:
+      "Elektrik elektronik öğrencisi ve full-stack geliştirici. 3D, web ve donanımı birleştirerek ürünler tasarlar, hızlı prototipler ve güçlü altyapı kurar.",
+    en:
+      "Electric & Electronics Engineering student and full-stack builder. I combine 3D, web, and hardware to ship products, rapid prototypes, and reliable systems.",
+  },
+  ogImage: "/og.png",
+  roles: {
+    tr: ["Elektrik Elektronik Öğrencisi", "Full-Stack Geliştirici"],
+    en: ["Electric & Electronics Engineering Student", "Full-stack Builder"],
+  },
+  location: {
+    tr: "Ankara, Türkiye",
+    en: "Ankara, Türkiye",
+  },
+  introLines: {
+    tr: [
+      "KININ-TERM 2.0 baslatiliyor...",
+      "Profil okunuyor: Yamac",
+      "Sistem hazir. /home/yamac baglandi.",
+      "\"help\" ile komutlari gorebilirsin.",
+    ],
+    en: [
+      "Starting KININ-TERM 2.0...",
+      "Loading profile: Yamac",
+      "System ready. /home/yamac mounted.",
+      "Type \"help\" for commands.",
+    ],
+  },
   socials: [
     {
       label: "GitHub",
@@ -22,26 +43,13 @@ export const profile = {
     },
     {
       label: "Email",
-      href: "mailto:hello@kinin.dev",
+      href: "mailto:developer@kinin-code.dev",
       icon: "@",
     },
   ],
   terminal: {
-    prompt: "yamac@edsh:~$",
-    helpText:
-      "Commands: help, ls, cd, pwd, show <file.md>, show -all, echo <text>, hello, mkdir <name>, touch <name>",
+    prompt: "yamac@comp:~$",
   },
-  contactForm: {
-    nameLabel: "Name",
-    namePlaceholder: "Your name",
-    emailLabel: "Email",
-    emailPlaceholder: "you@email.com",
-    messageLabel: "Project",
-    messagePlaceholder: "What should we build?",
-    submit: "Send Message",
-    sending: "Sending...",
-    success: "Message received. I’ll reply soon.",
-    error: "Something went wrong. Please try again.",
-  },
-  sections: ["home", "about", "projects", "contact"],
+  latestProjectsCount: 8,
+  sections: ["home", "intro", "featured", "capabilities", "about", "projects", "contact"],
 } as const;

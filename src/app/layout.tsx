@@ -2,10 +2,18 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { JetBrains_Mono, Space_Grotesk, Unbounded } from "next/font/google";
 import "./globals.css";
-import LoadingBar from "@/components/LoadingBar";
 import { PreferencesProvider } from "@/components/PreferencesProvider";
 import type { Language } from "@/lib/i18n";
-import { theme as siteTheme } from "@/content/theme";
+import { profile } from "@/content/profile";
+import {
+  buildAlternates,
+  getLocale,
+  getSiteUrl,
+  isNoIndex,
+  resolveLanguage,
+  withLangPath,
+} from "@/lib/seo";
+import SeoSchema from "@/components/SeoSchema";
 
 const display = Unbounded({
   variable: "--font-display",
@@ -22,47 +30,91 @@ const mono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Kinin Code — Yamac",
-  description:
-    "Electrical & Electronics student portfolio with 3D scene, selected projects, and contact form.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  openGraph: {
-    title: "Kinin Code — Yamac",
-    description:
-      "Electrical & Electronics student portfolio with 3D scene, selected projects, and contact form.",
-    type: "website",
-    images: [
-      {
-        url: "/og.png",
-        width: 1200,
-        height: 630,
-        alt: "Kinin Code — Yamac portfolio",
-      },
+export async function generateMetadata(): Promise<Metadata> {
+  const cookieStore = await cookies();
+  const language = resolveLanguage(cookieStore.get("lang")?.value);
+  const {
+    fullName,
+    jobTitle,
+    description: profileDescription,
+    ogImage,
+  } = profile;
+  const title = `${fullName} — ${jobTitle[language]}`;
+  const description = profileDescription[language];
+  const baseUrl = getSiteUrl();
+  const canonical = new URL(withLangPath(language, "/"), baseUrl).toString();
+  const alternates = buildAlternates("/");
+
+  return {
+    metadataBase: new URL(baseUrl),
+    title: {
+      default: title,
+      template: `%s | ${fullName}`,
+    },
+    description,
+    alternates: {
+      canonical,
+      languages: alternates.languages,
+    },
+    robots: isNoIndex()
+      ? { index: false, follow: false }
+      : { index: true, follow: true },
+    icons: {
+      icon: "/favicon.ico",
+      shortcut: "/favicon.ico",
+      apple: "/apple-icon.png",
+      other: [
+        { rel: "icon", url: "/icon-192.png" },
+        { rel: "icon", url: "/icon-512.png" },
+      ],
+    },
+    manifest: "/site.webmanifest",
+    authors: [{ name: fullName }],
+    creator: fullName,
+    publisher: fullName,
+    category: "portfolio",
+    keywords: [
+      fullName,
+      profile.asciiName,
+      jobTitle[language],
+      "Next.js",
+      "Three.js",
+      "Portfolio",
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    images: ["/og.png"],
-  },
-  icons: {
-    icon: "/icon.png",
-    shortcut: "/favicon.ico",
-    apple: "/apple-icon.png",
-  },
-  authors: [{ name: "Yamac" }],
-  creator: "Yamac",
-  category: "portfolio",
-  keywords: [
-    "Yamac",
-    "Kinin Code",
-    "Electrical Electronics",
-    "Student",
-    "Full-stack",
-    "Next.js",
-    "Three.js",
-  ],
-};
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      siteName: fullName,
+      locale: getLocale(language),
+      alternateLocale: [getLocale(language === "tr" ? "en" : "tr")],
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: fullName,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
+    referrer: "strict-origin-when-cross-origin",
+    applicationName: fullName,
+    generator: "Next.js",
+    themeColor: "#0b0f0e",
+    formatDetection: {
+      email: true,
+      address: false,
+      telephone: false,
+    },
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -74,28 +126,11 @@ export default async function RootLayout({
   const langValue = cookieStore.get("lang")?.value;
   const language: Language = langValue === "en" ? "en" : "tr";
 
-  const themeVars = {
-    "--hero-bg": siteTheme.palette.heroBg,
-    "--hero-accent": siteTheme.palette.heroAccent,
-    "--hero-accent-soft": siteTheme.palette.heroAccentSoft,
-    "--terminal-bg": siteTheme.palette.terminalBg,
-    "--terminal-text": siteTheme.palette.terminalText,
-    "--terminal-dim": siteTheme.palette.terminalDim,
-    "--content-bg": siteTheme.palette.contentBg,
-    "--content-ink": siteTheme.palette.contentInk,
-    "--content-muted": siteTheme.palette.contentMuted,
-    "--content-border": siteTheme.palette.border,
-    "--chip-bg": siteTheme.palette.chip,
-  } as React.CSSProperties;
-
   return (
     <html lang={language} data-theme={theme} data-lang={language}>
-      <body
-        className={`${display.variable} ${body.variable} ${mono.variable}`}
-        style={themeVars}
-      >
+      <body className={`${display.variable} ${body.variable} ${mono.variable}`}>
+        <SeoSchema language={language} />
         <PreferencesProvider initialTheme={theme} initialLanguage={language}>
-          <LoadingBar />
           {children}
         </PreferencesProvider>
       </body>

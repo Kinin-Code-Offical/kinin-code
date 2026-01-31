@@ -1,3 +1,3 @@
 # Yamac
 
-Electrical & Electronics student building full-stack experiences.
+Electric & Electronics Engineering student building full-stack experiences.

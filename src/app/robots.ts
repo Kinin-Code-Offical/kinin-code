@@ -1,14 +1,16 @@
 import type { MetadataRoute } from "next";
+import { getSiteUrl, isNoIndex } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const baseUrl = getSiteUrl();
+  const noIndex = isNoIndex();
 
   return {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
-        disallow: ["/api", "/503"],
+        allow: noIndex ? undefined : "/",
+        disallow: noIndex ? "/" : undefined,
       },
     ],
     host: baseUrl,

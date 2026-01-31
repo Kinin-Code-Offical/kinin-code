@@ -1,20 +1,27 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { CSSProperties, RefObject } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactElement, RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import ContactForm from "@/components/ContactForm";
-import DevConsole from "@/components/DevConsole";
 import Markdown from "@/components/Markdown";
-import TerminalCanvas, { TerminalApi } from "@/components/terminal/TerminalCanvas";
+import TerminalCanvas, {
+  TerminalApi,
+} from "@/components/terminal/TerminalCanvas";
 import type { SceneDebugInfo } from "@/components/hero/HeroScene";
+import { usePreferences } from "@/components/PreferencesProvider";
 import type { ContentData } from "@/lib/content";
-import type { DevSettings } from "@/lib/devtools";
-import { defaultDevSettings } from "@/lib/devtools";
+import { useI18n } from "@/hooks/useI18n";
+
+function HeroLoading() {
+  const { t } = useI18n();
+  return <div className="hero-loading">{t.hero.loading}</div>;
+}
 
 const HeroScene = dynamic(() => import("@/components/hero/HeroScene"), {
   ssr: false,
-  loading: () => <div className="hero-loading">Loading scene...</div>,
+  loading: () => <HeroLoading />,
 });
 
 type HomeClientProps = {
@@ -35,280 +42,2134 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function useScrollProgress(ref: RefObject<HTMLElement | null>) {
-  const [progress, setProgress] = useState(0);
+function useSmoothScrollProgress(
+  ref: RefObject<HTMLElement | null>,
+  onUpdate?: (value: number) => void,
+) {
+  const progressRef = useRef(0);
+  const targetRef = useRef(0);
+  const rafRef = useRef(0);
 
   useEffect(() => {
-    const handle = () => {
+    let active = true;
+
+    const computeTarget = () => {
       if (!ref.current) {
+        targetRef.current = 0;
         return;
       }
       const rect = ref.current.getBoundingClientRect();
       const total = rect.height - window.innerHeight;
       const raw = total > 0 ? Math.min(Math.max(-rect.top / total, 0), 1) : 0;
-      setProgress(raw);
+      targetRef.current = raw;
     };
-    handle();
-    window.addEventListener("scroll", handle, { passive: true });
-    window.addEventListener("resize", handle);
-    return () => {
-      window.removeEventListener("scroll", handle);
-      window.removeEventListener("resize", handle);
-    };
-  }, [ref]);
 
-  return progress;
+    const tick = () => {
+      if (!active) {
+        return;
+      }
+      const diff = targetRef.current - progressRef.current;
+      if (Math.abs(diff) < 0.0008) {
+        progressRef.current = targetRef.current;
+      } else {
+        progressRef.current += diff * 0.12;
+      }
+      onUpdate?.(progressRef.current);
+      rafRef.current = window.requestAnimationFrame(tick);
+    };
+
+    const schedule = () => {
+      computeTarget();
+    };
+
+    schedule();
+    rafRef.current = window.requestAnimationFrame(tick);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      active = false;
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      if (rafRef.current) {
+        window.cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [onUpdate, ref]);
+
+  return progressRef;
 }
 
+function useTypewriterText(
+  text: string,
+  active: boolean,
+  options: { typeSpeed?: number; deleteSpeed?: number; reduceMotion?: boolean },
+) {
+  const { typeSpeed = 36, deleteSpeed = 48, reduceMotion } = options;
+  const [count, setCount] = useState(active ? text.length : 0);
+  const progressRef = useRef(count);
+  const carryRef = useRef(0);
+
+  useEffect(() => {
+    progressRef.current = count;
+  }, [count]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      const next = active ? text.length : 0;
+      progressRef.current = next;
+      carryRef.current = 0;
+      const rafId = window.requestAnimationFrame(() => {
+        setCount(next);
+      });
+      return () => window.cancelAnimationFrame(rafId);
+    }
+
+    let raf = 0;
+    let last = performance.now();
+    const target = active ? text.length : 0;
+    const speed = active ? typeSpeed : deleteSpeed;
+
+    const step = (now: number) => {
+      const delta = now - last;
+      last = now;
+      const direction = active ? 1 : -1;
+      carryRef.current += (delta * speed) / 1000;
+      while (carryRef.current >= 1) {
+        carryRef.current -= 1;
+        const next = Math.min(
+          Math.max(progressRef.current + direction, 0),
+          text.length,
+        );
+        progressRef.current = next;
+        setCount(next);
+        if ((active && next >= target) || (!active && next <= target)) {
+          carryRef.current = 0;
+          break;
+        }
+      }
+      if (
+        (active && progressRef.current < target) ||
+        (!active && progressRef.current > target)
+      ) {
+        raf = window.requestAnimationFrame(step);
+      }
+    };
+
+    raf = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(raf);
+  }, [active, deleteSpeed, reduceMotion, text, typeSpeed]);
+
+  return {
+    visibleText: text.slice(0, Math.max(0, count)),
+    visibleCount: count,
+    phase: active ? "typing" : "deleting",
+  };
+}
+
+function useSwapTypewriter(
+  text: string,
+  options: { typeSpeed?: number; deleteSpeed?: number; reduceMotion?: boolean },
+) {
+  const { typeSpeed = 18, deleteSpeed = 26, reduceMotion } = options;
+  const [display, setDisplay] = useState(text);
+  const displayRef = useRef(display);
+  const targetRef = useRef(text);
+  const phaseRef = useRef<"typing" | "deleting" | null>(null);
+
+  useEffect(() => {
+    displayRef.current = display;
+  }, [display]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      targetRef.current = text;
+      displayRef.current = text;
+      const rafId = window.requestAnimationFrame(() => {
+        setDisplay(text);
+      });
+      phaseRef.current = null;
+      return () => window.cancelAnimationFrame(rafId);
+    }
+
+    if (text === displayRef.current) {
+      targetRef.current = text;
+      phaseRef.current = null;
+      return;
+    }
+
+    targetRef.current = text;
+    phaseRef.current = displayRef.current.length > 0 ? "deleting" : "typing";
+
+    let raf = 0;
+    let last = performance.now();
+    let carry = 0;
+
+    const step = (now: number) => {
+      const phase = phaseRef.current;
+      if (!phase) {
+        return;
+      }
+      const delta = now - last;
+      last = now;
+      const speed = phase === "typing" ? typeSpeed : deleteSpeed;
+      carry += (delta * speed) / 1000;
+
+      while (carry >= 1) {
+        carry -= 1;
+        const { current } = displayRef;
+        if (phaseRef.current === "deleting") {
+          const next = current.slice(0, -1);
+          displayRef.current = next;
+          setDisplay(next);
+          if (next.length === 0) {
+            phaseRef.current = "typing";
+          }
+        } else if (phaseRef.current === "typing") {
+          const target = targetRef.current;
+          const next = target.slice(0, current.length + 1);
+          displayRef.current = next;
+          setDisplay(next);
+          if (next.length >= target.length) {
+            phaseRef.current = null;
+            return;
+          }
+        }
+      }
+
+      if (phaseRef.current) {
+        raf = window.requestAnimationFrame(step);
+      }
+    };
+
+    raf = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(raf);
+  }, [text, reduceMotion, typeSpeed, deleteSpeed]);
+
+  return display;
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+type LocalizedProject = {
+  title: string;
+  year: string;
+  createdAt?: string;
+  featured?: boolean;
+  order?: number;
+  tags: readonly string[];
+  summary: string;
+  detailsMd?: string;
+  links: { repo?: string; live?: string };
+};
+
+function FeaturedCard({
+  project,
+  labels,
+}: {
+  project: LocalizedProject;
+  labels: { repo: string; live: string };
+}) {
+  return (
+    <article className="featured-card">
+      <div className="featured-card-header">
+        <span className="featured-year">{project.year}</span>
+        <h3>{project.title}</h3>
+      </div>
+      <p className="featured-summary">{project.summary}</p>
+      <div className="featured-tags">
+        {project.tags.map((tag) => (
+          <span key={tag}>{tag}</span>
+        ))}
+      </div>
+      <div className="featured-links">
+        {project.links.repo ? (
+          <a href={project.links.repo} target="_blank" rel="noreferrer">
+            {labels.repo}
+          </a>
+        ) : null}
+        {project.links.live ? (
+          <a href={project.links.live} target="_blank" rel="noreferrer">
+            {labels.live}
+          </a>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+const capabilityIcons: Record<string, ReactElement> = {
+  zap: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  cube: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 2l8 4v12l-8 4-8-4V6l8-4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M12 2v20M4 6l8 4 8-4" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  ),
+  cpu: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect
+        x="7"
+        y="7"
+        width="10"
+        height="10"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path
+        d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  brain: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M8 4a3 3 0 0 1 5 2v1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v2a3 3 0 0 1-6 0v-2H5a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3V7a3 3 0 0 1 3-3z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  layers: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  users: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M16 11a3 3 0 1 0-2.9-3.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M8 11a3 3 0 1 0-2.9-3.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M2 20a6 6 0 0 1 10-4M12 20a6 6 0 0 1 10-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+  wrench: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M14 7a4 4 0 1 0-5 5l-6 6 3 3 6-6a4 4 0 0 0 5-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+};
+
+type SectionId = ContentData["profile"]["sections"][number];
+
 export default function HomeClient({ content }: HomeClientProps) {
-  const { profile, projects, theme, pages } = content;
+  const { profile, projects, theme, pages, capabilities } = content;
+  const { t, language, setLanguage } = useI18n();
+  const { theme: currentTheme, toggleTheme, isSwitching } = usePreferences();
   const heroRef = useRef<HTMLElement>(null);
-  const scrollProgress = useScrollProgress(heroRef);
+  const featuredRef = useRef<HTMLElement>(null);
+  const featuredHeadingRef = useRef<HTMLHeadingElement>(null);
+  const featuredSubtitleRef = useRef<HTMLParagraphElement>(null);
+  const shellRef = useRef<HTMLElement>(null);
+  const featuredIndex = useMemo(
+    () => profile.sections.indexOf("featured"),
+    [profile.sections],
+  );
+  const [dockKeysVisible, setDockKeysVisible] = useState(true);
+  const dockKeysVisibleRef = useRef(true);
+  const scrollProgressRef = useSmoothScrollProgress(heroRef, (value) => {
+    if (!shellRef.current) {
+      return;
+    }
+    const activeId = activeSectionRef.current ?? "home";
+    const activeIndex = profile.sections.indexOf(activeId);
+    const forceOpaque = featuredIndex >= 0 && activeIndex > featuredIndex;
+    const clamp = (val: number, min: number, max: number) =>
+      Math.min(max, Math.max(min, val));
+    let reveal = 0;
+    const featuredEl =
+      featuredSubtitleRef.current ??
+      featuredHeadingRef.current ??
+      featuredRef.current;
+    if (featuredEl) {
+      const rect = featuredEl.getBoundingClientRect();
+      const elementCenter = rect.top + rect.height / 2;
+      const offsetCenter = elementCenter - window.innerHeight;
+      const triggerStart = window.innerHeight * 0.8;
+      const triggerEnd = window.innerHeight * 0.5;
+      if (triggerStart !== triggerEnd) {
+        reveal = clamp(
+          (triggerStart - offsetCenter) / (triggerStart - triggerEnd),
+          0,
+          1,
+        );
+      }
+    } else {
+      reveal = clamp((value - 0.85) / 0.12, 0, 1);
+    }
+    reveal = forceOpaque ? 1 : reveal;
+    const fade = forceOpaque ? 0 : 1 - reveal;
+    shellRef.current.style.setProperty("--hero-fade", String(fade));
+    shellRef.current.style.setProperty("--content-reveal", String(reveal));
+    const nextDockKeysVisible = reveal < 0.92;
+    if (dockKeysVisibleRef.current !== nextDockKeysVisible) {
+      dockKeysVisibleRef.current = nextDockKeysVisible;
+      setDockKeysVisible(nextDockKeysVisible);
+    }
+  });
   const isMobile = useMediaQuery("(max-width: 900px)");
-  const [devEnabled, setDevEnabled] = useState(false);
-  const [devSettings, setDevSettings] = useState<DevSettings>(defaultDevSettings);
+  const reducedMotion = useReducedMotion() ?? false;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const fallbackSection = profile.sections[0] ?? "home";
+  const [activeSection, setActiveSection] =
+    useState<SectionId>(fallbackSection);
+  const activeSectionRef = useRef<SectionId>(activeSection);
+  const [bootDone, setBootDone] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
+  const [modelReadyAt, setModelReadyAt] = useState<number | null>(null);
+  const [sceneReadyAt, setSceneReadyAt] = useState<number | null>(null);
+  const [siteReady, setSiteReady] = useState(false);
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null);
+  const [openCapabilityId, setOpenCapabilityId] = useState<string | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
   const [terminalFocused, setTerminalFocused] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<SceneDebugInfo>({
-    meshNames: [],
-    screenMeshName: null,
-    fallbackPlane: false,
+  const pendingTerminalFocusRef = useRef(false);
+  const [screenAspect, setScreenAspect] = useState(1.33);
+  const [screenAspectReady, setScreenAspectReady] = useState(false);
+  const [screenAspectReadyAt, setScreenAspectReadyAt] = useState<number | null>(
+    null,
+  );
+  const screenAspectRef = useRef(screenAspect);
+  const screenAspectTimerRef = useRef<number | null>(null);
+  const pendingAspectRef = useRef<number | null>(null);
+  const interactionActiveRef = useRef(false);
+  const [terminalBootReady, setTerminalBootReady] = useState(false);
+  const [terminalBootReadyAt, setTerminalBootReadyAt] = useState<number | null>(
+    null,
+  );
+  const [mobileModifiers, setMobileModifiers] = useState({
+    ctrl: false,
+    shift: false,
+    alt: false,
   });
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const params = new URLSearchParams(window.location.search);
-    setDevEnabled(params.get("dev") === "1" || process.env.NEXT_PUBLIC_DEVTOOLS === "1");
+  const [virtualKeysOpen, setVirtualKeysOpen] = useState(false);
+  const mobileModifiersRef = useRef(mobileModifiers);
+  const handleSceneReady = useCallback(() => {
+    setSceneReady(true);
+    setSceneReadyAt(Date.now());
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
+  const handleSceneDebug = useCallback((info: SceneDebugInfo) => {
+    if (info.modelLoaded || info.fallbackPlane) {
+      setModelReady(true);
+      setModelReadyAt(Date.now());
+    }
+  }, []);
+
+  const handleTerminalFocus = useCallback(() => {
+    if (terminalApi) {
+      terminalApi.focus();
+      pendingTerminalFocusRef.current = false;
       return;
     }
-    try {
-      const raw = localStorage.getItem("devtools");
-      if (raw) {
-        setDevSettings((prev) => ({ ...prev, ...JSON.parse(raw) } as DevSettings));
+    pendingTerminalFocusRef.current = true;
+  }, [terminalApi]);
+
+  const handleTerminalInputFocus = useCallback(() => {
+    terminalApi?.focusInput?.();
+  }, [terminalApi]);
+
+  const handleVirtualKey = useCallback(
+    (key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight") => {
+      handleTerminalFocus();
+      const modifiers = mobileModifiersRef.current;
+      const down = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        ctrlKey: modifiers.ctrl,
+        shiftKey: modifiers.shift,
+        altKey: modifiers.alt,
+      });
+      const up = new KeyboardEvent("keyup", {
+        key,
+        bubbles: true,
+        ctrlKey: modifiers.ctrl,
+        shiftKey: modifiers.shift,
+        altKey: modifiers.alt,
+      });
+      window.dispatchEvent(down);
+      window.dispatchEvent(up);
+    },
+    [handleTerminalFocus],
+  );
+
+  const toggleMobileModifier = useCallback((key: "ctrl" | "shift" | "alt") => {
+    setMobileModifiers((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      mobileModifiersRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const showVirtualKeys = isMobile || virtualKeysOpen;
+
+  const applyLanguage = (lang: "tr" | "en") => {
+    setLanguage(lang);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const cleanPath = url.pathname.replace(/^\/(tr|en)(?=\/|$)/, "");
+      url.pathname = cleanPath === "" ? "/" : cleanPath;
+      url.searchParams.set("lang", lang);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
+  const readyStartAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!sceneReady || !modelReady || !sceneReadyAt || !modelReadyAt) {
+      return;
+    }
+    const stableDelay = 500;
+    const maxWait = 8000;
+    const lastReadyAt = Math.max(
+      sceneReadyAt,
+      modelReadyAt,
+      screenAspectReadyAt ?? 0,
+      terminalBootReadyAt ?? 0,
+    );
+    const elapsed = Date.now() - lastReadyAt;
+    if (sceneReady && modelReady && readyStartAtRef.current === null) {
+      readyStartAtRef.current = Date.now();
+    } else if (!sceneReady || !modelReady) {
+      readyStartAtRef.current = null;
+    }
+    const readyElapsed = readyStartAtRef.current
+      ? Date.now() - readyStartAtRef.current
+      : 0;
+    const canFinish = screenAspectReady && terminalBootReady;
+    const shouldForce =
+      readyStartAtRef.current !== null && readyElapsed >= maxWait;
+    if (shouldForce) {
+      const timer = window.setTimeout(() => {
+        setBootDone(true);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    if (!canFinish) {
+      return;
+    }
+    const remaining = Math.max(0, stableDelay - elapsed);
+    const timer = window.setTimeout(() => {
+      setBootDone(true);
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [
+    modelReady,
+    modelReadyAt,
+    sceneReady,
+    sceneReadyAt,
+    screenAspectReady,
+    screenAspectReadyAt,
+    terminalBootReady,
+    terminalBootReadyAt,
+  ]);
+
+  useEffect(() => {
+    if (!bootDone) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSiteReady(true);
+    }, 160);
+    return () => window.clearTimeout(timer);
+  }, [bootDone]);
+
+  useEffect(() => {
+    if (bootDone) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setBootDone(true);
+    }, 10000);
+    return () => window.clearTimeout(timer);
+  }, [bootDone]);
+
+  useEffect(() => {
+    if (!terminalApi || !pendingTerminalFocusRef.current) {
+      return;
+    }
+    terminalApi.focus();
+    pendingTerminalFocusRef.current = false;
+  }, [terminalApi]);
+
+  useEffect(() => {
+    mobileModifiersRef.current = mobileModifiers;
+  }, [mobileModifiers]);
+
+  useEffect(() => {
+    if (!dockKeysVisible && virtualKeysOpen) {
+      setVirtualKeysOpen(false);
+    }
+  }, [dockKeysVisible, virtualKeysOpen]);
+
+  useEffect(() => {
+    screenAspectRef.current = screenAspect;
+  }, [screenAspect]);
+
+  useEffect(() => {
+    const handleInteraction = (event: Event) => {
+      const { detail } = event as CustomEvent<{ active?: boolean }>;
+      if (!detail) {
+        return;
       }
-    } catch {
-      // ignore
+      interactionActiveRef.current = Boolean(detail.active);
+      if (!detail.active && pendingAspectRef.current !== null) {
+        const nextAspect = pendingAspectRef.current;
+        pendingAspectRef.current = null;
+        setScreenAspect(nextAspect);
+        if (!screenAspectReady) {
+          setScreenAspectReady(true);
+          setScreenAspectReadyAt(Date.now());
+        }
+      }
+    };
+    window.addEventListener(
+      "hero-interaction",
+      handleInteraction as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "hero-interaction",
+        handleInteraction as EventListener,
+      );
+      if (screenAspectTimerRef.current) {
+        window.clearTimeout(screenAspectTimerRef.current);
+      }
+    };
+  }, [screenAspectReady]);
+
+  useEffect(() => {
+    const shouldLock = !siteReady || isSwitching || (menuOpen && isMobile);
+    document.body.style.overflow = shouldLock ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, isSwitching, menuOpen, siteReady]);
+
+  useEffect(() => {
+    if (!siteReady || isSwitching) {
+      window.scrollTo(0, 0);
     }
-  }, []);
+  }, [isSwitching, siteReady]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 900px)");
+    const handleChange = () => {
+      if (menuOpen) {
+        setMenuOpen(false);
+      }
+    };
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const sections = profile.sections
+      .map((id) => ({ id, element: document.getElementById(id) }))
+      .filter((item): item is { id: SectionId; element: HTMLElement } =>
+        Boolean(item.element),
+      );
+
+    if (sections.length === 0) {
+      return;
+    }
+
+    let frame: number | null = null;
+    const getAnchor = () => window.innerHeight * 0.25;
+
+    const updateActive = () => {
+      frame = null;
+      let bestId: SectionId = sections[0]?.id ?? fallbackSection;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      const anchor = getAnchor();
+
+      sections.forEach((section) => {
+        const rect = section.element.getBoundingClientRect();
+        const distance = Math.abs(rect.top - anchor);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestId = section.id;
+        }
+      });
+
+      if (bestId && bestId !== activeSectionRef.current) {
+        activeSectionRef.current = bestId;
+        setActiveSection(bestId);
+      }
+    };
+
+    const scheduleUpdate = () => {
+      if (frame === null) {
+        frame = window.requestAnimationFrame(updateActive);
+      }
+    };
+
+    updateActive();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, [fallbackSection, profile.sections]);
+
+  const localizedPages = useMemo(
+    () => ({
+      about: pages.about[language],
+      contact: pages.contact[language],
+      title: pages.title[language],
+    }),
+    [language, pages.about, pages.contact, pages.title],
+  );
+
+  const demoteHeadings = (value: string) => value.replace(/^#\s+/gm, "## ");
+  const stripLeadingHeading = (value: string) =>
+    value.replace(/^##?\s+.*\n+/, "");
+  const aboutParts = useMemo(() => {
+    const raw = localizedPages.about;
+    const split = raw.split(/<!--\s*more\s*-->/i);
+    return {
+      intro: stripLeadingHeading(demoteHeadings(split[0] ?? "")),
+      rest: stripLeadingHeading(
+        demoteHeadings(split.slice(1).join("\n") ?? ""),
+      ),
+    };
+  }, [localizedPages.about]);
+  const contactContent = useMemo(
+    () => demoteHeadings(localizedPages.contact),
+    [localizedPages.contact],
+  );
+  const localizedCapabilities = useMemo(
+    () =>
+      capabilities.map((capability) => ({
+        ...capability,
+        title: capability.title[language],
+        body: capability.body[language],
+        bullets: capability.bullets ? capability.bullets[language] : undefined,
+      })),
+    [capabilities, language],
+  );
+  const aboutTitle = useSwapTypewriter(
+    aboutOpen ? t.sections.about.longTitle : t.sections.about.title,
+    {
+      reduceMotion: reducedMotion,
+    },
+  );
+
+  const localizedProjects = useMemo<LocalizedProject[]>(
+    () =>
+      projects.map((project) => ({
+        ...project,
+        summary: project.summary[language],
+        detailsMd: project.detailsMd ? project.detailsMd[language] : undefined,
+      })),
+    [language, projects],
+  );
+
+  const featuredProjects = useMemo(() => {
+    const list = localizedProjects.filter((project) => project.featured);
+    return list.sort((a, b) => {
+      if (a.order !== undefined || b.order !== undefined) {
+        return (a.order ?? 999) - (b.order ?? 999);
+      }
+      const aTime = a.createdAt
+        ? Date.parse(`${a.createdAt}-01`)
+        : Date.parse(`${a.year}-01-01`);
+      const bTime = b.createdAt
+        ? Date.parse(`${b.createdAt}-01`)
+        : Date.parse(`${b.year}-01-01`);
+      return bTime - aTime;
+    });
+  }, [localizedProjects]);
+
+  const latestProjects = useMemo(() => {
+    const count = profile.latestProjectsCount ?? 6;
+    const sorted = [...localizedProjects].sort((a, b) => {
+      const aTime = a.createdAt
+        ? Date.parse(`${a.createdAt}-01`)
+        : Date.parse(`${a.year}-01-01`);
+      const bTime = b.createdAt
+        ? Date.parse(`${b.createdAt}-01`)
+        : Date.parse(`${b.year}-01-01`);
+      return bTime - aTime;
+    });
+    return sorted.slice(0, count);
+  }, [localizedProjects, profile.latestProjectsCount]);
 
   const projectsMd = useMemo(() => {
     return [
-      "# Projects",
+      `# ${t.projects.latestTitle}`,
       "",
-      ...projects.map(
-        (project) =>
-          `- ${project.title} (${project.year}): ${project.summary}`,
+      ...latestProjects.map(
+        (project) => `- ${project.title} (${project.year}): ${project.summary}`,
       ),
     ].join("\n");
-  }, [projects]);
-
-  const sectionLabels = useMemo(
-    () => Object.fromEntries(profile.menu.map((item) => [item.id, item.label])),
-    [profile.menu],
-  );
+  }, [latestProjects, t.projects.latestTitle]);
 
   const files = useMemo(
     () => [
-      { path: "/title/title.md", content: pages.title, section: "home" },
-      { path: "/about/about.md", content: pages.about, section: "about" },
-      { path: "/projects/projects.md", content: projectsMd, section: "projects" },
-      { path: "/contact/contact.md", content: pages.contact, section: "contact" },
+      {
+        path: "/title/title.md",
+        content: localizedPages.title,
+        section: "home",
+      },
+      {
+        path: "/about/about.md",
+        content: localizedPages.about,
+        section: "about",
+      },
+      {
+        path: "/projects/projects.md",
+        content: projectsMd,
+        section: "projects",
+      },
+      {
+        path: "/contact/contact.md",
+        content: localizedPages.contact,
+        section: "contact",
+      },
     ],
-    [pages, projectsMd],
+    [localizedPages, projectsMd],
   );
-
-  const fade = Math.max(0, 1 - scrollProgress * 1.2);
-  const reveal = Math.min(1, scrollProgress * 1.2);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+    setMenuOpen(false);
   };
 
-  return (
-    <main
-      className="edh-shell"
-      style={
-        {
-          "--hero-fade": String(fade),
-          "--content-reveal": String(reveal),
-        } as CSSProperties
-      }
-    >
-      <header className="fixed-menu">
-        <div className="menu-stack">
-          <button
-            className="menu-button"
-            type="button"
-            onClick={() => scrollToSection("home")}
-            aria-label="Menu"
-          >
-            ≡
-          </button>
-          {profile.menu.map((item) => (
-            <button
-              key={item.id}
-              className="menu-button"
-              type="button"
-              onClick={() => scrollToSection(item.id)}
-            >
-              {item.label[0]}
-            </button>
-          ))}
-        </div>
-        <div className="menu-stack">
-          {profile.socials.map((social) => (
-            <a key={social.label} className="menu-button" href={social.href} target="_blank" rel="noreferrer">
-              {social.icon}
-            </a>
-          ))}
-        </div>
-      </header>
+  const navLabels: Record<string, string> = {
+    home: t.nav.home,
+    intro: t.nav.intro,
+    featured: t.nav.featured,
+    capabilities: t.nav.capabilities,
+    about: t.nav.about,
+    projects: t.nav.projects,
+    contact: t.nav.contact,
+  };
 
-      <section ref={heroRef} id="home" className={`hero-shell ${terminalFocused ? "focused" : ""}`}>
-        <div className="hero-sticky">
-          <HeroScene
-            devSettings={devEnabled ? devSettings : undefined}
-            terminalApi={terminalApi}
-            scrollProgress={scrollProgress}
-            onDebug={setDebugInfo}
-            onFocus={() => terminalApi?.focus()}
-            onBlur={() => terminalApi?.blur()}
-          />
-          <div className="hero-overlay">
-            <div className="hero-title">
-              <span className="hero-tag">~&gt;</span>
-              <div>
-                <p className="hero-name">{profile.name}</p>
-                <p className="hero-role">{profile.roles.join(" · ")}</p>
-              </div>
+  const navItems = profile.sections.map((id) => ({
+    id,
+    label: navLabels[id] ?? id,
+  }));
+
+  const featuredCount = featuredProjects.length;
+  const [activeFeatured, setActiveFeatured] = useState(0);
+  const clampFeaturedIndex = useCallback(
+    (index: number) => {
+      if (featuredCount <= 0) {
+        return 0;
+      }
+      return Math.max(0, Math.min(index, featuredCount - 1));
+    },
+    [featuredCount],
+  );
+  const setFeaturedIndex = useCallback(
+    (index: number) => {
+      setActiveFeatured(clampFeaturedIndex(index));
+    },
+    [clampFeaturedIndex],
+  );
+  const shiftFeaturedIndex = useCallback(
+    (delta: number) => {
+      setActiveFeatured((prev) => clampFeaturedIndex(prev + delta));
+    },
+    [clampFeaturedIndex],
+  );
+  const featuredAutoDir = useRef(1);
+  useEffect(() => {
+    if (reducedMotion || featuredCount <= 1) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setActiveFeatured((prev) => {
+        if (prev >= featuredCount - 1) {
+          featuredAutoDir.current = -1;
+        } else if (prev <= 0) {
+          featuredAutoDir.current = 1;
+        }
+        return clampFeaturedIndex(prev + featuredAutoDir.current);
+      });
+    }, 5200);
+    return () => window.clearInterval(timer);
+  }, [clampFeaturedIndex, featuredCount, reducedMotion]);
+  const safeActiveFeatured =
+    featuredCount > 0 ? clampFeaturedIndex(activeFeatured) : 0;
+  const activeFeaturedProject =
+    featuredCount > 0 ? featuredProjects[safeActiveFeatured] : null;
+  const featuredSliderCss = useMemo(() => {
+    if (featuredCount === 0) {
+      return "";
+    }
+    const rules: string[] = [];
+    for (let active = 1; active <= featuredCount; active += 1) {
+      for (let item = 1; item <= featuredCount; item += 1) {
+        const offset = item - active;
+        let offsetValue = "0px";
+        let scale = 0.86;
+        let opacity = 0.6;
+        let zIndex = 0;
+        let position = "absolute";
+        let pointer = "none";
+
+        if (offset === 0) {
+          offsetValue = "0px";
+          scale = 1;
+          opacity = 1;
+          zIndex = 2;
+          position = "relative";
+          pointer = "auto";
+        } else if (offset === 1) {
+          offsetValue = "var(--featured-offset-1)";
+          scale = 0.86;
+          opacity = 0.6;
+          zIndex = 1;
+        } else if (offset === -1) {
+          offsetValue = "calc(var(--featured-offset-1) * -1)";
+          scale = 0.86;
+          opacity = 0.6;
+          zIndex = 1;
+        } else if (offset === 2) {
+          offsetValue = "var(--featured-offset-2)";
+          scale = 0.72;
+          opacity = 0;
+          zIndex = -1;
+        } else if (offset === -2) {
+          offsetValue = "calc(var(--featured-offset-2) * -1)";
+          scale = 0.72;
+          opacity = 0;
+          zIndex = -1;
+        } else if (offset > 2) {
+          offsetValue = "var(--featured-offset-2)";
+          scale = 0.72;
+          opacity = 0;
+          zIndex = -1;
+        } else {
+          offsetValue = "calc(var(--featured-offset-2) * -1)";
+          scale = 0.72;
+          opacity = 0;
+          zIndex = -1;
+        }
+
+        rules.push(
+          `#featured-slide-${active}:checked ~ .featured-track .featured-item--${item} { --featured-offset: ${offsetValue}; --featured-scale: ${scale}; --featured-opacity: ${opacity}; --featured-z: ${zIndex}; position: ${position}; pointer-events: ${pointer}; }`,
+        );
+      }
+      rules.push(
+        `#featured-slide-${active}:checked ~ .featured-controls .featured-dots .featured-dot--${active} { background: var(--hero-accent); border-color: var(--hero-accent); transform: scale(1.05); }`,
+      );
+    }
+    return rules.join("\n");
+  }, [featuredCount]);
+
+  useEffect(() => {
+    if (!shellRef.current) {
+      return;
+    }
+    shellRef.current.style.setProperty("--hero-fade", "1");
+    shellRef.current.style.setProperty("--content-reveal", "0");
+  }, []);
+
+  return (
+    <main className="site-shell" ref={shellRef}>
+      {!siteReady || isSwitching ? (
+        <div
+          className={`boot-screen ${isSwitching ? "is-switching" : ""}`}
+          role="status"
+          aria-live="polite">
+          <div className="boot-card">
+            <div className="boot-logo">~&gt;</div>
+            <div className="boot-lines">
+              {profile.introLines[language]
+                .filter((line) => !line.toLowerCase().includes("help"))
+                .map((line, index) => (
+                  <p key={`${line}-${index}`}>{line}</p>
+                ))}
             </div>
-            <p className="hero-hint">Scroll or type &quot;help&quot; to get started</p>
+            <div className="boot-progress">
+              <span />
+            </div>
           </div>
         </div>
-        <TerminalCanvas
-          files={files}
-          introLines={profile.introLines}
-          prompt={profile.terminal.prompt}
-          helpText={profile.terminal.helpText}
-          theme={theme}
-          isMobile={isMobile}
-          onNavigate={scrollToSection}
-          onReady={(api) => setTerminalApi(api)}
-          onFocusChange={(focused) => setTerminalFocused(focused)}
-        />
-      </section>
-
-      {devEnabled ? (
-        <DevConsole settings={devSettings} onChange={setDevSettings} debug={debugInfo} />
       ) : null}
 
-      {profile.sections
-        .filter((section) => section !== "home")
-        .map((section) => {
-          if (section === "about") {
-            return (
-              <section key={section} id="about" className="content-section">
-                <div className="section-header">
-                  <span className="section-label">{sectionLabels.about ?? "About"}</span>
-                  <h2>{sectionLabels.about ?? "About"}</h2>
+      <div className={`site-content ${siteReady ? "is-ready" : "is-loading"}`}>
+        {isMobile ? (
+          <button
+            className={`mobile-menu-toggle ${
+              menuOpen ? "is-active is-hidden" : ""
+            }`}
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            aria-haspopup="dialog"
+            aria-label={menuOpen ? t.nav.close : t.nav.menu}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M4 7h16M4 12h16M4 17h16"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        ) : null}
+
+        {!isMobile ? (
+          <div
+            className={`compact-dock ${menuOpen ? "is-hidden" : "is-visible"}`}
+            aria-label={t.nav.menu}>
+            <div className="dock-stack">
+              <button
+                className="dock-button"
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                aria-label={t.nav.menu}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M4 7h16M4 12h16M4 17h16"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+              <button
+                className="dock-button"
+                type="button"
+                onClick={toggleTheme}
+                aria-label={
+                  currentTheme === "dark" ? t.ui.themeDark : t.ui.themeLight
+                }
+                aria-pressed={currentTheme === "dark"}>
+                {currentTheme === "dark" ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M15.5 4.5a7.5 7.5 0 1 0 4 10.6 8 8 0 0 1-4-10.6z"
+                      strokeWidth="1.6"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="4.2"
+                      strokeWidth="1.6"
+                      fill="none"
+                    />
+                    <path
+                      d="M12 3v3M12 18v3M3 12h3M18 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                )}
+              </button>
+              <button
+                className="dock-button"
+                type="button"
+                onClick={() => applyLanguage(language === "tr" ? "en" : "tr")}
+                aria-label={t.ui.language}>
+                {language === "tr" ? "TR" : "EN"}
+              </button>
+            </div>
+            <div className="dock-socials" aria-label="Social links">
+              {profile.socials.map((social) => {
+                const isEmail = social.href.startsWith("mailto:");
+                if (isEmail) {
+                  return (
+                    <button
+                      key={social.label}
+                      className="dock-button"
+                      type="button"
+                      onClick={() => scrollToSection("contact")}
+                      aria-label={social.label}>
+                      {social.icon}
+                    </button>
+                  );
+                }
+                return (
+                  <a
+                    key={social.label}
+                    className="dock-button"
+                    href={social.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={social.label}>
+                    {social.icon}
+                  </a>
+                );
+              })}
+              {dockKeysVisible ? (
+                <button
+                  className={`dock-button${
+                    virtualKeysOpen ? " is-active" : ""
+                  }`}
+                  type="button"
+                  onClick={() => setVirtualKeysOpen((prev) => !prev)}
+                  aria-label={t.hero.keysToggle}
+                  aria-pressed={virtualKeysOpen}>
+                  K
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {!isMobile && menuOpen ? (
+          <div
+            className="sidebar-backdrop"
+            role="presentation"
+            onClick={() => setMenuOpen(false)}
+          />
+        ) : null}
+
+        {!isMobile ? (
+          <aside
+            className={`sidebar ${menuOpen ? "open" : ""}`}
+            aria-label={t.nav.menu}
+            aria-hidden={!menuOpen}>
+            <div className="sidebar-inner">
+              <div className="sidebar-brand">
+                <div className="brand-mark">~&gt;</div>
+                <div>
+                  <p className="brand-name">{profile.fullName}</p>
+                  <p className="brand-role">{profile.jobTitle[language]}</p>
                 </div>
-                <Markdown content={pages.about} />
-              </section>
-            );
-          }
-          if (section === "projects") {
-            return (
-              <section key={section} id="projects" className="content-section">
-                <div className="section-header">
-                  <span className="section-label">{sectionLabels.projects ?? "Projects"}</span>
-                  <h2>{sectionLabels.projects ?? "Projects"}</h2>
+                <button
+                  className="sidebar-close"
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label={t.nav.close}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M6 6l12 12M18 6l-12 12"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div className="sidebar-separator" role="presentation" />
+              <nav className="sidebar-nav" aria-label={t.nav.menu}>
+                {navItems.map((item) => {
+                  const isActive = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`sidebar-link ${isActive ? "active" : ""}`}
+                      onClick={() => scrollToSection(item.id)}
+                      aria-current={isActive ? "page" : undefined}>
+                      <span className="nav-glyph" aria-hidden="true">
+                        &gt;
+                      </span>
+                      <span className="nav-label">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+              <div className="sidebar-separator" role="presentation" />
+              <div className="sidebar-actions">
+                <button
+                  className="sidebar-action"
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label={
+                    currentTheme === "dark" ? t.ui.themeDark : t.ui.themeLight
+                  }
+                  aria-pressed={currentTheme === "dark"}>
+                  {currentTheme === "dark" ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false">
+                      <path
+                        d="M15.5 4.5a7.5 7.5 0 1 0 4 10.6 8 8 0 0 1-4-10.6z"
+                        strokeWidth="1.6"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false">
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="4.2"
+                        strokeWidth="1.6"
+                        fill="none"
+                      />
+                      <path
+                        d="M12 3v3M12 18v3M3 12h3M18 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                  <span className="sidebar-action-label">
+                    {currentTheme === "dark" ? t.ui.themeDark : t.ui.themeLight}
+                  </span>
+                </button>
+                <div className="sidebar-lang" aria-label={t.ui.language}>
+                  <button
+                    type="button"
+                    className={language === "tr" ? "active" : ""}
+                    onClick={() => applyLanguage("tr")}>
+                    TR
+                  </button>
+                  <span aria-hidden="true">/</span>
+                  <button
+                    type="button"
+                    className={language === "en" ? "active" : ""}
+                    onClick={() => applyLanguage("en")}>
+                    EN
+                  </button>
                 </div>
-                <div className="project-grid">
-                  {projects.map((project) => (
-                    <ProjectCard key={project.title} project={project} />
+                <div className="sidebar-socials" aria-label="Social links">
+                  {profile.socials.map((social) => (
+                    <a
+                      key={social.label}
+                      href={social.href}
+                      target="_blank"
+                      rel="noreferrer">
+                      <span className="social-glyph">{social.icon}</span>
+                      <span className="social-label">{social.label}</span>
+                    </a>
                   ))}
                 </div>
-              </section>
-            );
-          }
-          if (section === "contact") {
-            return (
-              <section key={section} id="contact" className="content-section">
-                <div className="section-header">
-                  <span className="section-label">{sectionLabels.contact ?? "Contact"}</span>
-                  <h2>{sectionLabels.contact ?? "Contact"}</h2>
+              </div>
+            </div>
+          </aside>
+        ) : null}
+
+        {isMobile ? (
+          <div
+            id="mobile-menu"
+            className={`mobile-sheet ${menuOpen ? "open" : ""}`}
+            role="dialog"
+            aria-modal="true"
+            aria-hidden={!menuOpen}
+            onClick={() => setMenuOpen(false)}>
+            <div
+              className="mobile-sheet-content"
+              onClick={(event) => event.stopPropagation()}>
+              <div className="mobile-sheet-header">
+                <div className="mobile-brand">
+                  <div className="brand-mark">~&gt;</div>
+                  <div>
+                    <p className="brand-name">{profile.fullName}</p>
+                    <p className="brand-role">{profile.jobTitle[language]}</p>
+                  </div>
                 </div>
-                <Markdown content={pages.contact} />
-                <div className="contact-form">
-                  <ContactForm labels={profile.contactForm} />
+                <button
+                  className="mobile-close"
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  aria-label={t.nav.close}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M6 6l12 12M18 6l-12 12"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div className="mobile-links">
+                {navItems.map((item) => {
+                  const isActive = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={isActive ? "active" : ""}
+                      onClick={() => scrollToSection(item.id)}>
+                      <span aria-hidden="true">›</span>
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mobile-actions">
+                <button
+                  className="sidebar-action"
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label={
+                    currentTheme === "dark" ? t.ui.themeDark : t.ui.themeLight
+                  }
+                  aria-pressed={currentTheme === "dark"}>
+                  {currentTheme === "dark" ? (
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false">
+                      <path
+                        d="M15.5 4.5a7.5 7.5 0 1 0 4 10.6 8 8 0 0 1-4-10.6z"
+                        strokeWidth="1.6"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      focusable="false">
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="4.2"
+                        strokeWidth="1.6"
+                        fill="none"
+                      />
+                      <path
+                        d="M12 3v3M12 18v3M3 12h3M18 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                  <span className="sidebar-action-label">
+                    {currentTheme === "dark" ? t.ui.themeDark : t.ui.themeLight}
+                  </span>
+                </button>
+                <div className="sidebar-lang" aria-label={t.ui.language}>
+                  <button
+                    type="button"
+                    className={language === "tr" ? "active" : ""}
+                    onClick={() => applyLanguage("tr")}>
+                    TR
+                  </button>
+                  <span aria-hidden="true">/</span>
+                  <button
+                    type="button"
+                    className={language === "en" ? "active" : ""}
+                    onClick={() => applyLanguage("en")}>
+                    EN
+                  </button>
                 </div>
-              </section>
-            );
-          }
-          return null;
-        })}
+                <div className="sidebar-socials" aria-label="Social links">
+                  {profile.socials.map((social) => (
+                    <a
+                      key={social.label}
+                      href={social.href}
+                      target="_blank"
+                      rel="noreferrer">
+                      <span className="social-glyph">{social.icon}</span>
+                      <span className="social-label">{social.label}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <section
+          ref={heroRef}
+          id="home"
+          className={`hero-shell ${terminalFocused ? "focused" : ""}`}>
+          <div className="hero-sticky">
+            <HeroScene
+              terminalApi={terminalApi}
+              scrollProgressRef={scrollProgressRef}
+              noteTexts={{ red: t.hero.noteRed, blue: t.hero.noteBlue }}
+              onDebugAction={handleSceneDebug}
+              onFocusAction={handleTerminalFocus}
+              onScreenAspectAction={(aspect) => {
+                if (!screenAspectReady) {
+                  setScreenAspect(aspect);
+                  setScreenAspectReady(true);
+                  setScreenAspectReadyAt(Date.now());
+                  screenAspectRef.current = aspect;
+                  pendingAspectRef.current = null;
+                  return;
+                }
+                const diff = Math.abs(aspect - screenAspectRef.current);
+                if (diff < 0.03) {
+                  return;
+                }
+                pendingAspectRef.current = aspect;
+                if (interactionActiveRef.current) {
+                  return;
+                }
+                if (screenAspectTimerRef.current) {
+                  window.clearTimeout(screenAspectTimerRef.current);
+                }
+                screenAspectTimerRef.current = window.setTimeout(() => {
+                  if (pendingAspectRef.current === null) {
+                    return;
+                  }
+                  const nextAspect = pendingAspectRef.current;
+                  pendingAspectRef.current = null;
+                  setScreenAspect(nextAspect);
+                  if (!screenAspectReady) {
+                    setScreenAspectReady(true);
+                    setScreenAspectReadyAt(Date.now());
+                  }
+                }, 140);
+              }}
+              onReadyAction={handleSceneReady}
+            />
+            <div className="hero-overlay">
+              <div className="hero-title">
+                <span className="hero-tag">~&gt;</span>
+                <div>
+                  <h1 className="hero-name">{profile.fullName}</h1>
+                  <p className="hero-role">
+                    {profile.roles[language].join(" · ")}
+                  </p>
+                </div>
+              </div>
+              <p className="hero-hint">{t.hero.hint}</p>
+              <p className="hero-hint">{t.hero.keysHint}</p>
+            </div>
+          </div>
+          {showVirtualKeys ? (
+            <div className="hero-mobile-keys" aria-hidden="true">
+              <button
+                type="button"
+                className="hero-key-button hero-key-focus"
+                aria-label="Terminal input"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  handleTerminalInputFocus();
+                }}>
+                ⌨
+              </button>
+              <button
+                type="button"
+                className="hero-key-button hero-key-up"
+                aria-label="Arrow up"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  handleVirtualKey("ArrowUp");
+                }}>
+                ▲
+              </button>
+              <button
+                type="button"
+                className="hero-key-button hero-key-left"
+                aria-label="Arrow left"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  handleVirtualKey("ArrowLeft");
+                }}>
+                ◀
+              </button>
+              <button
+                type="button"
+                className="hero-key-button hero-key-right"
+                aria-label="Arrow right"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  handleVirtualKey("ArrowRight");
+                }}>
+                ▶
+              </button>
+              <button
+                type="button"
+                className="hero-key-button hero-key-down"
+                aria-label="Arrow down"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  handleVirtualKey("ArrowDown");
+                }}>
+                ▼
+              </button>
+              <button
+                type="button"
+                className={`hero-key-button hero-key-mod hero-key-ctrl${
+                  mobileModifiers.ctrl ? " is-active" : ""
+                }`}
+                aria-label="Ctrl modifier"
+                aria-pressed={mobileModifiers.ctrl}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  toggleMobileModifier("ctrl");
+                }}>
+                Ctrl
+              </button>
+              <button
+                type="button"
+                className={`hero-key-button hero-key-mod hero-key-shift${
+                  mobileModifiers.shift ? " is-active" : ""
+                }`}
+                aria-label="Shift modifier"
+                aria-pressed={mobileModifiers.shift}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  toggleMobileModifier("shift");
+                }}>
+                ⇧
+              </button>
+              <button
+                type="button"
+                className={`hero-key-button hero-key-mod hero-key-alt${
+                  mobileModifiers.alt ? " is-active" : ""
+                }`}
+                aria-label="Alt modifier"
+                aria-pressed={mobileModifiers.alt}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  toggleMobileModifier("alt");
+                }}>
+                Alt
+              </button>
+            </div>
+          ) : null}
+          <div className="hero-scroll-shield" aria-hidden="true" />
+          <TerminalCanvas
+            files={files}
+            introLines={profile.introLines[language]}
+            prompt={profile.terminal.prompt}
+            language={language}
+            messages={t.terminal}
+            theme={theme}
+            isMobile={isMobile}
+            screenAspect={screenAspect}
+            onNavigateAction={scrollToSection}
+            onReadyAction={(api) => {
+              setTerminalApi(api);
+            }}
+            onBootReadyAction={() => {
+              setTerminalBootReady(true);
+              setTerminalBootReadyAt(Date.now());
+            }}
+            onFocusChangeAction={(focused) => setTerminalFocused(focused)}
+          />
+        </section>
+
+        <motion.section
+          id="intro"
+          className="section section-intro"
+          initial={reducedMotion ? false : { opacity: 0, y: 32 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.25 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner intro-grid">
+            <div>
+              <span className="section-eyebrow">
+                {t.sections.intro.eyebrow}
+              </span>
+              <h2 className="section-title">{t.sections.intro.title}</h2>
+              <p className="section-subtitle">{t.sections.intro.subtitle}</p>
+              <div className="intro-actions">
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => scrollToSection("projects")}>
+                  {t.sections.intro.primaryCta}
+                </button>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => scrollToSection("contact")}>
+                  {t.sections.intro.secondaryCta}
+                </button>
+              </div>
+            </div>
+            <div className="intro-card">
+              <span className="intro-label">{profile.location[language]}</span>
+              <h3>{profile.fullName}</h3>
+              <p>{profile.roles[language].join(" · ")}</p>
+              <div className="intro-tags">
+                {profile.socials.map((social) => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noreferrer">
+                    {social.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        <section id="featured" className="section section-featured">
+          <div className="section-inner featured-layout">
+            <div className="featured-copy">
+              <span className="section-eyebrow">
+                {t.sections.featured.eyebrow}
+              </span>
+              <h2 ref={featuredHeadingRef} className="section-title">
+                {t.sections.featured.title}
+              </h2>
+              <p ref={featuredSubtitleRef} className="section-subtitle">
+                {t.sections.featured.subtitle}
+              </p>
+              {!isMobile && activeFeaturedProject ? (
+                <div className="featured-status" aria-live="polite">
+                  <div className="featured-status-row">
+                    <span className="featured-count">
+                      {String(safeActiveFeatured + 1).padStart(2, "0")} /{" "}
+                      {String(featuredProjects.length).padStart(2, "0")}
+                    </span>
+                    <span className="featured-current">
+                      {activeFeaturedProject.title}
+                    </span>
+                  </div>
+                  <progress
+                    className="featured-progress"
+                    value={safeActiveFeatured + 1}
+                    max={featuredProjects.length}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <div className="featured-viewer">
+              {featuredCount > 0 ? (
+                <div className="featured-slider">
+                  <style>{featuredSliderCss}</style>
+                  {featuredProjects.map((project, index) => (
+                    <input
+                      key={`${project.title}-input`}
+                      className="featured-radio"
+                      type="radio"
+                      name="featured-slider"
+                      id={`featured-slide-${index + 1}`}
+                      checked={safeActiveFeatured === index}
+                      onChange={() => setFeaturedIndex(index)}
+                      aria-label={`${t.sections.featured.title} ${index + 1}`}
+                    />
+                  ))}
+                  <div className="featured-track">
+                    {featuredProjects.map((project, index) => (
+                      <article
+                        key={project.title}
+                        className={`featured-item featured-item--${index + 1}`}>
+                        <FeaturedCard
+                          project={project}
+                          labels={{
+                            repo: t.projects.repo,
+                            live: t.projects.live,
+                          }}
+                        />
+                      </article>
+                    ))}
+                    {featuredProjects[activeFeatured - 1] ? (
+                      <button
+                        type="button"
+                        className="featured-hit featured-hit-prev"
+                        aria-label={`${t.sections.featured.title} ${
+                          activeFeatured
+                        }/${featuredCount}`}
+                        onClick={() => shiftFeaturedIndex(-1)}
+                      />
+                    ) : null}
+                    {featuredProjects[activeFeatured + 1] ? (
+                      <button
+                        type="button"
+                        className="featured-hit featured-hit-next"
+                        aria-label={`${t.sections.featured.title} ${
+                          activeFeatured + 2
+                        }/${featuredCount}`}
+                        onClick={() => shiftFeaturedIndex(1)}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="featured-controls">
+                    <button
+                      type="button"
+                      className="featured-arrow featured-arrow-prev"
+                      aria-label={`${t.sections.featured.title} ${
+                        safeActiveFeatured + 1
+                      }/${featuredCount}`}
+                      onClick={() => shiftFeaturedIndex(-1)}
+                      disabled={safeActiveFeatured <= 0}>
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M15 5l-7 7 7 7"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <div className="featured-dots" role="group">
+                      {featuredProjects.map((project, index) => (
+                        <label
+                          key={`${project.title}-dot`}
+                          className={`featured-dot featured-dot--${index + 1}`}
+                          htmlFor={`featured-slide-${index + 1}`}
+                          aria-label={`${t.sections.featured.title} ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="featured-arrow featured-arrow-next"
+                      aria-label={`${t.sections.featured.title} ${
+                        safeActiveFeatured + 1
+                      }/${featuredCount}`}
+                      onClick={() => shiftFeaturedIndex(1)}
+                      disabled={safeActiveFeatured >= featuredCount - 1}>
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M9 5l7 7-7 7"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="featured-hint">{t.sections.featured.hint}</p>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <motion.section
+          id="capabilities"
+          className="section section-capabilities"
+          aria-labelledby="capabilities-title"
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner">
+            <div className="section-header">
+              <span className="section-eyebrow">
+                {t.sections.capabilities.eyebrow}
+              </span>
+              <h2 className="section-title" id="capabilities-title">
+                {t.sections.capabilities.title}
+              </h2>
+              <p className="section-subtitle">
+                {t.sections.capabilities.subtitle}
+              </p>
+            </div>
+            <motion.div
+              className="capability-grid"
+              initial={reducedMotion ? false : "hidden"}
+              whileInView={reducedMotion ? undefined : "show"}
+              viewport={{ once: true, amount: 0.2 }}
+              variants={{
+                hidden: { opacity: 0 },
+                show: {
+                  opacity: 1,
+                  transition: { staggerChildren: 0.06 },
+                },
+              }}>
+              {localizedCapabilities.map((item) => {
+                const isOpen = openCapabilityId === item.id;
+                const hasDetails = Boolean(item.bullets?.length);
+                return (
+                  <motion.article
+                    key={item.id}
+                    className="capability-card"
+                    variants={{
+                      hidden: { opacity: 0, y: 16 },
+                      show: { opacity: 1, y: 0 },
+                    }}
+                    whileHover={
+                      reducedMotion ? undefined : { y: -2, scale: 1.01 }
+                    }
+                    transition={{ duration: 0.35, ease: "easeOut" }}>
+                    <span className="capability-icon">
+                      {capabilityIcons[item.icon] ?? capabilityIcons.layers}
+                    </span>
+                    <div className="capability-body">
+                      <h3>{item.title}</h3>
+                      <p>{item.body}</p>
+                    </div>
+                    {hasDetails ? (
+                      <button
+                        type="button"
+                        className="capability-toggle"
+                        aria-expanded={isOpen}
+                        onClick={() =>
+                          setOpenCapabilityId(isOpen ? null : item.id)
+                        }>
+                        {isOpen
+                          ? t.sections.capabilities.close
+                          : t.sections.capabilities.details}
+                      </button>
+                    ) : null}
+                    {hasDetails ? (
+                      <motion.div
+                        className="capability-details"
+                        initial={false}
+                        animate={
+                          isOpen
+                            ? { height: "auto", opacity: 1 }
+                            : { height: 0, opacity: 0 }
+                        }
+                        transition={
+                          reducedMotion
+                            ? { duration: 0 }
+                            : { duration: 0.25, ease: "easeOut" }
+                        }>
+                        <ul>
+                          {item.bullets?.map((bullet) => (
+                            <li key={bullet}>{bullet}</li>
+                          ))}
+                        </ul>
+                      </motion.div>
+                    ) : null}
+                  </motion.article>
+                );
+              })}
+            </motion.div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="about"
+          className="section section-about"
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner">
+            <div className="section-header">
+              <span className="section-eyebrow">
+                {t.sections.about.eyebrow}
+              </span>
+              <h2 className="section-title section-title-caret">
+                {aboutTitle}
+                <span className="typing-caret" aria-hidden="true" />
+              </h2>
+              <p className="section-subtitle">{t.sections.about.subtitle}</p>
+            </div>
+            <div className="about-content">
+              <div className="about-card">
+                <Markdown content={aboutParts.intro} />
+                {aboutParts.rest ? (
+                  <button
+                    type="button"
+                    className="about-toggle"
+                    aria-expanded={aboutOpen}
+                    onClick={() => setAboutOpen((prev) => !prev)}>
+                    {aboutOpen ? t.sections.about.less : t.sections.about.more}
+                  </button>
+                ) : null}
+                {aboutParts.rest ? (
+                  <motion.div
+                    className="about-more"
+                    initial={false}
+                    animate={
+                      aboutOpen
+                        ? { opacity: 1, maxHeight: 1400, marginTop: 12 }
+                        : { opacity: 0, maxHeight: 0, marginTop: 0 }
+                    }
+                    transition={
+                      reducedMotion
+                        ? { duration: 0 }
+                        : { duration: 0.28, ease: "easeOut" }
+                    }>
+                    <Markdown content={aboutParts.rest} />
+                  </motion.div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="projects"
+          className="section"
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner">
+            <div className="section-header">
+              <span className="section-eyebrow">
+                {t.sections.projects.eyebrow}
+              </span>
+              <h2 className="section-title">{t.projects.latestTitle}</h2>
+              <p className="section-subtitle">{t.projects.latestSubtitle}</p>
+            </div>
+            <div className="project-grid">
+              {latestProjects.map((project) => (
+                <ProjectCard
+                  key={project.title}
+                  project={project}
+                  labels={{
+                    more: t.projects.more,
+                    less: t.projects.less,
+                    repo: t.projects.repo,
+                    live: t.projects.live,
+                  }}
+                  reducedMotion={Boolean(reducedMotion)}
+                  isOpen={openProjectId === project.title}
+                  onToggle={(nextOpen) =>
+                    setOpenProjectId(nextOpen ? project.title : null)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="contact"
+          className="section"
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner">
+            <div className="section-header">
+              <span className="section-eyebrow">
+                {t.sections.contact.eyebrow}
+              </span>
+              <h2 className="section-title">{t.sections.contact.title}</h2>
+              <p className="section-subtitle">{t.sections.contact.subtitle}</p>
+            </div>
+            <div className="contact-grid">
+              <div className="contact-card">
+                <Markdown content={contactContent} />
+              </div>
+              <div className="contact-form">
+                <ContactForm labels={t.contact.form} />
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        <footer className="site-footer">
+          <div className="footer-inner">
+            <div>
+              <p className="footer-name">{profile.fullName}</p>
+              <p className="footer-role">{profile.jobTitle[language]}</p>
+            </div>
+            <div className="footer-links">
+              {profile.socials.map((social) => (
+                <a
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noreferrer">
+                  {social.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        </footer>
+      </div>
     </main>
   );
 }
 
 function ProjectCard({
   project,
+  labels,
+  reducedMotion,
+  isOpen,
+  onToggle,
 }: {
-  project: {
-    title: string;
-    year: string;
-    tags: readonly string[];
-    summary: string;
-    detailsMd?: string;
-    links: {
-      repo?: string;
-      live?: string;
-    };
+  project: LocalizedProject;
+  labels: {
+    more: string;
+    less: string;
+    repo: string;
+    live: string;
   };
+  reducedMotion: boolean;
+  isOpen: boolean;
+  onToggle: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const projectId = `project-${slugify(project.title)}`;
+  const detailsId = `${projectId}-details`;
+  const maxTags = 4;
+  const visibleTags = project.tags.slice(0, maxTags);
+  const extraTags = project.tags.length - visibleTags.length;
+  const isExpandable = Boolean(project.detailsMd);
+  const { visibleText, visibleCount, phase } = useTypewriterText(
+    project.detailsMd ?? "",
+    isOpen,
+    {
+      reduceMotion: reducedMotion,
+    },
+  );
+  const showDetails =
+    Boolean(project.detailsMd) && (isOpen || visibleCount > 0);
+  const handleCardToggle = (event: React.MouseEvent<HTMLElement>) => {
+    if (!isExpandable) {
+      return;
+    }
+    if ((event.target as HTMLElement).closest("a, button")) {
+      return;
+    }
+    onToggle(!isOpen);
+  };
+  const handleKeyToggle = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!isExpandable) {
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onToggle(!isOpen);
+    }
+  };
 
   return (
-    <article className="project-card">
+    <motion.article
+      id={projectId}
+      className={`project-card ${isExpandable ? "is-clickable" : ""}`}
+      role={isExpandable ? "button" : undefined}
+      tabIndex={isExpandable ? 0 : undefined}
+      aria-expanded={isExpandable ? isOpen : undefined}
+      aria-controls={isExpandable ? detailsId : undefined}
+      onClick={handleCardToggle}
+      onKeyDown={handleKeyToggle}
+      whileHover={reducedMotion ? undefined : { y: -4 }}
+      transition={{ duration: 0.3 }}>
       <div className="project-header">
         <span className="project-year">{project.year}</span>
         <h3>{project.title}</h3>
       </div>
       <p className="project-summary">{project.summary}</p>
       <div className="project-tags">
-        {project.tags.map((tag) => (
+        {visibleTags.map((tag) => (
           <span key={tag} className="project-tag">
             {tag}
           </span>
         ))}
+        {extraTags > 0 ? (
+          <span className="project-tag project-tag-more">+{extraTags}</span>
+        ) : null}
       </div>
       {project.detailsMd ? (
-        <button className="project-toggle" type="button" onClick={() => setOpen((prev) => !prev)}>
-          {open ? "hide" : "more..."}
+        <button
+          className="project-toggle"
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={detailsId}
+          onClick={() => onToggle(!isOpen)}>
+          {isOpen ? labels.less : labels.more}
         </button>
       ) : null}
-      {open && project.detailsMd ? <Markdown content={project.detailsMd} /> : null}
+      {project.detailsMd ? (
+        <motion.div
+          id={detailsId}
+          className="project-details"
+          initial={false}
+          animate={
+            showDetails
+              ? { height: "auto", opacity: 1, marginTop: 8 }
+              : { height: 0, opacity: 0, marginTop: 0 }
+          }
+          transition={
+            reducedMotion
+              ? { duration: 0 }
+              : { duration: 0.25, ease: "easeOut" }
+          }>
+          <div className="project-details-inner">
+            <Markdown
+              content={visibleText}
+              caret={showDetails}
+              caretClassName={`project-typing-caret ${phase}`}
+            />
+          </div>
+        </motion.div>
+      ) : null}
       <div className="project-links">
         {project.links.repo ? (
           <a href={project.links.repo} target="_blank" rel="noreferrer">
-            repo
+            {labels.repo}
           </a>
         ) : null}
         {project.links.live ? (
           <a href={project.links.live} target="_blank" rel="noreferrer">
-            live
+            {labels.live}
           </a>
         ) : null}
       </div>
-    </article>
+    </motion.article>
   );
 }

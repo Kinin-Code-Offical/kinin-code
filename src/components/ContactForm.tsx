@@ -57,12 +57,19 @@ export default function ContactForm({ labels }: { labels: Labels }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div>
+    <form onSubmit={handleSubmit} className="contact-form-inner">
+      <div className="form-field">
         <label htmlFor="name">{labels.nameLabel}</label>
-        <input id="name" name="name" placeholder={labels.namePlaceholder} required />
+        <input
+          id="name"
+          name="name"
+          placeholder={labels.namePlaceholder}
+          required
+          disabled={status === "sending"}
+          autoComplete="name"
+        />
       </div>
-      <div>
+      <div className="form-field">
         <label htmlFor="email">{labels.emailLabel}</label>
         <input
           id="email"
@@ -70,21 +77,32 @@ export default function ContactForm({ labels }: { labels: Labels }) {
           type="email"
           placeholder={labels.emailPlaceholder}
           required
+          disabled={status === "sending"}
+          autoComplete="email"
         />
       </div>
-      <div>
+      <div className="form-field">
         <label htmlFor="message">{labels.messageLabel}</label>
         <textarea
           id="message"
           name="message"
           placeholder={labels.messagePlaceholder}
           required
+          disabled={status === "sending"}
+          rows={5}
         />
       </div>
-      <button className="button primary" type="submit" disabled={status === "sending"}>
+      <button
+        className="button primary"
+        type="submit"
+        disabled={status === "sending"}>
         {status === "sending" ? labels.sending : labels.submit}
       </button>
-      {message ? <p className="status">{message}</p> : null}
+      {message ? (
+        <p className="form-status" role="alert">
+          {message}
+        </p>
+      ) : null}
     </form>
   );
 }

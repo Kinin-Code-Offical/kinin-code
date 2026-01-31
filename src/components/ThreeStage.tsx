@@ -1,7 +1,13 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { Environment, Float, Html, OrbitControls, useGLTF } from "@react-three/drei";
+import {
+  Environment,
+  Float,
+  Html,
+  OrbitControls,
+  useGLTF,
+} from "@react-three/drei";
 import { Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   Box3,
@@ -12,7 +18,6 @@ import {
   SRGBColorSpace,
   Vector3,
 } from "three";
-import type { DevSettings } from "@/lib/devtools";
 
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(false);
@@ -33,7 +38,43 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-function Model({ url, settings }: { url: string; settings: DevSettings["model"] }) {
+type ModelSettings = {
+  scale: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+};
+
+type LightSettings = {
+  ambient: number;
+  hemi: number;
+  directional: number;
+  spotA: number;
+  spotB: number;
+};
+
+const DEFAULT_MODEL: ModelSettings = {
+  scale: 1.35,
+  rotX: 0.2,
+  rotY: -0.4,
+  rotZ: 0,
+  posX: 0,
+  posY: 0,
+  posZ: 0,
+};
+
+const DEFAULT_LIGHTS: LightSettings = {
+  ambient: 0.45,
+  hemi: 0.45,
+  directional: 1.1,
+  spotA: 0.8,
+  spotB: 0.35,
+};
+
+function Model({ url, settings }: { url: string; settings: ModelSettings }) {
   const { scene } = useGLTF(url);
 
   useLayoutEffect(() => {
@@ -53,8 +94,7 @@ function Model({ url, settings }: { url: string; settings: DevSettings["model"] 
     <group
       position={[settings.posX, settings.posY, settings.posZ]}
       rotation={[settings.rotX, settings.rotY, settings.rotZ]}
-      scale={settings.scale}
-    >
+      scale={settings.scale}>
       <primitive object={scene} />
     </group>
   );
@@ -65,14 +105,13 @@ function Placeholder({
   settings,
 }: {
   texture: CanvasTexture | null;
-  settings: DevSettings["model"];
+  settings: ModelSettings;
 }) {
   return (
     <mesh
       position={[settings.posX, settings.posY, settings.posZ]}
       rotation={[settings.rotX, settings.rotY, settings.rotZ]}
-      scale={settings.scale}
-    >
+      scale={settings.scale}>
       <boxGeometry args={[1.6, 1, 1.2]} />
       <meshStandardMaterial
         color="#6fd1ff"
@@ -87,14 +126,12 @@ function Placeholder({
 function Loader() {
   return (
     <Html center>
-      <div style={{ color: "#e9f1eb", fontSize: 12, letterSpacing: "0.12em" }}>
-        LOADING SCENE
-      </div>
+      <div className="three-stage-loading">LOADING SCENE</div>
     </Html>
   );
 }
 
-export default function ThreeStage({ devSettings }: { devSettings?: DevSettings }) {
+export default function ThreeStage() {
   const [canLoadModel, setCanLoadModel] = useState(false);
   const isMobile = useMediaQuery("(max-width: 900px)");
   const texture = useMemo(() => {
@@ -150,36 +187,16 @@ export default function ThreeStage({ devSettings }: { devSettings?: DevSettings 
     };
   }, []);
 
-  const camera = devSettings
-    ? devSettings.camera
-    : {
-        x: isMobile ? 0 : 0.2,
-        y: isMobile ? 0.6 : 0.9,
-        z: isMobile ? 3.2 : 3.6,
-        fov: isMobile ? 48 : 42,
-      };
+  const camera = {
+    x: isMobile ? 0 : 0.2,
+    y: isMobile ? 0.6 : 0.9,
+    z: isMobile ? 3.2 : 3.6,
+    fov: isMobile ? 48 : 42,
+  };
 
-  const modelSettings = devSettings
-    ? devSettings.model
-    : {
-        scale: 1.35,
-        rotX: 0.2,
-        rotY: -0.4,
-        rotZ: 0,
-        posX: 0,
-        posY: 0,
-        posZ: 0,
-      };
+  const modelSettings = DEFAULT_MODEL;
 
-  const lights = devSettings
-    ? devSettings.lights
-    : {
-        ambient: 0.45,
-        hemi: 0.45,
-        directional: 1.1,
-        spotA: 0.8,
-        spotB: 0.35,
-      };
+  const lights = DEFAULT_LIGHTS;
 
   return (
     <Canvas
@@ -187,8 +204,7 @@ export default function ThreeStage({ devSettings }: { devSettings?: DevSettings 
       shadows
       camera={{ position: [camera.x, camera.y, camera.z], fov: camera.fov }}
       gl={{ antialias: !isMobile, powerPreference: "high-performance" }}
-      style={{ width: "100%", height: isMobile ? 320 : 380 }}
-    >
+      style={{ width: "100%", height: isMobile ? 320 : 380 }}>
       <color attach="background" args={[new Color("#0b1110")]} />
       <ambientLight intensity={lights.ambient} />
       <hemisphereLight args={["#bde9ff", "#0a1412", lights.hemi]} />
@@ -199,14 +215,18 @@ export default function ThreeStage({ devSettings }: { devSettings?: DevSettings 
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
       />
-      <spotLight position={[-4, 4, 3]} intensity={lights.spotA} angle={0.4} penumbra={0.4} />
+      <spotLight
+        position={[-4, 4, 3]}
+        intensity={lights.spotA}
+        angle={0.4}
+        penumbra={0.4}
+      />
       <spotLight position={[0, -3, 3]} intensity={lights.spotB} angle={0.35} />
       <Suspense fallback={<Loader />}>
         <Float
           speed={isMobile ? 0.8 : 1.2}
           rotationIntensity={isMobile ? 0.25 : 0.4}
-          floatIntensity={isMobile ? 0.4 : 0.6}
-        >
+          floatIntensity={isMobile ? 0.4 : 0.6}>
           {canLoadModel ? (
             <Model url="/models/computer.glb" settings={modelSettings} />
           ) : (
@@ -216,8 +236,8 @@ export default function ThreeStage({ devSettings }: { devSettings?: DevSettings 
       </Suspense>
       <Environment preset="city" />
       <OrbitControls
-        enableZoom={Boolean(devSettings)}
-        enablePan={Boolean(devSettings)}
+        enableZoom={false}
+        enablePan={false}
         enabled={!isMobile}
         autoRotate
         autoRotateSpeed={isMobile ? 0.4 : 0.8}

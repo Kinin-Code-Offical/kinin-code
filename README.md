@@ -40,6 +40,39 @@ Validate content:
 npm run validate-content
 ```
 
+## Languages (TR / EN)
+
+Translations live here:
+
+```
+src/i18n/translations.ts
+```
+
+Markdown pages are per-language:
+
+```
+src/content/pages/about.tr.md
+src/content/pages/about.en.md
+src/content/pages/contact.tr.md
+src/content/pages/contact.en.md
+src/content/pages/title.tr.md
+src/content/pages/title.en.md
+```
+
+Projects and profile content are localized inside:
+
+```
+src/content/profile.ts
+src/content/projects.ts
+```
+
+To add a new language:
+1) Extend `Language` in `src/lib/i18n.ts`.
+2) Add translations in `src/i18n/translations.ts`.
+3) Add `*.md` pages for the new language.
+
+Language toggle writes to localStorage + cookie and also updates `?lang=tr|en`.
+
 ## 3D Model (GLB)
 
 Place the model here:
@@ -115,3 +148,12 @@ firebase emulators:start
 ```
 
 Note: `max-instances` caps cost.
+
+## SEO Checklist
+
+- Verify domain in Google Search Console (DNS).
+- Submit the sitemap (`/sitemap.xml`).
+- Check indexing with `site:your-domain`.
+- Validate canonical + hreflang tags.
+- Test structured data with Google Rich Results / Schema validator.
+- For preview/staging set `NEXT_PUBLIC_NO_INDEX=1` to prevent indexing.

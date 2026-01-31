@@ -1,20 +1,51 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import Markdown from "@/components/Markdown";
 import { getContent } from "@/lib/content";
+import { translations } from "@/i18n/translations";
+import { buildPageMetadata, resolveLanguage } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Projects — Yamac",
-  description: "Selected projects and experiments.",
-};
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: Promise<{ lang?: string }>;
+}): Promise<Metadata> {
+  const cookieStore = await cookies();
+  const params = searchParams ? await searchParams : undefined;
+  const language = resolveLanguage(
+    params?.lang ?? cookieStore.get("lang")?.value,
+  );
+  const t = translations[language];
+  return buildPageMetadata({
+    lang: language,
+    path: "/projects",
+    title: t.nav.projects,
+    description: t.sections.projects.subtitle,
+  });
+}
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ lang?: string }>;
+}) {
+  const cookieStore = await cookies();
+  const params = searchParams ? await searchParams : undefined;
+  const language = resolveLanguage(
+    params?.lang ?? cookieStore.get("lang")?.value,
+  );
+  const t = translations[language];
   const content = await getContent();
 
   return (
     <main className="simple-page">
       <section className="simple-card">
-        <Markdown content="# Projects" />
+        <div className="simple-header">
+          <span className="section-eyebrow">{t.sections.projects.eyebrow}</span>
+          <h1 className="section-title">{t.sections.projects.title}</h1>
+          <p className="section-subtitle">{t.sections.projects.subtitle}</p>
+        </div>
         <div className="project-grid">
           {content.projects.map((project) => (
             <article className="project-card" key={project.title}>
@@ -22,7 +53,7 @@ export default async function ProjectsPage() {
                 <span className="project-year">{project.year}</span>
                 <h3>{project.title}</h3>
               </div>
-              <p className="project-summary">{project.summary}</p>
+              <p className="project-summary">{project.summary[language]}</p>
               <div className="project-tags">
                 {project.tags.map((tag) => (
                   <span key={tag} className="project-tag">
@@ -30,16 +61,18 @@ export default async function ProjectsPage() {
                   </span>
                 ))}
               </div>
-              {project.detailsMd ? <Markdown content={project.detailsMd} /> : null}
+              {project.detailsMd ? (
+                <Markdown content={project.detailsMd[language]} />
+              ) : null}
               <div className="project-links">
-                {project.links.repo ? (
+                {"repo" in project.links && project.links.repo ? (
                   <a href={project.links.repo} target="_blank" rel="noreferrer">
-                    repo
+                    {t.projects.repo}
                   </a>
                 ) : null}
-                {project.links.live ? (
+                {"live" in project.links && project.links.live ? (
                   <a href={project.links.live} target="_blank" rel="noreferrer">
-                    live
+                    {t.projects.live}
                   </a>
                 ) : null}
               </div>
@@ -48,7 +81,7 @@ export default async function ProjectsPage() {
         </div>
         <div className="simple-actions">
           <Link className="button ghost" href="/">
-            Back
+            {t.nav.home}
           </Link>
         </div>
       </section>
