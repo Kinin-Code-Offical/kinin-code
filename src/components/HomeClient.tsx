@@ -560,7 +560,7 @@ export default function HomeClient({ content }: HomeClientProps) {
     });
   }, []);
 
-  const showVirtualKeys = isMobile || virtualKeysOpen;
+  const showVirtualKeys = isMobile || (virtualKeysOpen && dockKeysVisible);
 
   const applyLanguage = (lang: "tr" | "en") => {
     setLanguage(lang);
@@ -655,12 +655,6 @@ export default function HomeClient({ content }: HomeClientProps) {
   useEffect(() => {
     mobileModifiersRef.current = mobileModifiers;
   }, [mobileModifiers]);
-
-  useEffect(() => {
-    if (!dockKeysVisible && virtualKeysOpen) {
-      setVirtualKeysOpen(false);
-    }
-  }, [dockKeysVisible, virtualKeysOpen]);
 
   useEffect(() => {
     screenAspectRef.current = screenAspect;
