@@ -856,7 +856,6 @@ function ComputerModel({
     onScreenMeshAction,
     scene,
     setPlaneColor,
-    shadowsEnabled,
     lowPower,
     showNotes,
     usePhoneRig,
@@ -1070,7 +1069,13 @@ function ComputerModel({
       red: makeTexture(noteTexts.red, "#c94848"),
       blue: makeTexture(noteTexts.blue, "#3e6fd1"),
     };
-  }, [noteFontScale, noteTexts.blue, noteTexts.red, noteTextureSize, showNotes]);
+  }, [
+    noteFontScale,
+    noteTexts.blue,
+    noteTexts.red,
+    noteTextureSize,
+    showNotes,
+  ]);
 
   useEffect(() => {
     const notes = noteMeshesRef.current;
@@ -1184,7 +1189,7 @@ function PlaceholderComputer({
           color="#1a1410"
           map={texture ?? undefined}
           emissive={lowPower ? "#000000" : "#ffffff"}
-          emissiveMap={lowPower ? undefined : texture ?? undefined}
+          emissiveMap={lowPower ? undefined : (texture ?? undefined)}
           emissiveIntensity={lowPower ? 0 : 2}
           toneMapped={false}
         />
@@ -1466,7 +1471,14 @@ function SceneContent({
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [active, allowPointerParallax, invalidate, isMobile, lowPower, scrollProgressRef]);
+  }, [
+    active,
+    allowPointerParallax,
+    invalidate,
+    isMobile,
+    lowPower,
+    scrollProgressRef,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1515,7 +1527,9 @@ function SceneContent({
     window.addEventListener("scroll", markInteraction, { passive: true });
     window.addEventListener("wheel", markInteraction, { passive: true });
     if (!lowPower) {
-      window.addEventListener("pointermove", markInteraction, { passive: true });
+      window.addEventListener("pointermove", markInteraction, {
+        passive: true,
+      });
       window.addEventListener("touchmove", markInteraction, { passive: true });
     }
     window.addEventListener("keydown", handleKey);
