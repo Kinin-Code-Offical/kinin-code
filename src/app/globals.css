@@ -1476,41 +1476,43 @@ textarea {
 
 .boot-eye {
   width: 120px;
-  height: 54px;
+  height: 56px;
   margin: 0 auto 12px;
   position: relative;
   border-radius: 999px;
-  border: 1px solid rgba(var(--hero-accent-rgb), 0.4);
-  background: radial-gradient(circle at 50% 55%, rgba(var(--hero-accent-rgb), 0.22), rgba(0, 0, 0, 0.12));
+  border: 1px solid rgba(var(--hero-accent-rgb), 0.35);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(var(--hero-accent-rgb), 0.16), rgba(0, 0, 0, 0.25)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.2));
   box-shadow:
-    inset 0 0 14px rgba(var(--hero-accent-rgb), 0.22),
-    0 10px 30px rgba(0, 0, 0, 0.35);
+    inset 0 0 18px rgba(var(--hero-accent-rgb), 0.18),
+    0 12px 28px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
 .boot-eye::before {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -4px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0));
   transform-origin: center;
-  animation: boot-eye-blink 2.6s ease-in-out infinite;
+  animation: boot-eye-blink 4.2s ease-in-out infinite;
 }
 
 .boot-eye-core {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #ffffff, var(--hero-accent));
+  background: radial-gradient(circle at 35% 35%, #ffffff, rgba(var(--hero-accent-rgb), 0.95));
   box-shadow:
-    0 0 14px rgba(var(--hero-accent-rgb), 0.7),
-    0 0 30px rgba(var(--hero-accent-rgb), 0.35);
+    0 0 10px rgba(var(--hero-accent-rgb), 0.65),
+    0 0 22px rgba(var(--hero-accent-rgb), 0.28);
   transform: translate(-50%, -50%);
-  animation: boot-eye-pulse 2.6s ease-in-out infinite;
+  animation: boot-eye-pulse 4.2s ease-in-out infinite;
 }
 
 .boot-logo {
@@ -1528,13 +1530,17 @@ textarea {
 
 @keyframes boot-eye-blink {
   0%,
-  35%,
+  72%,
   100% {
-    transform: scaleY(0);
-    opacity: 0.75;
+    transform: scaleY(1);
+    opacity: 0.92;
   }
-  45%,
-  85% {
+  76%,
+  78% {
+    transform: scaleY(0.12);
+    opacity: 0.6;
+  }
+  82% {
     transform: scaleY(1);
     opacity: 0.95;
   }
@@ -1543,10 +1549,10 @@ textarea {
 @keyframes boot-eye-pulse {
   0%,
   100% {
-    transform: translate(-50%, -50%) scale(0.95);
+    transform: translate(-50%, -50%) scale(0.99);
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.05);
+    transform: translate(-50%, -50%) scale(1.01);
   }
 }
 

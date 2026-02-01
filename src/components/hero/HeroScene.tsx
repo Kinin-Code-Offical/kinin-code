@@ -572,6 +572,7 @@ function ComputerModel({
 
     const sceneScaleRef = Math.max(size.x, size.y, size.z);
     const shadowCullThreshold = sceneScaleRef * 0.08;
+    const meshSizes: Array<{ mesh: Mesh; maxDim: number }> = [];
     meshList.forEach((mesh) => {
       if (mesh === setPlaneRef.current) {
         return;
@@ -592,6 +593,9 @@ function ComputerModel({
       const worldSize = local.size.clone().multiply(scale);
       const maxDim = Math.max(worldSize.x, worldSize.y, worldSize.z);
       const eligible = maxDim >= shadowCullThreshold;
+      if (maxDim > 0) {
+        meshSizes.push({ mesh, maxDim });
+      }
       if (eligible) {
         shadowEligibleRef.current.add(mesh);
       }
@@ -741,11 +745,25 @@ function ComputerModel({
     }
 
     if (lowPower && detailMeshes.length) {
+      const keepCount = Math.max(6, Math.ceil(meshSizes.length * 0.15));
+      const keepLargest = meshSizes
+        .slice()
+        .sort((a, b) => b.maxDim - a.maxDim)
+        .slice(0, keepCount)
+        .map((entry) => entry.mesh);
+      const keepSet = new WeakSet<Mesh>();
+      keepLargest.forEach((mesh) => keepSet.add(mesh));
       detailMeshes.forEach((mesh) => {
         if (mesh === screenMesh) {
           return;
         }
         if (mesh === setPlaneRef.current) {
+          return;
+        }
+        if (keepSet.has(mesh)) {
+          return;
+        }
+        if (/case|body|base|keyboard|shell|chassis/i.test(mesh.name ?? "")) {
           return;
         }
         if (screenCandidates.includes(mesh)) {
