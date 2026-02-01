@@ -67,9 +67,10 @@ src/content/projects.ts
 ```
 
 To add a new language:
-1) Extend `Language` in `src/lib/i18n.ts`.
-2) Add translations in `src/i18n/translations.ts`.
-3) Add `*.md` pages for the new language.
+
+1. Extend `Language` in `src/lib/i18n.ts`.
+2. Add translations in `src/i18n/translations.ts`.
+3. Add `*.md` pages for the new language.
 
 Language toggle writes to localStorage + cookie and also updates `?lang=tr|en`.
 
@@ -98,6 +99,7 @@ screen mesh not found, using fallback plane
 ### Debug (`?dev=1`)
 
 The dev panel lists:
+
 - All mesh names in the GLB
 - The selected screen mesh name
 - Whether fallback plane is used
@@ -111,6 +113,7 @@ help, ls, cd, pwd, show <file.md>, show -all, echo <text>, hello, mkdir <name>, 
 ## Deploy (GCP)
 
 Required APIs:
+
 - run.googleapis.com
 - cloudbuild.googleapis.com
 - artifactregistry.googleapis.com
@@ -121,26 +124,32 @@ Required APIs:
 - firebasehosting.googleapis.com
 
 Configured names:
+
 - Artifact Registry repo: `kinin-code`
 - Cloud Run service: `kinin-code-dev`
 
 Cloud Build Trigger:
-1) Cloud Build -> Triggers -> connect GitHub
-2) Select `main` and use `cloudbuild.yaml`
+
+1. Cloud Build -> Triggers -> connect GitHub
+2. Select `main` and use `cloudbuild.yaml`
 
 Configured values:
+
 - Region: `europe-west1`
 - Project ID: `kinin-code`
 
 Firebase Hosting:
+
 ```bash
 firebase deploy --only hosting
 ```
 
 Cloudflare DNS:
+
 - Add the Firebase-provided DNS records in Cloudflare (DNS only recommended at first).
 
 Local test:
+
 ```bash
 docker build -t kinin-code .
 docker run -e PORT=8080 -p 8080:8080 kinin-code
@@ -148,6 +157,22 @@ firebase emulators:start
 ```
 
 Note: `max-instances` caps cost.
+
+## Contact form (Google Sheets)
+
+The contact API appends submissions to Google Sheets.
+
+Cloud Run (recommended):
+
+- Set `GOOGLE_SHEETS_SHEET_ID` (and optional `GOOGLE_SHEETS_RANGE`).
+- Grant the Cloud Run service account access to the sheet.
+- Share the sheet with the service account email.
+
+Local dev (optional):
+
+- Set `GOOGLE_SHEETS_CLIENT_EMAIL` + `GOOGLE_SHEETS_PRIVATE_KEY` in `.env`.
+
+Default range: `Contacts!A:D` (timestamp, name, email, message).
 
 ## SEO Checklist
 

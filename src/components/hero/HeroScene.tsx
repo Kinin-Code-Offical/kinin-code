@@ -5,6 +5,7 @@ import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
 import {
   Component,
   type ReactNode,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -32,6 +33,8 @@ import {
 } from "three";
 import type { TerminalApi } from "@/components/terminal/TerminalCanvas";
 
+useGLTF.preload("/models/computer.glb");
+
 export type SceneDebugInfo = {
   modelLoaded: boolean;
   meshNames: string[];
@@ -44,8 +47,8 @@ type HeroSceneProps = {
   terminalApi: TerminalApi | null;
   scrollProgressRef: MutableRefObject<number>;
   noteTexts: { red: string; blue: string };
+  active?: boolean;
   onDebugAction: (info: SceneDebugInfo) => void;
-  onFocusAction: () => void;
   onScreenAspectAction?: (aspect: number) => void;
   onReadyAction?: () => void;
 };
@@ -286,31 +289,37 @@ function ComputerModel({
   terminalApi,
   noteTexts,
   noteTextureSize,
+  noteFontScale,
   onDebugAction,
   onScreenAspectAction,
   onScreenFocus,
   onScreenMeshAction,
   onCameraRig,
   onContentReady,
-  isMobile,
   usePhoneRig,
   shadowsEnabled,
   allowTerminalTexture,
+  active,
+  lowPower,
+  showNotes,
   setPlaneColor,
 }: {
   terminalApi: TerminalApi | null;
   noteTexts: { red: string; blue: string };
   noteTextureSize?: number;
+  noteFontScale?: number;
   onDebugAction: (info: SceneDebugInfo) => void;
   onScreenAspectAction?: (aspect: number) => void;
   onScreenFocus?: (center: Vector3) => void;
   onScreenMeshAction?: (mesh: Mesh | null) => void;
   onCameraRig?: (rig: CameraRig) => void;
   onContentReady?: () => void;
-  isMobile: boolean;
   usePhoneRig: boolean;
   shadowsEnabled: boolean;
   allowTerminalTexture: boolean;
+  active: boolean;
+  lowPower: boolean;
+  showNotes: boolean;
   setPlaneColor: string;
 }) {
   const { scene, cameras } = useGLTF("/models/computer.glb");
@@ -323,6 +332,7 @@ function ComputerModel({
   });
   const screenMaterialRef = useRef<MeshBasicMaterial | null>(null);
   const lastTextureRef = useRef<CanvasTexture | null>(null);
+  const lastGoodTextureRef = useRef<CanvasTexture | null>(null);
   const sceneCenteredRef = useRef(false);
   const shadowEligibleRef = useRef<WeakSet<Mesh>>(new WeakSet());
   const applyScreenMaterial = useCallback((texture: CanvasTexture | null) => {
@@ -334,8 +344,8 @@ function ComputerModel({
       material.depthWrite = false;
       material.depthTest = true;
       material.polygonOffset = true;
-      material.polygonOffsetFactor = 2;
-      material.polygonOffsetUnits = 2;
+      material.polygonOffsetFactor = -1;
+      material.polygonOffsetUnits = -1;
       screenMaterialRef.current = material;
     }
     if (texture) {
@@ -347,7 +357,7 @@ function ComputerModel({
       texture.magFilter = LinearFilter;
     }
     material.map = texture ?? null;
-    material.color.set(texture ? "#ffffff" : "#1e1712");
+    material.color.set(texture ? "#ffffff" : "#2a1b0f");
     material.needsUpdate = true;
     if (screenMeshRef.current) {
       screenMeshRef.current.material = material;
@@ -362,17 +372,35 @@ function ComputerModel({
   const screenAspectRef = useRef<number | null>(null);
   const updateScreenMaterial = useCallback(
     (baseTexture: CanvasTexture | null) => {
-      const texture = allowTerminalTexture ? baseTexture : null;
-      applyScreenMaterial(texture);
-      lastTextureRef.current = texture;
+      const preferred = allowTerminalTexture ? baseTexture : null;
+      if (preferred) {
+        lastGoodTextureRef.current = preferred;
+      }
+      const nextTexture = preferred ?? lastGoodTextureRef.current;
+      applyScreenMaterial(nextTexture ?? null);
+      lastTextureRef.current = nextTexture ?? null;
     },
     [allowTerminalTexture, applyScreenMaterial],
   );
-  useFrame(() => {
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
     const baseTexture = allowTerminalTexture
       ? (terminalApi?.texture ?? null)
       : null;
-    if (baseTexture !== lastTextureRef.current) {
+    updateScreenMaterial(baseTexture);
+  }, [active, allowTerminalTexture, terminalApi, updateScreenMaterial]);
+  useFrame(() => {
+    if (!active) {
+      return;
+    }
+    const baseTexture = allowTerminalTexture
+      ? (terminalApi?.texture ?? null)
+      : null;
+    const candidate =
+      (allowTerminalTexture ? baseTexture : null) ?? lastGoodTextureRef.current;
+    if (candidate !== lastTextureRef.current) {
       updateScreenMaterial(baseTexture);
     }
   });
@@ -461,11 +489,14 @@ function ComputerModel({
     const meshNames: string[] = [];
     const meshList: Mesh[] = [];
     const noteMeshes: Mesh[] = [];
+    const detailMeshes: Mesh[] = [];
     const sceneCameras: Camera[] = [];
     const namedScreenMeshes: Mesh[] = [];
     const exactScreenMeshes: Mesh[] = [];
     const screenCandidates: Mesh[] = [];
     let screenMesh: Mesh | null = null;
+    const detailNamePattern =
+      /screw|button|key|knob|dial|pin|bolt|detail|logo|badge|vent|grill|speaker/i;
 
     if (fallbackPlaneRef.current) {
       scene.remove(fallbackPlaneRef.current);
@@ -518,6 +549,9 @@ function ComputerModel({
         if (/note/i.test(child.name)) {
           noteMeshes.push(child);
         }
+        if (lowPower && detailNamePattern.test(child.name)) {
+          detailMeshes.push(child);
+        }
         child.castShadow = enableShadows;
         child.receiveShadow = enableShadows;
       }
@@ -563,6 +597,14 @@ function ComputerModel({
       }
       mesh.castShadow = enableShadows && eligible;
       mesh.receiveShadow = enableShadows && eligible;
+      if (
+        lowPower &&
+        maxDim > 0 &&
+        maxDim < sceneScaleRef * 0.06 &&
+        !detailMeshes.includes(mesh)
+      ) {
+        detailMeshes.push(mesh);
+      }
     });
 
     if (exactScreenMeshes.length) {
@@ -586,6 +628,7 @@ function ComputerModel({
       }
       screenMeshRef.current = screenMesh;
       screenMesh.renderOrder = 0;
+      screenMesh.frustumCulled = false;
       scene.updateWorldMatrix(true, false);
       screenMesh.updateWorldMatrix(true, false);
       onScreenMeshAction?.(screenMesh);
@@ -663,6 +706,12 @@ function ComputerModel({
       });
 
       overlayCandidates.forEach((mesh) => {
+        if (lowPower) {
+          mesh.visible = false;
+          mesh.castShadow = false;
+          mesh.receiveShadow = false;
+          return;
+        }
         mesh.renderOrder = 1;
         const applyMat = (mat: unknown) => {
           const material = mat as {
@@ -691,6 +740,23 @@ function ComputerModel({
       });
     }
 
+    if (lowPower && detailMeshes.length) {
+      detailMeshes.forEach((mesh) => {
+        if (mesh === screenMesh) {
+          return;
+        }
+        if (mesh === setPlaneRef.current) {
+          return;
+        }
+        if (screenCandidates.includes(mesh)) {
+          return;
+        }
+        mesh.visible = false;
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+      });
+    }
+
     if (noteMeshes.length) {
       const byName = (pattern: RegExp) =>
         noteMeshes.find((mesh) => pattern.test(mesh.name)) ?? null;
@@ -703,7 +769,9 @@ function ComputerModel({
         red: red ?? fallback[0] ?? null,
         blue: blue ?? fallback[1] ?? null,
       };
-      noteMeshes.forEach((mesh) => ensurePlanarUv(mesh));
+      if (showNotes) {
+        noteMeshes.forEach((mesh) => ensurePlanarUv(mesh));
+      }
     }
 
     const screenMeshName: string | null = screenMesh?.name ?? null;
@@ -743,6 +811,7 @@ function ComputerModel({
       );
       plane.name = "FallbackScreen";
       plane.renderOrder = 0;
+      plane.frustumCulled = false;
       scene.add(plane);
       fallbackPlaneRef.current = plane;
       onScreenFocus?.(plane.position.clone());
@@ -787,6 +856,9 @@ function ComputerModel({
     onScreenMeshAction,
     scene,
     setPlaneColor,
+    shadowsEnabled,
+    lowPower,
+    showNotes,
     usePhoneRig,
   ]);
 
@@ -832,6 +904,8 @@ function ComputerModel({
       accentRgb && brightenRgb(accentRgb, 64)
         ? (brightenRgb(accentRgb, 64) as string)
         : setPlaneColor;
+    const emissiveValue = lowPower ? "#000000" : emissiveColor;
+    const emissiveIntensity = lowPower ? 0 : 0.35;
     const applyMat = (mat: unknown) => {
       if (!mat || typeof mat !== "object") {
         return;
@@ -845,8 +919,8 @@ function ComputerModel({
         material.color.set(planeColor);
       }
       if (material.emissive?.set) {
-        material.emissive.set(emissiveColor);
-        material.emissiveIntensity = 0.35;
+        material.emissive.set(emissiveValue);
+        material.emissiveIntensity = emissiveIntensity;
       }
     };
     if (Array.isArray(material)) {
@@ -854,13 +928,7 @@ function ComputerModel({
     } else {
       applyMat(material);
     }
-  }, [setPlaneColor]);
-
-  useEffect(() => {
-    return () => {
-      // keep GLTF cached to avoid reload/flicker on long sessions
-    };
-  }, []);
+  }, [lowPower, setPlaneColor]);
 
   useEffect(() => {
     updateScreenMaterial(terminalApi?.texture ?? null);
@@ -873,6 +941,9 @@ function ComputerModel({
   }, [terminalApi, updateScreenMaterial]);
 
   const noteTextures = useMemo(() => {
+    if (!showNotes) {
+      return { red: null, blue: null };
+    }
     const hashString = (value: string) => {
       let hash = 0;
       for (let i = 0; i < value.length; i += 1) {
@@ -897,6 +968,9 @@ function ComputerModel({
       if (!ctx) {
         return null;
       }
+      const fontScale = noteFontScale ?? 1;
+      const fontSize = Math.round(44 * fontScale);
+      const lineHeight = Math.round(62 * fontScale);
       const seed = hashString(label);
       const tilt = (rand(seed) - 0.5) * 0.08;
       const noiseCount = 2800;
@@ -928,12 +1002,10 @@ function ComputerModel({
       ctx.translate(size / 2, size / 2);
       ctx.rotate(tilt);
       ctx.fillStyle = "rgba(36, 26, 18, 0.92)";
-      ctx.font =
-        "bold 44px 'Segoe Print', 'Segoe Script', 'Comic Sans MS', cursive";
+      ctx.font = `bold ${fontSize}px 'Segoe Print', 'Segoe Script', 'Comic Sans MS', cursive`;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       const lines = label.split("\n");
-      const lineHeight = 62;
       const startY = -size * 0.22;
       const startX = -size * 0.28;
       lines.forEach((rawLine, index) => {
@@ -997,11 +1069,21 @@ function ComputerModel({
       red: makeTexture(noteTexts.red, "#c94848"),
       blue: makeTexture(noteTexts.blue, "#3e6fd1"),
     };
-  }, [noteTexts.blue, noteTexts.red, noteTextureSize]);
+  }, [noteFontScale, noteTexts.blue, noteTexts.red, noteTextureSize, showNotes]);
 
   useEffect(() => {
     const notes = noteMeshesRef.current;
     if (!notes.red && !notes.blue) {
+      return;
+    }
+    const setVisible = (mesh: Mesh | null, visible: boolean) => {
+      if (mesh) {
+        mesh.visible = visible;
+      }
+    };
+    setVisible(notes.red, showNotes);
+    setVisible(notes.blue, showNotes);
+    if (!showNotes) {
       return;
     }
     const applyMaterial = (
@@ -1020,7 +1102,7 @@ function ComputerModel({
 
     applyMaterial(notes.red, noteTextures.red);
     applyMaterial(notes.blue, noteTextures.blue);
-  }, [noteTextures.blue, noteTextures.red]);
+  }, [noteTextures.blue, noteTextures.red, showNotes]);
 
   useEffect(() => {
     return () => {
@@ -1061,9 +1143,11 @@ function ComputerModel({
 function PlaceholderComputer({
   terminalApi,
   allowTerminalTexture,
+  lowPower,
 }: {
   terminalApi: TerminalApi | null;
   allowTerminalTexture: boolean;
+  lowPower: boolean;
 }) {
   const screenRef = useRef<Mesh | null>(null);
   const texture = allowTerminalTexture ? (terminalApi?.texture ?? null) : null;
@@ -1098,9 +1182,9 @@ function PlaceholderComputer({
         <meshStandardMaterial
           color="#1a1410"
           map={texture ?? undefined}
-          emissive="#ffffff"
-          emissiveMap={texture ?? undefined}
-          emissiveIntensity={2}
+          emissive={lowPower ? "#000000" : "#ffffff"}
+          emissiveMap={lowPower ? undefined : texture ?? undefined}
+          emissiveIntensity={lowPower ? 0 : 2}
           toneMapped={false}
         />
       </mesh>
@@ -1112,8 +1196,8 @@ function SceneContent({
   terminalApi,
   scrollProgressRef,
   noteTexts,
+  active = true,
   onDebugAction,
-  onFocusAction,
   onScreenAspectAction,
   onReadyAction,
   interactionActive,
@@ -1127,7 +1211,8 @@ function SceneContent({
   const isMobile = useMediaQuery("(max-width: 900px)");
   const isLandscape = useMediaQuery("(orientation: landscape)");
   const isCoarsePointer = useMediaQuery("(pointer: coarse)");
-  const allowPointerParallax = !isMobile && !isCoarsePointer;
+  const allowPointerParallax =
+    active && !isMobile && !isCoarsePointer && !lowPower;
   const usePhoneRig = isMobile && !isLandscape;
   const isFirefox = useMemo(() => {
     if (typeof navigator === "undefined") {
@@ -1135,13 +1220,16 @@ function SceneContent({
     }
     return /firefox/i.test(navigator.userAgent);
   }, []);
-  const [canLoadModel, setCanLoadModel] = useState(false);
+  const [modelAttempt, setModelAttempt] = useState(0);
   const [bgColor, setBgColor] = useState("#0b0f0e");
   const { gl, invalidate } = useThree();
   const parallax = useParallax(allowPointerParallax);
   const groupRef = useRef<Mesh>(null);
   const contentReadyRef = useRef(false);
   const frameReadyRef = useRef(false);
+  const retryTimerRef = useRef<number | null>(null);
+  const retryCountRef = useRef(0);
+  const modelFailedRef = useRef(false);
   const screenFocusRef = useRef(new Vector3(0, 0.2, 0));
   const focusWorldRef = useRef(new Vector3());
   const cameraDirRef = useRef(new Vector3());
@@ -1181,8 +1269,43 @@ function SceneContent({
 
   const handleContentReady = useCallback(() => {
     contentReadyRef.current = true;
+    modelFailedRef.current = false;
+    retryCountRef.current = 0;
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     invalidate();
   }, [invalidate]);
+
+  const scheduleModelRetry = useCallback(
+    (reason: "error" | "reset" | "visible") => {
+      if (retryTimerRef.current) {
+        window.clearTimeout(retryTimerRef.current);
+      }
+      const attempt =
+        reason === "reset" ? 0 : Math.min(retryCountRef.current + 1, 6);
+      retryCountRef.current = attempt;
+      const delay =
+        reason === "reset" ? 0 : Math.min(9000, 700 + attempt * 900);
+      retryTimerRef.current = window.setTimeout(() => {
+        setModelAttempt((prev) => prev + 1);
+      }, delay);
+    },
+    [],
+  );
+
+  const handleModelError = useCallback(() => {
+    modelFailedRef.current = true;
+    onDebugAction({
+      modelLoaded: false,
+      meshNames: [],
+      meshCount: 0,
+      screenMeshName: null,
+      fallbackPlane: true,
+    });
+    scheduleModelRetry("error");
+  }, [onDebugAction, scheduleModelRetry]);
 
   const handleScreenFocus = useCallback((center: Vector3) => {
     screenFocusRef.current.copy(center);
@@ -1209,21 +1332,29 @@ function SceneContent({
   }, []);
 
   useEffect(() => {
-    let active = true;
-    fetch("/models/computer.glb", { method: "GET", cache: "no-store" })
-      .then((res) => {
-        if (active) {
-          setCanLoadModel(res.ok);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setCanLoadModel(false);
-        }
-      });
-
+    const handleCanvasReset = () => {
+      modelFailedRef.current = false;
+      scheduleModelRetry("reset");
+    };
+    const handleVisibility = () => {
+      if (!document.hidden && modelFailedRef.current) {
+        scheduleModelRetry("visible");
+      }
+    };
+    window.addEventListener("hero-canvas-reset", handleCanvasReset);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      active = false;
+      window.removeEventListener("hero-canvas-reset", handleCanvasReset);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [scheduleModelRetry]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -1259,16 +1390,29 @@ function SceneContent({
   }, []);
 
   useEffect(() => {
+    if (!active) {
+      return;
+    }
     let rafId = 0;
     let ticking = false;
+    let lastInvalidate = 0;
     const { current: initialScroll } = scrollProgressRef;
     const lastScrollRef = { value: initialScroll };
     lastScrollValueRef.current = initialScroll;
     lastScrollTimeRef.current = performance.now();
+    const lowPowerInterval = 120;
+    const diffThreshold = lowPower ? 0.0018 : 0.0005;
+    const minInterval = lowPower ? lowPowerInterval : isMobile ? 70 : 45;
     const tick = () => {
+      const now = performance.now();
       const { current } = scrollProgressRef;
       const diff = Math.abs(current - lastScrollRef.value);
-      if (diff > 0.0002 || needsInvalidateRef.current) {
+      if (diff > diffThreshold || needsInvalidateRef.current) {
+        if (now - lastInvalidate < minInterval) {
+          rafId = window.requestAnimationFrame(tick);
+          return;
+        }
+        lastInvalidate = now;
         lastScrollRef.value = current;
         lastScrollValueRef.current = current;
         needsInvalidateRef.current = false;
@@ -1296,33 +1440,54 @@ function SceneContent({
         requestTick();
       }
     };
+    const handleVisibility = () => {
+      if (document.hidden) {
+        return;
+      }
+      needsInvalidateRef.current = true;
+      requestTick();
+    };
     window.addEventListener("scroll", markScroll, { passive: true });
     window.addEventListener("resize", markScroll);
-    window.addEventListener("pointermove", handleMove, { passive: true });
+    if (allowPointerParallax) {
+      window.addEventListener("pointermove", handleMove, { passive: true });
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
     requestTick();
     return () => {
       window.removeEventListener("scroll", markScroll);
       window.removeEventListener("resize", markScroll);
-      window.removeEventListener("pointermove", handleMove);
+      if (allowPointerParallax) {
+        window.removeEventListener("pointermove", handleMove);
+      }
+      document.removeEventListener("visibilitychange", handleVisibility);
       if (rafId) {
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [allowPointerParallax, invalidate, scrollProgressRef]);
+  }, [active, allowPointerParallax, invalidate, isMobile, lowPower, scrollProgressRef]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
+    if (!active) {
+      window.dispatchEvent(
+        new CustomEvent("hero-interaction", { detail: { active: false } }),
+      );
+      return;
+    }
     let timerId = 0;
-    let active = false;
+    let interactionFlag = false;
     const setActive = (next: boolean) => {
-      if (active === next) {
+      if (interactionFlag === next) {
         return;
       }
-      active = next;
+      interactionFlag = next;
       window.dispatchEvent(
-        new CustomEvent("hero-interaction", { detail: { active } }),
+        new CustomEvent("hero-interaction", {
+          detail: { active: interactionFlag },
+        }),
       );
     };
     const scheduleEnd = () => {
@@ -1348,21 +1513,25 @@ function SceneContent({
     };
     window.addEventListener("scroll", markInteraction, { passive: true });
     window.addEventListener("wheel", markInteraction, { passive: true });
-    window.addEventListener("pointermove", markInteraction, { passive: true });
-    window.addEventListener("touchmove", markInteraction, { passive: true });
+    if (!lowPower) {
+      window.addEventListener("pointermove", markInteraction, { passive: true });
+      window.addEventListener("touchmove", markInteraction, { passive: true });
+    }
     window.addEventListener("keydown", handleKey);
     return () => {
       window.removeEventListener("scroll", markInteraction);
       window.removeEventListener("wheel", markInteraction);
-      window.removeEventListener("pointermove", markInteraction);
-      window.removeEventListener("touchmove", markInteraction);
+      if (!lowPower) {
+        window.removeEventListener("pointermove", markInteraction);
+        window.removeEventListener("touchmove", markInteraction);
+      }
       window.removeEventListener("keydown", handleKey);
       if (timerId) {
         window.clearTimeout(timerId);
       }
       setActive(false);
     };
-  }, []);
+  }, [active, lowPower]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -1377,6 +1546,9 @@ function SceneContent({
   }, [gl]);
 
   useEffect(() => {
+    if (!active) {
+      return;
+    }
     const handleTextureUpdate = () => {
       if (interactionActive) {
         pendingTextureUpdateRef.current = true;
@@ -1391,29 +1563,28 @@ function SceneContent({
         handleTextureUpdate,
       );
     };
-  }, [interactionActive, invalidate]);
+  }, [active, interactionActive, invalidate]);
 
   useEffect(() => {
+    if (!active) {
+      return;
+    }
     if (!interactionActive && pendingTextureUpdateRef.current) {
       pendingTextureUpdateRef.current = false;
       invalidate();
     }
-  }, [interactionActive, invalidate]);
+  }, [active, interactionActive, invalidate]);
 
   useEffect(() => {
-    if (!canLoadModel) {
-      onDebugAction({
-        modelLoaded: false,
-        meshNames: [],
-        meshCount: 0,
-        screenMeshName: null,
-        fallbackPlane: true,
-      });
-      contentReadyRef.current = true;
+    if (active) {
+      invalidate();
     }
-  }, [canLoadModel, onDebugAction]);
+  }, [active, invalidate]);
 
   useFrame(({ camera }) => {
+    if (!active) {
+      return;
+    }
     const scroll = scrollProgressRef.current;
     const base = {
       x: isMobile ? 0 : 0.2,
@@ -1551,14 +1722,17 @@ function SceneContent({
   });
 
   const lights = DEFAULT_LIGHTS;
-  const lightingActive = enhancedLighting && !interactionActive;
-  const shadowsEnabled = lightingActive && !lowPower && !isFirefox;
-  const shadowMapSize = isMobile ? 1024 : 2048;
+  const lightingActive =
+    active && enhancedLighting && !interactionActive && !lowPower;
+  const shadowsEnabled = lightingActive && !isFirefox;
+  const shadowMapSize = lowPower ? 512 : isMobile ? 1024 : 2048;
   const maxTextureSize = gl.capabilities.maxTextureSize || 1024;
   const noteTextureSize = Math.min(
-    isMobile || lowPower ? 512 : 1024,
+    lowPower ? (isMobile ? 256 : 384) : isMobile ? 512 : 1024,
     maxTextureSize,
   );
+  const noteFontScale = isFirefox ? 1.18 : lowPower ? 0.95 : 1;
+  const minimalLighting = lowPower || isFirefox;
 
   return (
     <>
@@ -1583,65 +1757,82 @@ function SceneContent({
         shadow-mapSize-height={shadowMapSize}
         shadow-bias={-0.00015}
       />
-      <directionalLight
-        position={[-6, 3, 5]}
-        intensity={isMobile ? 0.4 : 0.55}
-        castShadow={false}
-      />
-      <directionalLight
-        position={[-4, 3, -2]}
-        intensity={isMobile ? 0.35 : 0.45}
-        castShadow={false}
-      />
-      <spotLight
-        position={[-3, 4, 2]}
-        intensity={isMobile ? lights.spotA * 0.85 : lights.spotA * 0.95}
-        angle={0.45}
-        penumbra={0.4}
-      />
-      <spotLight
-        position={[2, -2, 2]}
-        intensity={isMobile ? lights.spotB * 0.75 : lights.spotB * 0.9}
-        angle={0.35}
-      />
+      {!minimalLighting ? (
+        <directionalLight
+          position={[-6, 3, 5]}
+          intensity={isMobile ? 0.4 : 0.55}
+          castShadow={false}
+        />
+      ) : null}
+      {!minimalLighting ? (
+        <directionalLight
+          position={[-4, 3, -2]}
+          intensity={isMobile ? 0.35 : 0.45}
+          castShadow={false}
+        />
+      ) : null}
+      {!minimalLighting ? (
+        <spotLight
+          position={[-3, 4, 2]}
+          intensity={isMobile ? lights.spotA * 0.85 : lights.spotA * 0.95}
+          angle={0.45}
+          penumbra={0.4}
+        />
+      ) : null}
+      {!minimalLighting ? (
+        <spotLight
+          position={[2, -2, 2]}
+          intensity={isMobile ? lights.spotB * 0.75 : lights.spotB * 0.9}
+          angle={0.35}
+        />
+      ) : null}
       <group
         ref={groupRef}
         castShadow={shadowsEnabled}
         receiveShadow={shadowsEnabled}>
-        {canLoadModel ? (
-          <SceneErrorBoundary
+        <SceneErrorBoundary
+          key={modelAttempt}
+          fallback={
+            <PlaceholderComputer
+              terminalApi={terminalApi}
+              allowTerminalTexture={true}
+              lowPower={lowPower}
+            />
+          }
+          onError={handleModelError}>
+          <Suspense
             fallback={
               <PlaceholderComputer
                 terminalApi={terminalApi}
                 allowTerminalTexture={true}
+                lowPower={lowPower}
               />
-            }
-            onError={() => setCanLoadModel(false)}>
+            }>
             <ComputerModel
               terminalApi={terminalApi}
               noteTexts={noteTexts}
               noteTextureSize={noteTextureSize}
+              noteFontScale={noteFontScale}
               onDebugAction={onDebugAction}
               onScreenAspectAction={onScreenAspectAction}
               onScreenFocus={handleScreenFocus}
               onScreenMeshAction={handleScreenMesh}
               onCameraRig={handleCameraRig}
               onContentReady={handleContentReady}
-              isMobile={isMobile}
               usePhoneRig={usePhoneRig}
               shadowsEnabled={shadowsEnabled}
               allowTerminalTexture={true}
+              active={active}
+              lowPower={lowPower}
+              showNotes={!lowPower}
               setPlaneColor={bgColor}
             />
-          </SceneErrorBoundary>
-        ) : (
-          <PlaceholderComputer
-            terminalApi={terminalApi}
-            allowTerminalTexture={true}
-          />
-        )}
+          </Suspense>
+        </SceneErrorBoundary>
       </group>
-      {lightingActive && !isFirefox ? <Environment preset="warehouse" /> : null}
+      {lightingActive && !minimalLighting ? (
+        <Environment preset="warehouse" />
+      ) : null}
       <OrbitControls
         enableZoom={false}
         enablePan={false}
@@ -1655,6 +1846,7 @@ function SceneContent({
 
 export default function HeroScene(props: HeroSceneProps) {
   const isMobile = useMediaQuery("(max-width: 900px)");
+  const isActive = props.active ?? true;
   const [lowPowerOverride, setLowPowerOverride] = useState(false);
   const [canvasKey, setCanvasKey] = useState(0);
   const [enhancedLighting, setEnhancedLighting] = useState(false);
@@ -1713,20 +1905,20 @@ export default function HeroScene(props: HeroSceneProps) {
   return (
     <Canvas
       key={canvasKey}
-      frameloop="demand"
+      frameloop={isActive ? "demand" : "never"}
       dpr={
-        lowPower || isMobile || isFirefox || interactionActive
+        !isActive || lowPower || isMobile || isFirefox || interactionActive
           ? [1, 1]
           : [1, 1.1]
       }
       camera={{ position: [0.2, 0.8, 3.6], fov: 42 }}
       gl={{
-        antialias: !isMobile && !lowPower && !isFirefox,
+        antialias: isActive && !isMobile && !lowPower && !isFirefox,
         powerPreference:
-          lowPower || isFirefox || interactionActive
+          !isActive || lowPower || isFirefox || interactionActive
             ? "low-power"
             : "high-performance",
-        logarithmicDepthBuffer: true,
+        logarithmicDepthBuffer: !lowPower,
       }}
       shadows={enhancedLighting && !isMobile && !lowPower && !isFirefox}
       onCreated={({ gl }) => {
@@ -1739,12 +1931,34 @@ export default function HeroScene(props: HeroSceneProps) {
           setLowPowerOverride(true);
           setEnhancedLighting(false);
           setCanvasKey((value) => value + 1);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("hero-canvas-reset"));
+          }
+        };
+        const handleRestored = () => {
+          if (!contextLostRef.current) {
+            return;
+          }
+          contextLostRef.current = false;
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("hero-canvas-reset"));
+          }
         };
         gl.domElement.addEventListener("webglcontextlost", handleLost, false);
+        gl.domElement.addEventListener(
+          "webglcontextrestored",
+          handleRestored,
+          false,
+        );
         return () => {
           gl.domElement.removeEventListener(
             "webglcontextlost",
             handleLost,
+            false,
+          );
+          gl.domElement.removeEventListener(
+            "webglcontextrestored",
+            handleRestored,
             false,
           );
         };
@@ -1757,6 +1971,7 @@ export default function HeroScene(props: HeroSceneProps) {
       }}>
       <SceneContent
         {...props}
+        active={isActive}
         lowPower={lowPower}
         enhancedLighting={enhancedLighting}
         interactionActive={interactionActive}

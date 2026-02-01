@@ -87,7 +87,9 @@ export const translations = {
       hint: "Komut listesi icin help yaz",
       help: [
         "Komutlar:",
-        "help, ls, cd, pwd, show <dosya.md>, show -all, open <dosya.md>, clear, echo <metin>, hello, mkdir <ad>, touch <ad>",
+        "help, ls [-al], cd, pwd, cat, less, head, tail, tree, find, grep, mkdir, touch, rm, mv, cp",
+        "echo, clear, history, env, export, alias, which, man, python, calc, snake, pacman, edit",
+        "show/open <dosya.md> ile site bolumleri acilir",
       ],
       availableFiles: "Dosyalar:",
       tip: "Ipucu: show about.md / show projects.md / show contact.md",
@@ -207,7 +209,9 @@ export const translations = {
       hint: "Type help for commands",
       help: [
         "Commands:",
-        "help, ls, cd, pwd, show <file.md>, show -all, open <file.md>, clear, echo <text>, hello, mkdir <name>, touch <name>",
+        "help, ls [-al], cd, pwd, cat, less, head, tail, tree, find, grep, mkdir, touch, rm, mv, cp",
+        "echo, clear, history, env, export, alias, which, man, python, calc, snake, pacman, edit",
+        "show/open <file.md> opens site sections",
       ],
       availableFiles: "Files:",
       tip: "Tip: show about.md / show projects.md / show contact.md",

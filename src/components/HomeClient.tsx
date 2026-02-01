@@ -2,7 +2,14 @@
 
 import dynamic from "next/dynamic";
 import type { ReactElement, RefObject } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import ContactForm from "@/components/ContactForm";
 import Markdown from "@/components/Markdown";
@@ -422,8 +429,26 @@ export default function HomeClient({ content }: HomeClientProps) {
     () => profile.sections.indexOf("featured"),
     [profile.sections],
   );
+  const emailIndex = useMemo(
+    () => profile.socials.findIndex((social) => social.href.startsWith("mailto:")),
+    [profile.socials],
+  );
   const [dockKeysVisible, setDockKeysVisible] = useState(true);
   const dockKeysVisibleRef = useRef(true);
+  const [heroActive, setHeroActive] = useState(true);
+  const heroActiveRef = useRef(true);
+  const [virtualKeysOpen, setVirtualKeysOpenState] = useState(false);
+  const virtualKeysOpenRef = useRef(false);
+  const setVirtualKeysOpen = useCallback(
+    (value: boolean | ((prev: boolean) => boolean)) => {
+      setVirtualKeysOpenState((prev) => {
+        const nextValue = typeof value === "function" ? value(prev) : value;
+        virtualKeysOpenRef.current = nextValue;
+        return nextValue;
+      });
+    },
+    [],
+  );
   const scrollProgressRef = useSmoothScrollProgress(heroRef, (value) => {
     if (!shellRef.current) {
       return;
@@ -458,13 +483,26 @@ export default function HomeClient({ content }: HomeClientProps) {
     const fade = forceOpaque ? 0 : 1 - reveal;
     shellRef.current.style.setProperty("--hero-fade", String(fade));
     shellRef.current.style.setProperty("--content-reveal", String(reveal));
+    const nextHeroActive = reveal < 0.98;
+    if (heroActiveRef.current !== nextHeroActive) {
+      heroActiveRef.current = nextHeroActive;
+      setHeroActive(nextHeroActive);
+    }
     const nextDockKeysVisible = reveal < 0.92;
     if (dockKeysVisibleRef.current !== nextDockKeysVisible) {
       dockKeysVisibleRef.current = nextDockKeysVisible;
       setDockKeysVisible(nextDockKeysVisible);
     }
+    if (
+      (!nextDockKeysVisible || !nextHeroActive) &&
+      virtualKeysOpenRef.current
+    ) {
+      virtualKeysOpenRef.current = false;
+      setVirtualKeysOpen(false);
+    }
   });
   const isMobile = useMediaQuery("(max-width: 900px)");
+  const isCoarsePointer = useMediaQuery("(pointer: coarse)");
   const reducedMotion = useReducedMotion() ?? false;
   const [menuOpen, setMenuOpen] = useState(false);
   const fallbackSection = profile.sections[0] ?? "home";
@@ -501,7 +539,6 @@ export default function HomeClient({ content }: HomeClientProps) {
     shift: false,
     alt: false,
   });
-  const [virtualKeysOpen, setVirtualKeysOpen] = useState(false);
   const mobileModifiersRef = useRef(mobileModifiers);
   const handleSceneReady = useCallback(() => {
     setSceneReady(true);
@@ -529,8 +566,13 @@ export default function HomeClient({ content }: HomeClientProps) {
   }, [terminalApi]);
 
   const handleVirtualKey = useCallback(
-    (key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight") => {
-      handleTerminalFocus();
+    (
+      key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight",
+      options?: { focus?: boolean },
+    ) => {
+      if (options?.focus !== false) {
+        handleTerminalFocus();
+      }
       const modifiers = mobileModifiersRef.current;
       const down = new KeyboardEvent("keydown", {
         key,
@@ -560,7 +602,7 @@ export default function HomeClient({ content }: HomeClientProps) {
     });
   }, []);
 
-  const showVirtualKeys = isMobile || virtualKeysOpen;
+  const showVirtualKeys = heroActive && (isMobile || virtualKeysOpen);
 
   const applyLanguage = (lang: "tr" | "en") => {
     setLanguage(lang);
@@ -580,7 +622,7 @@ export default function HomeClient({ content }: HomeClientProps) {
       return;
     }
     const stableDelay = 500;
-    const maxWait = 8000;
+    const maxWait = 12000;
     const lastReadyAt = Math.max(
       sceneReadyAt,
       modelReadyAt,
@@ -598,7 +640,9 @@ export default function HomeClient({ content }: HomeClientProps) {
       : 0;
     const canFinish = screenAspectReady && terminalBootReady;
     const shouldForce =
-      readyStartAtRef.current !== null && readyElapsed >= maxWait;
+      readyStartAtRef.current !== null &&
+      readyElapsed >= maxWait &&
+      terminalBootReady;
     if (shouldForce) {
       const timer = window.setTimeout(() => {
         setBootDone(true);
@@ -635,16 +679,6 @@ export default function HomeClient({ content }: HomeClientProps) {
   }, [bootDone]);
 
   useEffect(() => {
-    if (bootDone) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      setBootDone(true);
-    }, 10000);
-    return () => window.clearTimeout(timer);
-  }, [bootDone]);
-
-  useEffect(() => {
     if (!terminalApi || !pendingTerminalFocusRef.current) {
       return;
     }
@@ -653,14 +687,23 @@ export default function HomeClient({ content }: HomeClientProps) {
   }, [terminalApi]);
 
   useEffect(() => {
-    mobileModifiersRef.current = mobileModifiers;
-  }, [mobileModifiers]);
+    if (!bootDone || !terminalApi || isMobile || isCoarsePointer) {
+      return;
+    }
+    const active = document.activeElement;
+    if (
+      active &&
+      active !== document.body &&
+      active !== document.documentElement
+    ) {
+      return;
+    }
+    terminalApi.focus();
+  }, [bootDone, isCoarsePointer, isMobile, terminalApi]);
 
   useEffect(() => {
-    if (!dockKeysVisible && virtualKeysOpen) {
-      setVirtualKeysOpen(false);
-    }
-  }, [dockKeysVisible, virtualKeysOpen]);
+    mobileModifiersRef.current = mobileModifiers;
+  }, [mobileModifiers]);
 
   useEffect(() => {
     screenAspectRef.current = screenAspect;
@@ -699,10 +742,14 @@ export default function HomeClient({ content }: HomeClientProps) {
   }, [screenAspectReady]);
 
   useEffect(() => {
-    const shouldLock = !siteReady || isSwitching || (menuOpen && isMobile);
-    document.body.style.overflow = shouldLock ? "hidden" : "";
+    const shouldLock =
+      isMobile && (isSwitching || !siteReady || menuOpen);
+    const overflowValue = shouldLock ? "hidden" : "";
+    document.body.style.overflow = overflowValue;
+    document.documentElement.style.overflow = overflowValue;
     return () => {
       document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
     };
   }, [isMobile, isSwitching, menuOpen, siteReady]);
 
@@ -882,31 +929,101 @@ export default function HomeClient({ content }: HomeClientProps) {
     ].join("\n");
   }, [latestProjects, t.projects.latestTitle]);
 
-  const files = useMemo(
-    () => [
+  const files = useMemo(() => {
+    const terminalUser = profile.terminal.prompt.split("@")[0] || "user";
+    const homeDir = `/home/${terminalUser}`;
+    const docsDir = `${homeDir}/docs`;
+    const scriptsDir = `${homeDir}/scripts`;
+    const projectsDir = `${homeDir}/projects`;
+    return [
       {
-        path: "/title/title.md",
+        path: `${homeDir}/README.md`,
+        content: `# ${profile.fullName}\n\nWelcome to KININ-TERM.\n\nQuick links:\n- docs/about.md\n- docs/projects.md\n- docs/contact.md\n`,
+      },
+      {
+        path: `${docsDir}/title.md`,
         content: localizedPages.title,
         section: "home",
       },
       {
-        path: "/about/about.md",
+        path: `${docsDir}/about.md`,
         content: localizedPages.about,
         section: "about",
       },
       {
-        path: "/projects/projects.md",
+        path: `${docsDir}/projects.md`,
         content: projectsMd,
         section: "projects",
       },
       {
-        path: "/contact/contact.md",
+        path: `${docsDir}/contact.md`,
         content: localizedPages.contact,
         section: "contact",
       },
-    ],
-    [localizedPages, projectsMd],
-  );
+      {
+        path: `${homeDir}/notes/todo.txt`,
+        content:
+          "- finalize terminal sim\n- tune hero camera\n- deploy to cloud run\n- add new 3d scene\n",
+      },
+      {
+        path: `${homeDir}/notes/ideas.txt`,
+        content:
+          "Ideas:\n- retro mini games\n- hardware blog posts\n- terminal theme switch\n",
+      },
+      {
+        path: `${scriptsDir}/calc.py`,
+        content:
+          "# MiniCalc 0.2\n# Usage: calc 2+2\n\nprint('MiniCalc 0.2')\n",
+      },
+      {
+        path: `${scriptsDir}/snake.py`,
+        content: "# Snake (simulated)\nprint('Launching snake...')\n",
+      },
+      {
+        path: `${scriptsDir}/pacman.py`,
+        content: "# Pacman (simulated)\nprint('Launching pacman...')\n",
+      },
+      {
+        path: `${projectsDir}/kinin-portfolio/README.md`,
+        content:
+          "# Kinin Portfolio\n\nStatus: active\nStack: Next.js, Three.js, WebGL\n",
+      },
+      {
+        path: `${projectsDir}/retro-os/README.md`,
+        content:
+          "# Retro OS\n\nExperimenting with terminal UX and CRT shaders.\n",
+      },
+      {
+        path: `${homeDir}/.bashrc`,
+        content: "alias ll='ls -al'\nalias la='ls -a'\n",
+      },
+      {
+        path: `${homeDir}/.profile`,
+        content: "export LANG=en_US.UTF-8\nexport TERM=kinin-term\n",
+      },
+      {
+        path: "/etc/os-release",
+        content:
+          "NAME=KininOS\nVERSION=0.9.4\nID=kininos\nPRETTY_NAME=\"KininOS 0.9.4\"\n",
+      },
+      {
+        path: "/var/log/boot.log",
+        content: "boot: ok\nservices: ready\n",
+      },
+      {
+        path: "/usr/bin/python",
+        content: "ELF... (simulated)",
+      },
+      {
+        path: "/usr/bin/pacman",
+        content: "ELF... (simulated)",
+      },
+      {
+        path: "/usr/bin/snake",
+        content: "ELF... (simulated)",
+      },
+    ];
+  }, [localizedPages, profile.fullName, profile.terminal.prompt, projectsMd]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -1056,6 +1173,9 @@ export default function HomeClient({ content }: HomeClientProps) {
           role="status"
           aria-live="polite">
           <div className="boot-card">
+            <div className="boot-eye" aria-hidden="true">
+              <span className="boot-eye-core" />
+            </div>
             <div className="boot-logo">~&gt;</div>
             <div className="boot-lines">
               {profile.introLines[language]
@@ -1155,18 +1275,31 @@ export default function HomeClient({ content }: HomeClientProps) {
               </button>
             </div>
             <div className="dock-socials" aria-label="Social links">
-              {profile.socials.map((social) => {
+              {profile.socials.map((social, index) => {
                 const isEmail = social.href.startsWith("mailto:");
                 if (isEmail) {
                   return (
-                    <button
-                      key={social.label}
-                      className="dock-button"
-                      type="button"
-                      onClick={() => scrollToSection("contact")}
-                      aria-label={social.label}>
-                      {social.icon}
-                    </button>
+                    <Fragment key={social.label}>
+                      <button
+                        className="dock-button"
+                        type="button"
+                        onClick={() => scrollToSection("contact")}
+                        aria-label={social.label}>
+                        {social.icon}
+                      </button>
+                      {dockKeysVisible && index === emailIndex ? (
+                        <button
+                          className={`dock-button${
+                            virtualKeysOpen ? " is-active" : ""
+                          }`}
+                          type="button"
+                          onClick={() => setVirtualKeysOpen((prev) => !prev)}
+                          aria-label={t.hero.keysToggle}
+                          aria-pressed={virtualKeysOpen}>
+                          K
+                        </button>
+                      ) : null}
+                    </Fragment>
                   );
                 }
                 return (
@@ -1181,7 +1314,7 @@ export default function HomeClient({ content }: HomeClientProps) {
                   </a>
                 );
               })}
-              {dockKeysVisible ? (
+              {dockKeysVisible && emailIndex === -1 ? (
                 <button
                   className={`dock-button${
                     virtualKeysOpen ? " is-active" : ""
@@ -1462,8 +1595,8 @@ export default function HomeClient({ content }: HomeClientProps) {
               terminalApi={terminalApi}
               scrollProgressRef={scrollProgressRef}
               noteTexts={{ red: t.hero.noteRed, blue: t.hero.noteBlue }}
+              active={heroActive}
               onDebugAction={handleSceneDebug}
-              onFocusAction={handleTerminalFocus}
               onScreenAspectAction={(aspect) => {
                 if (!screenAspectReady) {
                   setScreenAspect(aspect);
@@ -1531,7 +1664,7 @@ export default function HomeClient({ content }: HomeClientProps) {
                 aria-label="Arrow up"
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowUp");
+                  handleVirtualKey("ArrowUp", { focus: false });
                 }}>
                 ▲
               </button>
@@ -1541,7 +1674,7 @@ export default function HomeClient({ content }: HomeClientProps) {
                 aria-label="Arrow left"
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowLeft");
+                  handleVirtualKey("ArrowLeft", { focus: false });
                 }}>
                 ◀
               </button>
@@ -1551,7 +1684,7 @@ export default function HomeClient({ content }: HomeClientProps) {
                 aria-label="Arrow right"
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowRight");
+                  handleVirtualKey("ArrowRight", { focus: false });
                 }}>
                 ▶
               </button>
@@ -1561,7 +1694,7 @@ export default function HomeClient({ content }: HomeClientProps) {
                 aria-label="Arrow down"
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowDown");
+                  handleVirtualKey("ArrowDown", { focus: false });
                 }}>
                 ▼
               </button>
@@ -1606,7 +1739,10 @@ export default function HomeClient({ content }: HomeClientProps) {
               </button>
             </div>
           ) : null}
-          <div className="hero-scroll-shield" aria-hidden="true" />
+          <div
+            className={`hero-scroll-shield${heroActive ? " is-active" : ""}`}
+            aria-hidden="true"
+          />
           <TerminalCanvas
             files={files}
             introLines={profile.introLines[language]}
@@ -1615,6 +1751,7 @@ export default function HomeClient({ content }: HomeClientProps) {
             messages={t.terminal}
             theme={theme}
             isMobile={isMobile}
+            isActive={heroActive}
             screenAspect={screenAspect}
             onNavigateAction={scrollToSection}
             onReadyAction={(api) => {

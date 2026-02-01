@@ -668,7 +668,7 @@ textarea {
     pointer-events: auto;
   }
 
-  .hero-scroll-shield {
+  .hero-scroll-shield.is-active {
     pointer-events: auto;
   }
 }
@@ -767,6 +767,11 @@ textarea {
   appearance: none;
   box-shadow: var(--shadow);
   text-shadow: none;
+}
+
+.hero-key-button.hero-key-mod {
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 .hero-key-button.is-active {
@@ -1469,6 +1474,45 @@ textarea {
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
 }
 
+.boot-eye {
+  width: 120px;
+  height: 54px;
+  margin: 0 auto 12px;
+  position: relative;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--hero-accent-rgb), 0.4);
+  background: radial-gradient(circle at 50% 55%, rgba(var(--hero-accent-rgb), 0.22), rgba(0, 0, 0, 0.12));
+  box-shadow:
+    inset 0 0 14px rgba(var(--hero-accent-rgb), 0.22),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.boot-eye::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+  transform-origin: center;
+  animation: boot-eye-blink 2.6s ease-in-out infinite;
+}
+
+.boot-eye-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff, var(--hero-accent));
+  box-shadow:
+    0 0 14px rgba(var(--hero-accent-rgb), 0.7),
+    0 0 30px rgba(var(--hero-accent-rgb), 0.35);
+  transform: translate(-50%, -50%);
+  animation: boot-eye-pulse 2.6s ease-in-out infinite;
+}
+
 .boot-logo {
   display: inline-flex;
   align-items: center;
@@ -1480,6 +1524,30 @@ textarea {
   color: var(--hero-accent);
   font-family: var(--font-mono), monospace;
   margin-bottom: 16px;
+}
+
+@keyframes boot-eye-blink {
+  0%,
+  35%,
+  100% {
+    transform: scaleY(0);
+    opacity: 0.75;
+  }
+  45%,
+  85% {
+    transform: scaleY(1);
+    opacity: 0.95;
+  }
+}
+
+@keyframes boot-eye-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
 }
 
 .boot-lines {
@@ -3158,4 +3226,6 @@ textarea {
   background: transparent;
   pointer-events: none;
   touch-action: pan-y;
+  opacity: calc(1 - var(--content-reveal));
+  transition: height 0.3s ease, opacity 0.3s ease;
 }

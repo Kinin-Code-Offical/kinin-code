@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { JetBrains_Mono, Space_Grotesk, Unbounded } from "next/font/google";
 import "./globals.css";
@@ -58,7 +58,17 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     robots: isNoIndex()
       ? { index: false, follow: false }
-      : { index: true, follow: true },
+      : {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            "max-snippet": -1,
+            "max-image-preview": "large",
+            "max-video-preview": -1,
+          },
+        },
     icons: {
       icon: "/favicon.ico",
       shortcut: "/favicon.ico",
@@ -68,7 +78,6 @@ export async function generateMetadata(): Promise<Metadata> {
         { rel: "icon", url: "/icon-512.png" },
       ],
     },
-    manifest: "/site.webmanifest",
     authors: [{ name: fullName }],
     creator: fullName,
     publisher: fullName,
@@ -107,12 +116,21 @@ export async function generateMetadata(): Promise<Metadata> {
     referrer: "strict-origin-when-cross-origin",
     applicationName: fullName,
     generator: "Next.js",
-    themeColor: "#0b0f0e",
     formatDetection: {
       email: true,
       address: false,
       telephone: false,
     },
+  };
+}
+
+export function generateViewport(): Viewport {
+  return {
+    themeColor: [
+      { media: "(prefers-color-scheme: dark)", color: "#0b0f0e" },
+      { media: "(prefers-color-scheme: light)", color: "#e9dcc6" },
+    ],
+    colorScheme: "dark light",
   };
 }
 

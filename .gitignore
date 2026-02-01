@@ -31,6 +31,15 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# editor
+.vscode
+.idea
+
+# cache
+.eslintcache
+.turbo
+.parcel-cache
+
 # env files (can opt-in for committing if needed)
 .env*
 

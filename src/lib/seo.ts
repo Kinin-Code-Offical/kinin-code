@@ -63,7 +63,19 @@ export function buildPageMetadata({ lang, path, title, description }: BuildMetad
       canonical,
       languages: alternates.languages,
     },
-    robots: isNoIndex() ? { index: false, follow: false } : { index: true, follow: true },
+    robots: isNoIndex()
+      ? { index: false, follow: false }
+      : {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          "max-snippet": -1,
+          "max-image-preview": "large",
+          "max-video-preview": -1,
+        },
+      },
     openGraph: {
       title,
       description,
