@@ -430,7 +430,8 @@ export default function HomeClient({ content }: HomeClientProps) {
     [profile.sections],
   );
   const emailIndex = useMemo(
-    () => profile.socials.findIndex((social) => social.href.startsWith("mailto:")),
+    () =>
+      profile.socials.findIndex((social) => social.href.startsWith("mailto:")),
     [profile.socials],
   );
   const [dockKeysVisible, setDockKeysVisible] = useState(true);
@@ -492,6 +493,10 @@ export default function HomeClient({ content }: HomeClientProps) {
     if (dockKeysVisibleRef.current !== nextDockKeysVisible) {
       dockKeysVisibleRef.current = nextDockKeysVisible;
       setDockKeysVisible(nextDockKeysVisible);
+      // Close virtual keys when dock becomes hidden
+      if (!nextDockKeysVisible) {
+        setVirtualKeysOpen(false);
+      }
     }
     if (
       (!nextDockKeysVisible || !nextHeroActive) &&
@@ -742,8 +747,7 @@ export default function HomeClient({ content }: HomeClientProps) {
   }, [screenAspectReady]);
 
   useEffect(() => {
-    const shouldLock =
-      isMobile && (isSwitching || !siteReady || menuOpen);
+    const shouldLock = isMobile && (isSwitching || !siteReady || menuOpen);
     const overflowValue = shouldLock ? "hidden" : "";
     document.body.style.overflow = overflowValue;
     document.documentElement.style.overflow = overflowValue;
@@ -972,8 +976,7 @@ export default function HomeClient({ content }: HomeClientProps) {
       },
       {
         path: `${scriptsDir}/calc.py`,
-        content:
-          "# MiniCalc 0.2\n# Usage: calc 2+2\n\nprint('MiniCalc 0.2')\n",
+        content: "# MiniCalc 0.2\n# Usage: calc 2+2\n\nprint('MiniCalc 0.2')\n",
       },
       {
         path: `${scriptsDir}/snake.py`,
@@ -1004,7 +1007,7 @@ export default function HomeClient({ content }: HomeClientProps) {
       {
         path: "/etc/os-release",
         content:
-          "NAME=KininOS\nVERSION=0.9.4\nID=kininos\nPRETTY_NAME=\"KininOS 0.9.4\"\n",
+          'NAME=KininOS\nVERSION=0.9.4\nID=kininos\nPRETTY_NAME="KininOS 0.9.4"\n',
       },
       {
         path: "/var/log/boot.log",

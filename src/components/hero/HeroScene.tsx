@@ -860,6 +860,7 @@ function ComputerModel({
     lowPower,
     showNotes,
     usePhoneRig,
+    shadowsEnabled,
   ]);
 
   useEffect(() => {
