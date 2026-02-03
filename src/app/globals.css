@@ -3237,6 +3237,68 @@ textarea {
   }
 }
 
+@media (max-width: 600px) {
+  .hero-name {
+    font-size: 20px;
+    letter-spacing: 0.06em;
+  }
+
+  .hero-role,
+  .hero-hint {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .section-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+  }
+
+  .section-title {
+    font-size: clamp(20px, 6vw, 26px);
+  }
+
+  .section-subtitle {
+    font-size: 12px;
+  }
+
+  .markdown-p,
+  .markdown-li,
+  .about-card p,
+  .about-card li {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .mobile-menu-toggle,
+  .dock-button,
+  .featured-card,
+  .capability-card,
+  .contact-card,
+  .about-card,
+  .project-card {
+    box-shadow: none;
+  }
+
+  .sidebar-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .hero-mobile-keys {
+    animation: none;
+  }
+
+  .hero-shell,
+  .section {
+    background: var(--content-bg);
+  }
+
+  body::after {
+    opacity: 0.04;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;

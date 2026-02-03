@@ -1573,6 +1573,11 @@ export default function HomeClient({
 
   const featuredCount = featuredProjects.length;
   const [activeFeatured, setActiveFeatured] = useState(0);
+  const featuredAutoTimerRef = useRef<number | null>(null);
+  const featuredAutoScheduleRef = useRef<((delay: number) => void) | null>(
+    null,
+  );
+  const featuredLastInteractionRef = useRef(0);
   const clampFeaturedIndex = useCallback(
     (index: number) => {
       if (featuredCount <= 0) {
@@ -1594,22 +1599,55 @@ export default function HomeClient({
     },
     [clampFeaturedIndex],
   );
+  const registerFeaturedInteraction = useCallback(() => {
+    featuredLastInteractionRef.current = Date.now();
+    if (featuredAutoScheduleRef.current) {
+      featuredAutoScheduleRef.current(12000);
+    }
+  }, []);
   const featuredAutoDir = useRef(1);
   useEffect(() => {
     if (reducedMotion || featuredCount <= 1) {
       return;
     }
-    const timer = window.setInterval(() => {
-      setActiveFeatured((prev) => {
-        if (prev >= featuredCount - 1) {
-          featuredAutoDir.current = -1;
-        } else if (prev <= 0) {
-          featuredAutoDir.current = 1;
+    let active = true;
+    const clearTimer = () => {
+      if (featuredAutoTimerRef.current !== null) {
+        window.clearTimeout(featuredAutoTimerRef.current);
+        featuredAutoTimerRef.current = null;
+      }
+    };
+    const schedule = (delay: number) => {
+      clearTimer();
+      featuredAutoTimerRef.current = window.setTimeout(() => {
+        if (!active) {
+          return;
         }
-        return clampFeaturedIndex(prev + featuredAutoDir.current);
-      });
-    }, 5200);
-    return () => window.clearInterval(timer);
+        const now = Date.now();
+        const sinceInteraction =
+          now - (featuredLastInteractionRef.current || 0);
+        if (sinceInteraction < 12000) {
+          schedule(12000 - sinceInteraction);
+          return;
+        }
+        setActiveFeatured((prev) => {
+          if (prev >= featuredCount - 1) {
+            featuredAutoDir.current = -1;
+          } else if (prev <= 0) {
+            featuredAutoDir.current = 1;
+          }
+          return clampFeaturedIndex(prev + featuredAutoDir.current);
+        });
+        schedule(5200);
+      }, delay);
+    };
+    featuredAutoScheduleRef.current = schedule;
+    schedule(5200);
+    return () => {
+      active = false;
+      featuredAutoScheduleRef.current = null;
+      clearTimer();
+    };
   }, [clampFeaturedIndex, featuredCount, reducedMotion]);
   const safeActiveFeatured =
     featuredCount > 0 ? clampFeaturedIndex(activeFeatured) : 0;
@@ -2412,7 +2450,10 @@ export default function HomeClient({
                       name="featured-slider"
                       id={`featured-slide-${index + 1}`}
                       checked={safeActiveFeatured === index}
-                      onChange={() => setFeaturedIndex(index)}
+                      onChange={() => {
+                        registerFeaturedInteraction();
+                        setFeaturedIndex(index);
+                      }}
                       aria-label={`${t.sections.featured.title} ${index + 1}`}
                     />
                   ))}
@@ -2437,7 +2478,10 @@ export default function HomeClient({
                         aria-label={`${t.sections.featured.title} ${
                           activeFeatured
                         }/${featuredCount}`}
-                        onClick={() => shiftFeaturedIndex(-1)}
+                        onClick={() => {
+                          registerFeaturedInteraction();
+                          shiftFeaturedIndex(-1);
+                        }}
                       />
                     ) : null}
                     {featuredProjects[activeFeatured + 1] ? (
@@ -2447,7 +2491,10 @@ export default function HomeClient({
                         aria-label={`${t.sections.featured.title} ${
                           activeFeatured + 2
                         }/${featuredCount}`}
-                        onClick={() => shiftFeaturedIndex(1)}
+                        onClick={() => {
+                          registerFeaturedInteraction();
+                          shiftFeaturedIndex(1);
+                        }}
                       />
                     ) : null}
                   </div>
@@ -2458,7 +2505,10 @@ export default function HomeClient({
                       aria-label={`${t.sections.featured.title} ${
                         safeActiveFeatured + 1
                       }/${featuredCount}`}
-                      onClick={() => shiftFeaturedIndex(-1)}
+                      onClick={() => {
+                        registerFeaturedInteraction();
+                        shiftFeaturedIndex(-1);
+                      }}
                       disabled={safeActiveFeatured <= 0}>
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path
@@ -2485,7 +2535,10 @@ export default function HomeClient({
                       aria-label={`${t.sections.featured.title} ${
                         safeActiveFeatured + 1
                       }/${featuredCount}`}
-                      onClick={() => shiftFeaturedIndex(1)}
+                      onClick={() => {
+                        registerFeaturedInteraction();
+                        shiftFeaturedIndex(1);
+                      }}
                       disabled={safeActiveFeatured >= featuredCount - 1}>
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path
