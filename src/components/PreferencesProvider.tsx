@@ -59,7 +59,8 @@ function getInitialLanguage(initialLanguage: Language): Language {
   if (paramLang === "tr" || paramLang === "en") {
     return paramLang;
   }
-  const storedLang = localStorage.getItem(LANG_COOKIE) || readCookie(LANG_COOKIE);
+  const storedLang =
+    localStorage.getItem(LANG_COOKIE) || readCookie(LANG_COOKIE);
   if (storedLang === "tr" || storedLang === "en") {
     return storedLang;
   }

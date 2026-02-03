@@ -2635,7 +2635,11 @@ export default function HomeClient({
                     initial={false}
                     animate={
                       aboutOpen
-                        ? { opacity: 1, maxHeight: 1400, marginTop: 12 }
+                        ? {
+                            opacity: 1,
+                            maxHeight: isMobile ? 3200 : 3600,
+                            marginTop: 12,
+                          }
                         : { opacity: 0, maxHeight: 0, marginTop: 0 }
                     }
                     transition={

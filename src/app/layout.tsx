@@ -20,21 +20,45 @@ const display = Unbounded({
   variable: "--font-display",
   subsets: ["latin"],
   display: "optional",
-  fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
+  fallback: [
+    "system-ui",
+    "-apple-system",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 const body = Space_Grotesk({
   variable: "--font-body",
   subsets: ["latin"],
   display: "optional",
-  fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
+  fallback: [
+    "system-ui",
+    "-apple-system",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica",
+    "Arial",
+    "sans-serif",
+  ],
 });
 
 const mono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
   display: "optional",
-  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "monospace"],
+  fallback: [
+    "ui-monospace",
+    "SFMono-Regular",
+    "Menlo",
+    "Monaco",
+    "Consolas",
+    "Liberation Mono",
+    "monospace",
+  ],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -149,7 +173,7 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const theme = cookieStore.get("theme")?.value === "light" ? "light" : "dark";
   const langValue = cookieStore.get("lang")?.value;
-  const language: Language = langValue === "en" ? "en" : "tr";
+  const language: Language = langValue === "tr" ? "tr" : "en";
 
   return (
     <html lang={language} data-theme={theme} data-lang={language}>
