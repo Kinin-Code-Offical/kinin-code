@@ -3004,6 +3004,13 @@ textarea {
   color: var(--content-muted);
 }
 
+.footer-copy {
+  margin: 10px 0 0;
+  color: var(--content-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
 .footer-links {
   display: flex;
   flex-wrap: wrap;

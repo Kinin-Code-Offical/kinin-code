@@ -1,3 +1,3 @@
-# Yamac
+# Title
 
-Electric & Electronics Engineering student building full-stack experiences.
+Yamaç Gürsel | Electric & Electronics Engineering Student

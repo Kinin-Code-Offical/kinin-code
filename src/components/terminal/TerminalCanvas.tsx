@@ -76,6 +76,159 @@ type TerminalCanvasProps = {
     mkdirMissing: string;
     touchMissing: string;
     hello: string;
+    system: {
+      exit: string;
+      exitLine: string;
+      historyCleared: string;
+      noOutput: string;
+    };
+    pip: {
+      help: string;
+      missingPackage: string;
+      installed: string;
+      uninstalled: string;
+      packageNotFound: string;
+      unknownCommand: string;
+    };
+    editor: {
+      header: string;
+      editing: string;
+      saveFailed: string;
+      unsavedChanges: string;
+      exit: string;
+      saved: string;
+      savedAs: string;
+      lineNumbersOn: string;
+      lineNumbersOff: string;
+      usageSet: string;
+      help: string;
+      invalidLineNumber: string;
+      lineDeleted: string;
+      lineInserted: string;
+      unknownCommand: string;
+      lineUpdated: string;
+      lineAdded: string;
+      missingFile: string;
+      targetIsDirectory: string;
+    };
+    commands: {
+      echoMissingFile: string;
+      mkdirCannotCreate: string;
+      rmMissingOperand: string;
+      rmIsDirectory: string;
+      rmdirMissingOperand: string;
+      rmdirNotEmpty: string;
+      cpMissingOperand: string;
+      cpIsDirectory: string;
+      mvMissingOperand: string;
+      catMissingOperand: string;
+      headMissingOperand: string;
+      grepMissing: string;
+      whichMissing: string;
+      whichBuiltin: string;
+      whichNotFound: string;
+      manMissingTopic: string;
+      manNoEntry: string;
+    };
+    python: {
+      version: string;
+      usage: string;
+      missingCode: string;
+      loading: string;
+      error: string;
+      cantOpen: string;
+    };
+    media: {
+      mp3NoMedia: string;
+      videoNoMedia: string;
+      imageNoMedia: string;
+      imageUnsupported: string;
+      imageLoading: string;
+      imageLoadError: string;
+      playbackComplete: string;
+      playing: string;
+      paused: string;
+      loadingImage: string;
+      unableToLoadImage: string;
+      noImagesFound: string;
+    };
+    calc: {
+      launch: string;
+      invalidChars: string;
+      evalError: string;
+      invalid: string;
+      error: string;
+    };
+    apps: {
+      launchSnake: string;
+      launchPacman: string;
+      launchPong: string;
+      launchChess: string;
+      launchSolitaire: string;
+      modeStatus: string;
+    };
+    chess: {
+      selectPiece: string;
+      promotePawn: string;
+      noPieceSelected: string;
+      notYourTurn: string;
+      illegalMove: string;
+      checkmate: string;
+      stalemate: string;
+      check: string;
+      botThinking: string;
+      difficulty: string;
+      modeBot: string;
+      modePvp: string;
+      modeLabelBot: string;
+      modeLabelPvp: string;
+      colorWhite: string;
+      colorBlack: string;
+      botColor: string;
+      header: string;
+      promoteOptions: string;
+    };
+    solitaire: {
+      hint: string;
+      stockRecycled: string;
+      noCardsLeft: string;
+      wasteEmpty: string;
+      selectedWaste: string;
+      selectCardFirst: string;
+      cannotMoveFoundation: string;
+      drawCard: string;
+      placedCard: string;
+      emptyPile: string;
+      flippedCard: string;
+      selectedPile: string;
+      cannotStack: string;
+      movedCard: string;
+    };
+    ui: {
+      player: string;
+      playerControlsMedia: string;
+      playerControlsImage: string;
+      sciCalc: string;
+      calcControls: string;
+      retroFps: string;
+      chessControls: string;
+      chessMeta: string;
+      solitaireTitle: string;
+      solitaireControls: string;
+      solitaireStock: string;
+      solitaireWaste: string;
+      snakeHeader: string;
+      snakeWin: string;
+      snakeGameOver: string;
+      snakeControls: string;
+      pacmanHeader: string;
+      pacmanWin: string;
+      pacmanGameOver: string;
+      pacmanControls: string;
+      pongHeader: string;
+      pongControls: string;
+      pongGameOver: string;
+    };
   };
   theme: Theme;
   isMobile: boolean;
@@ -2050,13 +2203,13 @@ export default function TerminalCanvas({
     chessSelectedRef.current = null;
     chessTurnRef.current = "w";
     chessMovesRef.current = 0;
-    chessStatusRef.current = "Select a piece";
+    chessStatusRef.current = messages.chess.selectPiece;
     chessBotThinkingRef.current = false;
     chessCastlingRef.current = { wK: true, wQ: true, bK: true, bQ: true };
     chessEnPassantRef.current = null;
     chessPendingPromotionRef.current = null;
     dirtyRef.current = true;
-  }, []);
+  }, [messages.chess.selectPiece]);
 
   const getChessColor = useCallback((piece: string) => {
     if (!piece) {
@@ -2435,24 +2588,24 @@ export default function TerminalCanvas({
   const attemptChessMove = useCallback(
     (from: GridPoint, to: GridPoint) => {
       if (chessPendingPromotionRef.current) {
-        chessStatusRef.current = "Promote pawn: Q/R/B/N";
+        chessStatusRef.current = messages.chess.promotePawn;
         return false;
       }
       const board = chessBoardRef.current;
       const piece = board[from.y]?.[from.x] ?? "";
       if (!piece) {
-        chessStatusRef.current = "No piece selected";
+        chessStatusRef.current = messages.chess.noPieceSelected;
         return false;
       }
       const color = getChessColor(piece);
       if (!color || color !== chessTurnRef.current) {
-        chessStatusRef.current = "Not your turn";
+        chessStatusRef.current = messages.chess.notYourTurn;
         return false;
       }
       const moves = getChessLegalMoves(board, from.x, from.y);
       const isLegal = moves.some((move) => move.x === to.x && move.y === to.y);
       if (!isLegal) {
-        chessStatusRef.current = "Illegal move";
+        chessStatusRef.current = messages.chess.illegalMove;
         return false;
       }
       const captured = board[to.y]?.[to.x] ?? "";
@@ -2518,7 +2671,7 @@ export default function TerminalCanvas({
             nextTurn,
           };
           chessPromotionChoiceRef.current = 0;
-          chessStatusRef.current = "Promote pawn: Q/R/B/N";
+          chessStatusRef.current = messages.chess.promotePawn;
           return true;
         }
       } else {
@@ -2529,9 +2682,11 @@ export default function TerminalCanvas({
       const enemyColor = chessTurnRef.current;
       const inCheck = isChessInCheck(chessBoardRef.current, enemyColor);
       if (!hasChessLegalMove(chessBoardRef.current, enemyColor)) {
-        chessStatusRef.current = inCheck ? "Checkmate" : "Stalemate";
+        chessStatusRef.current = inCheck
+          ? messages.chess.checkmate
+          : messages.chess.stalemate;
       } else {
-        chessStatusRef.current = inCheck ? "Check!" : null;
+        chessStatusRef.current = inCheck ? messages.chess.check : null;
       }
       return true;
     },
@@ -2541,6 +2696,7 @@ export default function TerminalCanvas({
       getChessLegalMoves,
       hasChessLegalMove,
       isChessInCheck,
+      messages.chess,
     ],
   );
 
@@ -2559,7 +2715,7 @@ export default function TerminalCanvas({
       return;
     }
     chessBotThinkingRef.current = true;
-    chessStatusRef.current = "Bot thinking...";
+    chessStatusRef.current = messages.chess.botThinking;
     dirtyRef.current = true;
 
     const pickMove = () => {
@@ -2634,7 +2790,9 @@ export default function TerminalCanvas({
           chessBoardRef.current,
           chessTurnRef.current,
         );
-        chessStatusRef.current = isCheck ? "Checkmate" : "Stalemate";
+        chessStatusRef.current = isCheck
+          ? messages.chess.checkmate
+          : messages.chess.stalemate;
         chessBotThinkingRef.current = false;
         dirtyRef.current = true;
         return;
@@ -2664,6 +2822,7 @@ export default function TerminalCanvas({
     getChessColor,
     getChessLegalMoves,
     isChessInCheck,
+    messages.chess,
   ]);
 
   const resetSolitaire = useCallback(() => {
@@ -2699,10 +2858,9 @@ export default function TerminalCanvas({
       "♣": [],
     };
     solitaireSelectionRef.current = null;
-    solitaireMessageRef.current =
-      "D: draw  W: waste  1-7: tableau  F: to foundation";
+    solitaireMessageRef.current = messages.solitaire.hint;
     dirtyRef.current = true;
-  }, []);
+  }, [messages.solitaire.hint]);
 
   const getSolitaireRankIndex = useCallback(
     (rank: string) => SOLITAIRE_RANKS.findIndex((item) => item === rank),
@@ -3062,50 +3220,53 @@ export default function TerminalCanvas({
     return frames.length ? frames : [raw];
   }, []);
 
-  const buildAsciiFromImage = useCallback((image: HTMLImageElement) => {
-    const canvas = canvasRef.current;
-    const width = canvas?.width ?? 640;
-    const maxCols = Math.max(28, Math.min(120, Math.floor(width / 9)));
-    const aspect = image.height / Math.max(1, image.width);
-    const rows = Math.max(
-      14,
-      Math.min(80, Math.floor(maxCols * aspect * 0.55)),
-    );
-    const offscreen = document.createElement("canvas");
-    offscreen.width = maxCols;
-    offscreen.height = rows;
-    const ctx = offscreen.getContext("2d", { willReadFrequently: true });
-    if (!ctx) {
-      return "(image decode failed)";
-    }
-    ctx.drawImage(image, 0, 0, maxCols, rows);
-    const { data } = ctx.getImageData(0, 0, maxCols, rows);
-    const ramp = " .:-=+*#%@";
-    const lines: string[] = [];
-    for (let y = 0; y < rows; y += 1) {
-      let line = "";
-      for (let x = 0; x < maxCols; x += 1) {
-        const index = (y * maxCols + x) * 4;
-        const r = data[index];
-        const g = data[index + 1];
-        const b = data[index + 2];
-        const a = data[index + 3];
-        if (a < 12) {
-          line += " ";
-          continue;
-        }
-        const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-        const gamma = Math.pow(luminance, 0.85);
-        const rampIndex = Math.min(
-          ramp.length - 1,
-          Math.max(0, Math.round(gamma * (ramp.length - 1))),
-        );
-        line += ramp[rampIndex];
+  const buildAsciiFromImage = useCallback(
+    (image: HTMLImageElement) => {
+      const canvas = canvasRef.current;
+      const width = canvas?.width ?? 640;
+      const maxCols = Math.max(28, Math.min(120, Math.floor(width / 9)));
+      const aspect = image.height / Math.max(1, image.width);
+      const rows = Math.max(
+        14,
+        Math.min(80, Math.floor(maxCols * aspect * 0.55)),
+      );
+      const offscreen = document.createElement("canvas");
+      offscreen.width = maxCols;
+      offscreen.height = rows;
+      const ctx = offscreen.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        return messages.media.unableToLoadImage;
       }
-      lines.push(line);
-    }
-    return lines.join("\n");
-  }, []);
+      ctx.drawImage(image, 0, 0, maxCols, rows);
+      const { data } = ctx.getImageData(0, 0, maxCols, rows);
+      const ramp = " .:-=+*#%@";
+      const lines: string[] = [];
+      for (let y = 0; y < rows; y += 1) {
+        let line = "";
+        for (let x = 0; x < maxCols; x += 1) {
+          const index = (y * maxCols + x) * 4;
+          const r = data[index];
+          const g = data[index + 1];
+          const b = data[index + 2];
+          const a = data[index + 3];
+          if (a < 12) {
+            line += " ";
+            continue;
+          }
+          const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+          const gamma = Math.pow(luminance, 0.85);
+          const rampIndex = Math.min(
+            ramp.length - 1,
+            Math.max(0, Math.round(gamma * (ramp.length - 1))),
+          );
+          line += ramp[rampIndex];
+        }
+        lines.push(line);
+      }
+      return lines.join("\n");
+    },
+    [messages.media.unableToLoadImage],
+  );
 
   const loadImageAscii = useCallback(
     (src: string) =>
@@ -3114,10 +3275,11 @@ export default function TerminalCanvas({
         image.crossOrigin = "anonymous";
         image.decoding = "async";
         image.onload = () => resolve(buildAsciiFromImage(image));
-        image.onerror = () => reject(new Error("unable to load image"));
+        image.onerror = () =>
+          reject(new Error(messages.media.unableToLoadImage));
         image.src = src;
       }),
-    [buildAsciiFromImage],
+    [buildAsciiFromImage, messages.media.unableToLoadImage],
   );
 
   const resolveImagePlaylist = useCallback(() => {
@@ -3148,7 +3310,7 @@ export default function TerminalCanvas({
       );
       if (playerProgressRef.current >= playerDurationRef.current) {
         playerIsPlayingRef.current = false;
-        playerStatusRef.current = "Playback complete";
+        playerStatusRef.current = messages.media.playbackComplete;
       }
       playerFrameIndexRef.current =
         (playerFrameIndexRef.current + 1) %
@@ -3162,7 +3324,7 @@ export default function TerminalCanvas({
         playerProgressRef.current + 1,
       );
     }
-  }, []);
+  }, [messages.media.playbackComplete]);
 
   const startGameLoop = useCallback(
     (mode: AppMode) => {
@@ -3279,7 +3441,7 @@ export default function TerminalCanvas({
     (direction: number) => {
       const { paths } = resolveImagePlaylist();
       if (!paths.length) {
-        playerStatusRef.current = "No images found";
+        playerStatusRef.current = messages.media.noImagesFound;
         dirtyRef.current = true;
         return;
       }
@@ -3309,18 +3471,25 @@ export default function TerminalCanvas({
           ? node.content.trim()
           : null;
       const src = dataSource ?? nextPath;
-      playerStatusRef.current = "Loading image...";
+      playerStatusRef.current = messages.media.loadingImage;
       dirtyRef.current = true;
       void loadImageAscii(src)
         .then((ascii) => {
           startPlayer("image", nextPath, ascii);
         })
         .catch(() => {
-          playerStatusRef.current = "Unable to load image";
+          playerStatusRef.current = messages.media.unableToLoadImage;
           dirtyRef.current = true;
         });
     },
-    [loadImageAscii, resolveImagePlaylist, startPlayer],
+    [
+      loadImageAscii,
+      messages.media.loadingImage,
+      messages.media.noImagesFound,
+      messages.media.unableToLoadImage,
+      resolveImagePlaylist,
+      startPlayer,
+    ],
   );
 
   const startApp = useCallback(
@@ -3705,12 +3874,20 @@ export default function TerminalCanvas({
     [appendLine],
   );
 
+  const formatMessage = useCallback(
+    (template: string, vars: Record<string, string>) => {
+      return Object.entries(vars).reduce(
+        (acc, [key, value]) => acc.replaceAll(`{${key}}`, value),
+        template,
+      );
+    },
+    [],
+  );
+
   const runPipCommand = useCallback(
     (pipArgs: string[]) => {
       if (!pipArgs.length || pipArgs.includes("--help")) {
-        appendLine(
-          "pip (simulated) - commands: list, install, uninstall, freeze",
-        );
+        appendLine(messages.pip.help);
         return;
       }
       const [action, ...rest] = pipArgs;
@@ -3721,37 +3898,37 @@ export default function TerminalCanvas({
       }
       if (action === "install") {
         if (!rest.length) {
-          appendLine("pip: missing package name");
+          appendLine(messages.pip.missingPackage);
           return;
         }
         rest.forEach((pkg) => {
           if (!packages.includes(pkg)) {
             packages.push(pkg);
           }
-          appendLine(`Installed ${pkg}`);
+          appendLine(formatMessage(messages.pip.installed, { pkg }));
         });
         packages.sort();
         return;
       }
       if (action === "uninstall") {
         if (!rest.length) {
-          appendLine("pip: missing package name");
+          appendLine(messages.pip.missingPackage);
           return;
         }
         rest.forEach((pkg) => {
           const index = packages.indexOf(pkg);
           if (index >= 0) {
             packages.splice(index, 1);
-            appendLine(`Uninstalled ${pkg}`);
+            appendLine(formatMessage(messages.pip.uninstalled, { pkg }));
           } else {
-            appendLine(`Package not found: ${pkg}`);
+            appendLine(formatMessage(messages.pip.packageNotFound, { pkg }));
           }
         });
         return;
       }
-      appendLine(`pip: unknown command '${action}'`);
+      appendLine(formatMessage(messages.pip.unknownCommand, { cmd: action }));
     },
-    [appendLine],
+    [appendLine, formatMessage, messages.pip],
   );
 
   const stopApp = useCallback(
@@ -3762,21 +3939,19 @@ export default function TerminalCanvas({
       const ended = appModeRef.current;
       appModeRef.current = null;
       if (ended) {
-        appendLine(message ?? `Exited ${ended}`);
+        appendLine(
+          message ?? formatMessage(messages.system.exit, { app: ended }),
+        );
       }
       dirtyRef.current = true;
     },
-    [appendLine, stopGameLoop, stopSynthAudio],
-  );
-
-  const formatMessage = useCallback(
-    (template: string, vars: Record<string, string>) => {
-      return Object.entries(vars).reduce(
-        (acc, [key, value]) => acc.replaceAll(`{${key}}`, value),
-        template,
-      );
-    },
-    [],
+    [
+      appendLine,
+      formatMessage,
+      messages.system.exit,
+      stopGameLoop,
+      stopSynthAudio,
+    ],
   );
 
   const resetTerminal = useCallback(() => {
@@ -4009,12 +4184,17 @@ export default function TerminalCanvas({
 
   const printEditorBuffer = useCallback(
     (state: EditorState) => {
-      appendLine(`-- ${state.path} (${state.buffer.length} lines) --`);
+      appendLine(
+        formatMessage(messages.editor.header, {
+          path: state.path,
+          lines: String(state.buffer.length),
+        }),
+      );
       state.buffer.forEach((line, index) => {
         appendLine(formatEditorLine(line, index, state.showLineNumbers));
       });
     },
-    [appendLine, formatEditorLine],
+    [appendLine, formatEditorLine, formatMessage, messages.editor.header],
   );
 
   const handleEditorInputLine = useCallback(
@@ -4035,7 +4215,7 @@ export default function TerminalCanvas({
           );
           const ok = writeFile(path, sanitized.join("\n"), { create: true });
           if (!ok) {
-            appendLine("edit: save failed");
+            appendLine(messages.editor.saveFailed);
             return false;
           }
           state.modified = false;
@@ -4043,45 +4223,43 @@ export default function TerminalCanvas({
         };
         if (cmd === "q") {
           if (state.modified) {
-            appendLine("edit: unsaved changes (use :q! to quit)");
+            appendLine(messages.editor.unsavedChanges);
           } else {
             editorRef.current = null;
-            appendLine("-- EXIT --");
+            appendLine(messages.editor.exit);
           }
         } else if (cmd === "q!") {
           editorRef.current = null;
-          appendLine("-- EXIT --");
+          appendLine(messages.editor.exit);
         } else if (cmd === "w" && arg) {
           if (saveTo(arg)) {
             state.path = arg;
-            appendLine(`-- SAVED AS ${arg} --`);
+            appendLine(formatMessage(messages.editor.savedAs, { path: arg }));
           }
         } else if (cmd === "w") {
           if (saveTo(state.path)) {
-            appendLine("-- SAVED --");
+            appendLine(messages.editor.saved);
           }
         } else if (cmd === "wq") {
           if (saveTo(state.path)) {
-            appendLine("-- SAVED --");
+            appendLine(messages.editor.saved);
             editorRef.current = null;
-            appendLine("-- EXIT --");
+            appendLine(messages.editor.exit);
           }
         } else if (cmd === "set") {
           if (arg === "nu" || arg === "number") {
             state.showLineNumbers = true;
-            appendLine("edit: line numbers on");
+            appendLine(messages.editor.lineNumbersOn);
           } else if (arg === "nonu" || arg === "nonumber") {
             state.showLineNumbers = false;
-            appendLine("edit: line numbers off");
+            appendLine(messages.editor.lineNumbersOff);
           } else {
-            appendLine("edit: usage :set nu|nonu");
+            appendLine(messages.editor.usageSet);
           }
         } else if (cmd === "p") {
           printEditorBuffer(state);
         } else if (cmd === "help") {
-          appendLine(
-            "Commands: :w :wq :q :q! :w <file> :set nu|nonu :p :help | N: <text> | :d N | :i N <text>",
-          );
+          appendLine(messages.editor.help);
         } else if (cmd === "d") {
           const index = Number.parseInt(parts[1] ?? "", 10) - 1;
           if (
@@ -4089,16 +4267,20 @@ export default function TerminalCanvas({
             index < 0 ||
             index >= state.buffer.length
           ) {
-            appendLine("edit: invalid line number");
+            appendLine(messages.editor.invalidLineNumber);
           } else {
             state.buffer.splice(index, 1);
             state.modified = true;
-            appendLine(`edit: line ${index + 1} deleted`);
+            appendLine(
+              formatMessage(messages.editor.lineDeleted, {
+                line: String(index + 1),
+              }),
+            );
           }
         } else if (cmd === "i") {
           const index = Number.parseInt(parts[1] ?? "", 10) - 1;
           if (Number.isNaN(index) || index < 0) {
-            appendLine("edit: invalid line number");
+            appendLine(messages.editor.invalidLineNumber);
           } else {
             const text = parts.slice(2).join(" ");
             if (index >= state.buffer.length) {
@@ -4111,11 +4293,13 @@ export default function TerminalCanvas({
             }
             state.modified = true;
             appendLine(
-              `edit: line ${Math.min(index + 1, state.buffer.length)} inserted`,
+              formatMessage(messages.editor.lineInserted, {
+                line: String(Math.min(index + 1, state.buffer.length)),
+              }),
             );
           }
         } else {
-          appendLine("edit: unknown command");
+          appendLine(messages.editor.unknownCommand);
         }
         syncInputValue("");
         dirtyRef.current = true;
@@ -4125,7 +4309,7 @@ export default function TerminalCanvas({
       if (lineMatch) {
         const index = Number.parseInt(lineMatch[1], 10) - 1;
         if (Number.isNaN(index) || index < 0) {
-          appendLine("edit: invalid line number");
+          appendLine(messages.editor.invalidLineNumber);
         } else {
           const text = lineMatch[2] ?? "";
           const wasExisting = index < state.buffer.length;
@@ -4135,7 +4319,12 @@ export default function TerminalCanvas({
           state.buffer[index] = text;
           state.modified = true;
           appendLine(
-            `edit: line ${index + 1} ${wasExisting ? "updated" : "added"}`,
+            formatMessage(
+              wasExisting
+                ? messages.editor.lineUpdated
+                : messages.editor.lineAdded,
+              { line: String(index + 1) },
+            ),
           );
         }
         syncInputValue("");
@@ -4148,7 +4337,14 @@ export default function TerminalCanvas({
       dirtyRef.current = true;
       return true;
     },
-    [appendLine, printEditorBuffer, syncInputValue, writeFile],
+    [
+      appendLine,
+      formatMessage,
+      messages.editor,
+      printEditorBuffer,
+      syncInputValue,
+      writeFile,
+    ],
   );
 
   const runCommand = useCallback(
@@ -4252,7 +4448,7 @@ export default function TerminalCanvas({
           if (redirectIndex >= 0) {
             const target = args[redirectIndex + 1];
             if (!target) {
-              appendLine("echo: missing file");
+              appendLine(messages.commands.echoMissingFile);
               break;
             }
             const text = args.slice(0, redirectIndex).join(" ");
@@ -4326,7 +4522,7 @@ export default function TerminalCanvas({
           if (hasFlag("c")) {
             historyRef.current = [];
             historyIndexRef.current = -1;
-            appendLine("history cleared");
+            appendLine(messages.system.historyCleared);
             break;
           }
           historyRef.current.forEach((entry, index) =>
@@ -4342,7 +4538,11 @@ export default function TerminalCanvas({
           params.forEach((value) => {
             const ok = createDir(value, recursive);
             if (!ok) {
-              appendLine(`mkdir: cannot create directory '${value}'`);
+              appendLine(
+                formatMessage(messages.commands.mkdirCannotCreate, {
+                  dir: value,
+                }),
+              );
             }
           });
           break;
@@ -4357,7 +4557,7 @@ export default function TerminalCanvas({
         }
         case "rm": {
           if (!params.length) {
-            appendLine("rm: missing operand");
+            appendLine(messages.commands.rmMissingOperand);
             break;
           }
           const recursive = hasFlag("r") || hasFlag("f");
@@ -4368,7 +4568,11 @@ export default function TerminalCanvas({
               return;
             }
             if (node.type === "dir" && !recursive) {
-              appendLine(`rm: ${value}: is a directory`);
+              appendLine(
+                formatMessage(messages.commands.rmIsDirectory, {
+                  path: value,
+                }),
+              );
               return;
             }
             removeNode(value, recursive);
@@ -4377,7 +4581,7 @@ export default function TerminalCanvas({
         }
         case "rmdir": {
           if (!params.length) {
-            appendLine("rmdir: missing operand");
+            appendLine(messages.commands.rmdirMissingOperand);
             break;
           }
           params.forEach((value) => {
@@ -4387,7 +4591,11 @@ export default function TerminalCanvas({
               return;
             }
             if (Object.keys(node.children).length > 0) {
-              appendLine(`rmdir: ${value}: directory not empty`);
+              appendLine(
+                formatMessage(messages.commands.rmdirNotEmpty, {
+                  path: value,
+                }),
+              );
               return;
             }
             removeNode(value, true);
@@ -4396,7 +4604,7 @@ export default function TerminalCanvas({
         }
         case "cp": {
           if (params.length < 2) {
-            appendLine("cp: missing file operand");
+            appendLine(messages.commands.cpMissingOperand);
             break;
           }
           const dest = params[params.length - 1];
@@ -4408,7 +4616,11 @@ export default function TerminalCanvas({
               return;
             }
             if (sourceNode.type === "dir" && !hasFlag("r")) {
-              appendLine(`cp: ${source}: is a directory`);
+              appendLine(
+                formatMessage(messages.commands.cpIsDirectory, {
+                  path: source,
+                }),
+              );
               return;
             }
             const targetPath = resolveArg(dest);
@@ -4451,7 +4663,7 @@ export default function TerminalCanvas({
         }
         case "mv": {
           if (params.length < 2) {
-            appendLine("mv: missing file operand");
+            appendLine(messages.commands.mvMissingOperand);
             break;
           }
           const dest = params[params.length - 1];
@@ -4502,7 +4714,7 @@ export default function TerminalCanvas({
         case "cat":
         case "less": {
           if (!params.length) {
-            appendLine("cat: missing file operand");
+            appendLine(messages.commands.catMissingOperand);
             break;
           }
           params.forEach((value) => {
@@ -4518,13 +4730,13 @@ export default function TerminalCanvas({
         case "edit":
         case "nano": {
           if (!arg) {
-            appendLine("edit: missing file");
+            appendLine(messages.editor.missingFile);
             break;
           }
           const targetPath = resolveArg(arg);
           const node = findNode(fsRef.current, targetPath);
           if (node && node.type === "dir") {
-            appendLine("edit: target is a directory");
+            appendLine(messages.editor.targetIsDirectory);
             break;
           }
           if (!node) {
@@ -4539,10 +4751,8 @@ export default function TerminalCanvas({
             showLineNumbers: true,
             modified: false,
           };
-          appendLine(`-- EDIT ${arg} --`);
-          appendLine(
-            "Commands: :w :wq :q :q! :w <file> :set nu|nonu :p :help | N: <text> | :d N | :i N <text>",
-          );
+          appendLine(formatMessage(messages.editor.editing, { path: arg }));
+          appendLine(messages.editor.help);
           if (content) {
             printEditorBuffer(editorRef.current);
           }
@@ -4551,7 +4761,9 @@ export default function TerminalCanvas({
         case "head":
         case "tail": {
           if (!params.length) {
-            appendLine(`${cmd}: missing file operand`);
+            appendLine(
+              formatMessage(messages.commands.headMissingOperand, { cmd }),
+            );
             break;
           }
           const countArgIndex = args.findIndex((value) => value === "-n");
@@ -4637,7 +4849,7 @@ export default function TerminalCanvas({
         }
         case "grep": {
           if (params.length < 2) {
-            appendLine("grep: missing pattern or file");
+            appendLine(messages.commands.grepMissing);
             break;
           }
           const ignoreCase = hasFlag("i");
@@ -4670,7 +4882,7 @@ export default function TerminalCanvas({
         }
         case "which": {
           if (!params.length) {
-            appendLine("which: missing command");
+            appendLine(messages.commands.whichMissing);
             break;
           }
           const commandName = params[0];
@@ -4683,7 +4895,11 @@ export default function TerminalCanvas({
             break;
           }
           if (builtinCommands.includes(commandName)) {
-            appendLine(`${commandName}: builtin`);
+            appendLine(
+              formatMessage(messages.commands.whichBuiltin, {
+                cmd: commandName,
+              }),
+            );
             break;
           }
           const pathEntries = (env.PATH ?? "").split(":");
@@ -4701,14 +4917,18 @@ export default function TerminalCanvas({
           if (found) {
             appendLine(found);
           } else {
-            appendLine(`${commandName}: not found`);
+            appendLine(
+              formatMessage(messages.commands.whichNotFound, {
+                cmd: commandName,
+              }),
+            );
           }
           break;
         }
         case "man": {
           const target = params[0];
           if (!target) {
-            appendLine("man: missing topic");
+            appendLine(messages.commands.manMissingTopic);
             break;
           }
           const manualsTr: Record<string, string[]> = {
@@ -4850,7 +5070,9 @@ export default function TerminalCanvas({
           if (manual) {
             manual.forEach((line) => appendLine(line));
           } else {
-            appendLine(`No manual entry for ${target}`);
+            appendLine(
+              formatMessage(messages.commands.manNoEntry, { topic: target }),
+            );
           }
           break;
         }
@@ -4861,7 +5083,7 @@ export default function TerminalCanvas({
         case "python":
         case "python2": {
           if (hasFlag("V") || hasFlag("v")) {
-            appendLine("Python 3.11 (pyodide)");
+            appendLine(messages.python.version);
             break;
           }
           const moduleIndex = args.findIndex((value) => value === "-m");
@@ -4870,24 +5092,24 @@ export default function TerminalCanvas({
             break;
           }
           if (!params.length) {
-            appendLine("Python 3.11 (pyodide)");
-            appendLine("Usage: python -c <code> | python <file.py>");
+            appendLine(messages.python.version);
+            appendLine(messages.python.usage);
             break;
           }
           const codeIndex = args.findIndex((value) => value === "-c");
           if (codeIndex >= 0) {
             const code = args.slice(codeIndex + 1).join(" ");
             if (!code) {
-              appendLine("python: missing code after -c");
+              appendLine(messages.python.missingCode);
               break;
             }
             appendLine(">>> " + code);
             if (!pyodideRef.current) {
-              appendLine("python: loading runtime...");
+              appendLine(messages.python.loading);
             }
             void runPythonCode(code, "<string>").then(({ output, error }) => {
               if (error) {
-                appendLine(`python: ${error}`);
+                appendLine(formatMessage(messages.python.error, { error }));
                 return;
               }
               output
@@ -4895,7 +5117,7 @@ export default function TerminalCanvas({
                 .filter((line) => line.length > 0)
                 .forEach((line) => appendLine(line));
               if (!output.trim()) {
-                appendLine("(no output)");
+                appendLine(messages.system.noOutput);
               }
             });
             break;
@@ -4903,17 +5125,19 @@ export default function TerminalCanvas({
           const scriptPath = params[0];
           const node = findNode(fsRef.current, resolveArg(scriptPath));
           if (!node || node.type !== "file") {
-            appendLine(`python: can't open file '${scriptPath}'`);
+            appendLine(
+              formatMessage(messages.python.cantOpen, { file: scriptPath }),
+            );
             break;
           }
           if (!pyodideRef.current) {
-            appendLine("python: loading runtime...");
+            appendLine(messages.python.loading);
           }
           const resolvedScript = resolveArg(scriptPath);
           void runPythonCode(node.content, resolvedScript).then(
             ({ output, error }) => {
               if (error) {
-                appendLine(`python: ${error}`);
+                appendLine(formatMessage(messages.python.error, { error }));
                 return;
               }
               output
@@ -4921,7 +5145,7 @@ export default function TerminalCanvas({
                 .filter((line) => line.length > 0)
                 .forEach((line) => appendLine(line));
               if (!output.trim()) {
-                appendLine("(no output)");
+                appendLine(messages.system.noOutput);
               }
             },
           );
@@ -4941,7 +5165,7 @@ export default function TerminalCanvas({
           };
           const target = params[0] ?? pickRandom(".mp3");
           if (!target) {
-            appendLine("mp3: no media found (.mp3)");
+            appendLine(messages.media.mp3NoMedia);
             break;
           }
           const node = findNode(fsRef.current, resolveArg(target));
@@ -4966,7 +5190,7 @@ export default function TerminalCanvas({
           };
           const target = params[0] ?? pickRandom(".vid");
           if (!target) {
-            appendLine("video: no media found (.vid)");
+            appendLine(messages.media.videoNoMedia);
             break;
           }
           const node = findNode(fsRef.current, resolveArg(target));
@@ -4992,7 +5216,7 @@ export default function TerminalCanvas({
           const target =
             params[0] ?? pickRandom([".txt", ".png", ".jpg", ".jpeg"]);
           if (!target) {
-            appendLine("image: no media found (.txt/.png/.jpg)");
+            appendLine(messages.media.imageNoMedia);
             break;
           }
           const lower = target.toLowerCase();
@@ -5011,9 +5235,7 @@ export default function TerminalCanvas({
             break;
           }
           if (!isImage) {
-            appendLine(
-              "image: unsupported format (use .png, .jpg, .jpeg, .txt)",
-            );
+            appendLine(messages.media.imageUnsupported);
             break;
           }
           const imageNode = findNode(fsRef.current, resolveArg(target));
@@ -5031,47 +5253,55 @@ export default function TerminalCanvas({
               : resolved.startsWith("/")
                 ? resolved
                 : `/${resolved}`);
-          appendLine(`image: loading ${target}...`);
+          appendLine(
+            formatMessage(messages.media.imageLoading, { file: target }),
+          );
           void loadImageAscii(src)
             .then((ascii) => {
               startPlayer("image", target, ascii);
             })
             .catch((error) => {
               const message =
-                error instanceof Error ? error.message : "unable to load image";
-              appendLine(`image: ${message}`);
+                error instanceof Error
+                  ? error.message
+                  : messages.media.unableToLoadImage;
+              appendLine(
+                formatMessage(messages.media.imageLoadError, {
+                  error: message,
+                }),
+              );
             });
           break;
         }
         case "calc": {
           const expr = params.join(" ");
           if (!expr) {
-            appendLine("Launching calc...");
+            appendLine(messages.calc.launch);
             startApp("calc");
             break;
           }
           if (!/^[0-9a-zA-Z+\-*/^().,\s]+$/.test(expr)) {
-            appendLine("calc: invalid characters");
+            appendLine(messages.calc.invalidChars);
             break;
           }
           try {
             const result = evaluateScientificExpression(expr);
             appendLine(String(result));
           } catch {
-            appendLine("calc: error evaluating expression");
+            appendLine(messages.calc.evalError);
           }
           break;
         }
         case "snake":
-          appendLine("Launching snake...");
+          appendLine(messages.apps.launchSnake);
           startApp("snake");
           break;
         case "pacman":
-          appendLine("Launching pacman...");
+          appendLine(messages.apps.launchPacman);
           startApp("pacman");
           break;
         case "pong":
-          appendLine("Launching pong...");
+          appendLine(messages.apps.launchPong);
           startApp("pong");
           break;
         case "doom":
@@ -5121,16 +5351,19 @@ export default function TerminalCanvas({
                 chessBotColorRef.current = "b";
               }
             }
-            appendLine("Launching chess...");
+            appendLine(messages.apps.launchChess);
             appendLine(
-              `Mode: ${chessModeRef.current}  Difficulty: ${chessDifficultyRef.current}`,
+              formatMessage(messages.apps.modeStatus, {
+                mode: chessModeRef.current,
+                difficulty: chessDifficultyRef.current,
+              }),
               theme.palette.terminalDim,
             );
             startApp("chess");
           }
           break;
         case "solitaire":
-          appendLine("Launching solitaire...");
+          appendLine(messages.apps.launchSolitaire);
           startApp("solitaire");
           break;
         case "hello":
@@ -5164,15 +5397,7 @@ export default function TerminalCanvas({
       doomText,
       listDir,
       loadImageAscii,
-      messages.availableFiles,
-      messages.commandNotFound,
-      messages.fileNotFound,
-      messages.hello,
-      messages.help,
-      messages.mkdirMissing,
-      messages.noSuchDirectory,
-      messages.tip,
-      messages.touchMissing,
+      messages,
       printFile,
       printEditorBuffer,
       profileName,
@@ -5459,7 +5684,13 @@ export default function TerminalCanvas({
         ctx.strokeRect(pad, pad, boxW, boxH);
         ctx.fillStyle = accent;
         const playerMode = playerModeRef.current ?? "media";
-        ctx.fillText(`PLAYER:${playerMode.toUpperCase()}`, pad + 12, pad + 8);
+        ctx.fillText(
+          formatMessage(messages.ui.player, {
+            mode: playerMode.toUpperCase(),
+          }),
+          pad + 12,
+          pad + 8,
+        );
         ctx.fillStyle = dim;
         ctx.fillText(playerTitleRef.current, pad + 12, pad + 32);
 
@@ -5520,8 +5751,8 @@ export default function TerminalCanvas({
         ctx.fillStyle = dim;
         const controlsText =
           playerMode === "image"
-            ? "←/→: previous/next  +/-: zoom  0: reset  Q: quit"
-            : "Space: play/pause  ←/→: seek  Q: quit";
+            ? messages.ui.playerControlsImage
+            : messages.ui.playerControlsMedia;
         ctx.fillText(controlsText, pad + 12, pad + boxH + 6);
       } else if (mode === "calc") {
         const pad = Math.floor(Math.min(width, height) * 0.12);
@@ -5531,7 +5762,7 @@ export default function TerminalCanvas({
         ctx.lineWidth = 2;
         ctx.strokeRect(pad, pad, boxW, boxH);
         ctx.fillStyle = accent;
-        ctx.fillText("SCI-CALC", pad + 12, pad + 8);
+        ctx.fillText(messages.ui.sciCalc, pad + 12, pad + 8);
         const displaySize = Math.max(16, Math.floor(fontSize * 1.6));
         ctx.font = `${displaySize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         const inputText = calcInputRef.current || "0";
@@ -5571,11 +5802,7 @@ export default function TerminalCanvas({
           });
         });
         ctx.fillStyle = dim;
-        ctx.fillText(
-          "Arrow keys: move  Enter: select  Q: quit",
-          pad + 12,
-          height - pad - 6,
-        );
+        ctx.fillText(messages.ui.calcControls, pad + 12, height - pad - 6);
       } else if (mode === "doom") {
         const map = doomMapRef.current;
         const pad = Math.floor(Math.min(width, height) * 0.1);
@@ -5597,7 +5824,7 @@ export default function TerminalCanvas({
             Math.ceil(viewH * 0.45),
           );
           ctx.fillStyle = theme.palette.terminalText;
-          ctx.fillText("RETRO FPS", viewX + 12, viewY + 10);
+          ctx.fillText(messages.ui.retroFps, viewX + 12, viewY + 10);
           ctx.fillStyle = theme.palette.terminalDim;
           ctx.fillText(doomText("loading"), viewX + 12, viewY + 34);
           const barW = Math.floor(viewW * 0.6);
@@ -6007,7 +6234,7 @@ export default function TerminalCanvas({
         ctx.fillRect(weaponX + weaponW - 20, weaponY + 14, 6, 4);
 
         ctx.fillStyle = accent;
-        ctx.fillText("RETRO FPS", viewX, viewY - 24);
+        ctx.fillText(messages.ui.retroFps, viewX, viewY - 24);
         if (doomMessageRef.current) {
           ctx.fillStyle = dim;
           ctx.fillText(doomMessageRef.current, viewX + 110, viewY - 24);
@@ -6134,16 +6361,27 @@ export default function TerminalCanvas({
         const offsetX = Math.floor((width - boardW) / 2);
         const offsetY = Math.floor((height - boardH) / 2);
         ctx.fillStyle = accent;
+        const botColorLabel =
+          chessBotColorRef.current === "w"
+            ? messages.chess.colorWhite
+            : messages.chess.colorBlack;
         const chessModeLabel =
           chessModeRef.current === "bot"
-            ? `BOT ${chessDifficultyRef.current.toUpperCase()} ${
-                chessBotColorRef.current === "w" ? "(WHITE)" : "(BLACK)"
-              }`
-            : "PVP";
+            ? formatMessage(messages.chess.modeLabelBot, {
+                difficulty: chessDifficultyRef.current.toUpperCase(),
+                color: botColorLabel,
+              })
+            : messages.chess.modeLabelPvp;
+        const turnLabel =
+          chessTurnRef.current === "w"
+            ? messages.chess.colorWhite
+            : messages.chess.colorBlack;
         ctx.fillText(
-          `CHESS ${chessModeLabel}  TURN ${
-            chessTurnRef.current === "w" ? "WHITE" : "BLACK"
-          }  MOVE ${chessMovesRef.current}`,
+          formatMessage(messages.chess.header, {
+            mode: chessModeLabel,
+            turn: turnLabel,
+            count: String(chessMovesRef.current),
+          }),
           offsetX,
           offsetY - 24,
         );
@@ -6269,16 +6507,8 @@ export default function TerminalCanvas({
         }
         ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillStyle = dim;
-        ctx.fillText(
-          "Arrows/WASD: move  Enter: select/move  X: clear  Q: quit",
-          offsetX,
-          offsetY + boardH + 12,
-        );
-        ctx.fillText(
-          "1/2/3: difficulty  B: bot  P: pvp  C: bot color",
-          offsetX,
-          offsetY + boardH + 32,
-        );
+        ctx.fillText(messages.ui.chessControls, offsetX, offsetY + boardH + 12);
+        ctx.fillText(messages.ui.chessMeta, offsetX, offsetY + boardH + 32);
         if (chessStatusRef.current) {
           ctx.fillStyle = accent;
           ctx.fillText(chessStatusRef.current, offsetX, offsetY + boardH + 52);
@@ -6293,7 +6523,9 @@ export default function TerminalCanvas({
             .join(" ");
           ctx.fillStyle = accent;
           ctx.fillText(
-            `Promote: ${optionText}  (Arrows/1-4/Enter)`,
+            formatMessage(messages.chess.promoteOptions, {
+              options: optionText,
+            }),
             offsetX,
             offsetY + boardH + 72,
           );
@@ -6356,7 +6588,7 @@ export default function TerminalCanvas({
         };
 
         ctx.fillStyle = accent;
-        ctx.fillText("SOLITAIRE", pad, pad);
+        ctx.fillText(messages.ui.solitaireTitle, pad, pad);
 
         const stockX = pad;
         const wasteX = pad + cardW + gap;
@@ -6368,13 +6600,13 @@ export default function TerminalCanvas({
             faceUp: false,
           });
         } else {
-          drawSlot(stockX, topRowY, "STOCK");
+          drawSlot(stockX, topRowY, messages.ui.solitaireStock);
         }
 
         if (wasteCard) {
           drawCard(wasteX, topRowY, wasteCard, selection?.type === "waste");
         } else {
-          drawSlot(wasteX, topRowY, "WASTE");
+          drawSlot(wasteX, topRowY, messages.ui.solitaireWaste);
         }
 
         suits.forEach((suit, index) => {
@@ -6422,11 +6654,7 @@ export default function TerminalCanvas({
           ctx.fillText(solitaireMessageRef.current, pad, height - pad - 44);
         }
         ctx.fillStyle = dim;
-        ctx.fillText(
-          "D: draw  W: waste  1-7: tableau  F: foundation  Q: quit",
-          pad,
-          height - pad - 20,
-        );
+        ctx.fillText(messages.ui.solitaireControls, pad, height - pad - 20);
       } else {
         const grid =
           mode === "snake"
@@ -6452,7 +6680,9 @@ export default function TerminalCanvas({
         if (mode === "snake") {
           ctx.fillStyle = accent;
           ctx.fillText(
-            `SNAKE  SCORE ${snakeScoreRef.current}`,
+            formatMessage(messages.ui.snakeHeader, {
+              score: String(snakeScoreRef.current),
+            }),
             offsetX,
             offsetY - 24,
           );
@@ -6478,26 +6708,28 @@ export default function TerminalCanvas({
           }
           if (snakeWonRef.current) {
             ctx.fillStyle = "#6fd68d";
-            ctx.fillText(
-              "YOU WIN!  R: restart  Q: quit",
-              offsetX,
-              offsetY + boardH + 12,
-            );
+            ctx.fillText(messages.ui.snakeWin, offsetX, offsetY + boardH + 12);
           } else if (!snakeAliveRef.current) {
             ctx.fillStyle = "#d6735b";
             ctx.fillText(
-              "GAME OVER  R: restart  Q: quit",
+              messages.ui.snakeGameOver,
               offsetX,
               offsetY + boardH + 12,
             );
           } else {
             ctx.fillStyle = dim;
-            ctx.fillText("R: restart  Q: quit", offsetX, offsetY + boardH + 12);
+            ctx.fillText(
+              messages.ui.snakeControls,
+              offsetX,
+              offsetY + boardH + 12,
+            );
           }
         } else if (mode === "pacman") {
           ctx.fillStyle = accent;
           ctx.fillText(
-            `PACMAN  SCORE ${pacmanScoreRef.current}`,
+            formatMessage(messages.ui.pacmanHeader, {
+              score: String(pacmanScoreRef.current),
+            }),
             offsetX,
             offsetY - 24,
           );
@@ -6555,27 +6787,31 @@ export default function TerminalCanvas({
           ctx.fill();
           if (pacmanWonRef.current) {
             ctx.fillStyle = "#6fd68d";
-            ctx.fillText(
-              "YOU WIN!  R: restart  Q: quit",
-              offsetX,
-              offsetY + boardH + 12,
-            );
+            ctx.fillText(messages.ui.pacmanWin, offsetX, offsetY + boardH + 12);
           } else if (pacmanGameOverRef.current) {
             ctx.fillStyle = "#d6735b";
             ctx.fillText(
-              "GAME OVER  R: restart  Q: quit",
+              messages.ui.pacmanGameOver,
               offsetX,
               offsetY + boardH + 12,
             );
           } else {
             ctx.fillStyle = dim;
-            ctx.fillText("R: restart  Q: quit", offsetX, offsetY + boardH + 12);
+            ctx.fillText(
+              messages.ui.pacmanControls,
+              offsetX,
+              offsetY + boardH + 12,
+            );
           }
         } else if (mode === "pong") {
           const paddleWidth = Math.max(4, Math.floor(cols * 0.2));
           ctx.fillStyle = accent;
           ctx.fillText(
-            `PONG  ${pongScoreRef.current.player}-${pongScoreRef.current.ai}  LIVES ${pongLivesRef.current}`,
+            formatMessage(messages.ui.pongHeader, {
+              player: String(pongScoreRef.current.player),
+              ai: String(pongScoreRef.current.ai),
+              lives: String(pongLivesRef.current),
+            }),
             offsetX,
             offsetY - 24,
           );
@@ -6604,14 +6840,14 @@ export default function TerminalCanvas({
           ctx.fill();
           ctx.fillStyle = dim;
           ctx.fillText(
-            "Left/Right: move  R: restart  Q: quit",
+            messages.ui.pongControls,
             offsetX,
             offsetY + boardH + 12,
           );
           if (pongOverRef.current) {
             ctx.fillStyle = "#d6735b";
             ctx.fillText(
-              "GAME OVER",
+              messages.ui.pongGameOver,
               offsetX + Math.floor(boardW * 0.35),
               offsetY + Math.floor(boardH * 0.45),
             );
@@ -6762,6 +6998,8 @@ export default function TerminalCanvas({
     perfTier,
     prompt,
     doomText,
+    formatMessage,
+    messages,
     theme.crt.glow,
     theme.crt.noiseOpacity,
     theme.crt.scanlineOpacity,
@@ -6871,7 +7109,7 @@ export default function TerminalCanvas({
       const { key } = event;
       const lower = key.toLowerCase();
       if (key === "Escape" || lower === "q") {
-        stopApp("-- EXIT --");
+        stopApp(messages.system.exitLine);
         event.preventDefault();
         return true;
       }
@@ -6914,7 +7152,7 @@ export default function TerminalCanvas({
               calcResultRef.current = "0";
               calcErrorRef.current = null;
             } else if (!/^[0-9a-zA-Z+\-*/^().,\s]+$/.test(expr)) {
-              calcErrorRef.current = "Invalid";
+              calcErrorRef.current = messages.calc.invalid;
             } else {
               try {
                 calcResultRef.current = String(
@@ -6922,7 +7160,7 @@ export default function TerminalCanvas({
                 );
                 calcErrorRef.current = null;
               } catch {
-                calcErrorRef.current = "Error";
+                calcErrorRef.current = messages.calc.error;
               }
             }
             return;
@@ -7051,8 +7289,8 @@ export default function TerminalCanvas({
         if (key === " " || key === "Enter") {
           playerIsPlayingRef.current = !playerIsPlayingRef.current;
           playerStatusRef.current = playerIsPlayingRef.current
-            ? "Playing"
-            : "Paused";
+            ? messages.media.playing
+            : messages.media.paused;
           audioAutoPausedRef.current = false;
           if (playerModeRef.current === "mp3") {
             if (playerIsPlayingRef.current) {
@@ -7201,9 +7439,11 @@ export default function TerminalCanvas({
             const enemyColor = chessTurnRef.current;
             const inCheck = isChessInCheck(chessBoardRef.current, enemyColor);
             if (!hasChessLegalMove(chessBoardRef.current, enemyColor)) {
-              chessStatusRef.current = inCheck ? "Checkmate" : "Stalemate";
+              chessStatusRef.current = inCheck
+                ? messages.chess.checkmate
+                : messages.chess.stalemate;
             } else {
-              chessStatusRef.current = inCheck ? "Check!" : null;
+              chessStatusRef.current = inCheck ? messages.chess.check : null;
             }
             dirtyRef.current = true;
             scheduleChessBotMove();
@@ -7213,7 +7453,7 @@ export default function TerminalCanvas({
             chessPromotionChoiceRef.current =
               (chessPromotionChoiceRef.current + promotionKeys.length - 1) %
               promotionKeys.length;
-            chessStatusRef.current = "Promote pawn: Q/R/B/N";
+            chessStatusRef.current = messages.chess.promotePawn;
             dirtyRef.current = true;
             event.preventDefault();
             return true;
@@ -7221,7 +7461,7 @@ export default function TerminalCanvas({
           if (key === "ArrowRight" || key === "ArrowDown") {
             chessPromotionChoiceRef.current =
               (chessPromotionChoiceRef.current + 1) % promotionKeys.length;
-            chessStatusRef.current = "Promote pawn: Q/R/B/N";
+            chessStatusRef.current = messages.chess.promotePawn;
             dirtyRef.current = true;
             event.preventDefault();
             return true;
@@ -7253,7 +7493,7 @@ export default function TerminalCanvas({
             event.preventDefault();
             return true;
           }
-          chessStatusRef.current = "Promote pawn: Q/R/B/N";
+          chessStatusRef.current = messages.chess.promotePawn;
           dirtyRef.current = true;
           event.preventDefault();
           return true;
@@ -7261,7 +7501,9 @@ export default function TerminalCanvas({
         if (lower === "1" || lower === "2" || lower === "3") {
           chessDifficultyRef.current =
             lower === "1" ? "easy" : lower === "2" ? "medium" : "hard";
-          chessStatusRef.current = `Difficulty: ${chessDifficultyRef.current}`;
+          chessStatusRef.current = formatMessage(messages.chess.difficulty, {
+            level: chessDifficultyRef.current,
+          });
           dirtyRef.current = true;
           scheduleChessBotMove();
           event.preventDefault();
@@ -7269,7 +7511,7 @@ export default function TerminalCanvas({
         }
         if (lower === "b") {
           chessModeRef.current = "bot";
-          chessStatusRef.current = "Mode: BOT";
+          chessStatusRef.current = messages.chess.modeBot;
           dirtyRef.current = true;
           scheduleChessBotMove();
           event.preventDefault();
@@ -7277,7 +7519,7 @@ export default function TerminalCanvas({
         }
         if (lower === "p") {
           chessModeRef.current = "pvp";
-          chessStatusRef.current = "Mode: PVP";
+          chessStatusRef.current = messages.chess.modePvp;
           dirtyRef.current = true;
           event.preventDefault();
           return true;
@@ -7285,9 +7527,12 @@ export default function TerminalCanvas({
         if (lower === "c") {
           chessBotColorRef.current =
             chessBotColorRef.current === "w" ? "b" : "w";
-          chessStatusRef.current = `Bot color: ${
-            chessBotColorRef.current === "w" ? "WHITE" : "BLACK"
-          }`;
+          chessStatusRef.current = formatMessage(messages.chess.botColor, {
+            color:
+              chessBotColorRef.current === "w"
+                ? messages.chess.colorWhite
+                : messages.chess.colorBlack,
+          });
           dirtyRef.current = true;
           scheduleChessBotMove();
           event.preventDefault();
@@ -7297,7 +7542,7 @@ export default function TerminalCanvas({
           chessModeRef.current === "bot" &&
           chessTurnRef.current === chessBotColorRef.current
         ) {
-          chessStatusRef.current = "Bot thinking...";
+          chessStatusRef.current = messages.chess.botThinking;
           dirtyRef.current = true;
           scheduleChessBotMove();
           event.preventDefault();
@@ -7411,15 +7656,18 @@ export default function TerminalCanvas({
                 .reverse()
                 .map((card) => ({ ...card, faceUp: false }));
               solitaireWasteRef.current = [];
-              solitaireMessageRef.current = "Stock recycled";
+              solitaireMessageRef.current = messages.solitaire.stockRecycled;
             } else {
-              solitaireMessageRef.current = "No cards left";
+              solitaireMessageRef.current = messages.solitaire.noCardsLeft;
             }
           } else {
             const card = stock.pop();
             if (card) {
               solitaireWasteRef.current.push({ ...card, faceUp: true });
-              solitaireMessageRef.current = `Draw: ${solitaireCardLabel(card)}`;
+              solitaireMessageRef.current = formatMessage(
+                messages.solitaire.drawCard,
+                { card: solitaireCardLabel(card) },
+              );
             }
           }
           dirtyRef.current = true;
@@ -7429,10 +7677,10 @@ export default function TerminalCanvas({
 
         if (lower === "w") {
           if (!waste.length) {
-            solitaireMessageRef.current = "Waste empty";
+            solitaireMessageRef.current = messages.solitaire.wasteEmpty;
           } else {
             solitaireSelectionRef.current = { type: "waste" };
-            solitaireMessageRef.current = "Selected waste";
+            solitaireMessageRef.current = messages.solitaire.selectedWaste;
           }
           dirtyRef.current = true;
           event.preventDefault();
@@ -7454,9 +7702,10 @@ export default function TerminalCanvas({
             }
           }
           if (!moving || !sourcePile) {
-            solitaireMessageRef.current = "Select a card first";
+            solitaireMessageRef.current = messages.solitaire.selectCardFirst;
           } else if (!canStackOnFoundation(moving)) {
-            solitaireMessageRef.current = "Cannot move to foundation";
+            solitaireMessageRef.current =
+              messages.solitaire.cannotMoveFoundation;
           } else {
             foundations[moving.suit].push({ ...moving, faceUp: true });
             sourcePile.pop();
@@ -7464,7 +7713,10 @@ export default function TerminalCanvas({
               revealTop(sourcePile);
             }
             solitaireSelectionRef.current = null;
-            solitaireMessageRef.current = `Placed ${solitaireCardLabel(moving)}`;
+            solitaireMessageRef.current = formatMessage(
+              messages.solitaire.placedCard,
+              { card: solitaireCardLabel(moving) },
+            );
           }
           dirtyRef.current = true;
           event.preventDefault();
@@ -7480,13 +7732,16 @@ export default function TerminalCanvas({
           if (!selection) {
             const top = targetPile[targetPile.length - 1];
             if (!top) {
-              solitaireMessageRef.current = "Empty pile";
+              solitaireMessageRef.current = messages.solitaire.emptyPile;
             } else if (!top.faceUp) {
               top.faceUp = true;
-              solitaireMessageRef.current = "Flipped card";
+              solitaireMessageRef.current = messages.solitaire.flippedCard;
             } else {
               solitaireSelectionRef.current = { type: "tableau", index };
-              solitaireMessageRef.current = `Selected T${index + 1}`;
+              solitaireMessageRef.current = formatMessage(
+                messages.solitaire.selectedPile,
+                { index: String(index + 1) },
+              );
             }
           } else {
             let moving: SolitaireCard | undefined;
@@ -7504,9 +7759,9 @@ export default function TerminalCanvas({
             }
             const targetTop = targetPile[targetPile.length - 1];
             if (!moving || !sourcePile) {
-              solitaireMessageRef.current = "Select a card first";
+              solitaireMessageRef.current = messages.solitaire.selectCardFirst;
             } else if (!canStackOnTableau(moving, targetTop)) {
-              solitaireMessageRef.current = "Cannot stack there";
+              solitaireMessageRef.current = messages.solitaire.cannotStack;
             } else {
               targetPile.push({ ...moving, faceUp: true });
               sourcePile.pop();
@@ -7514,7 +7769,10 @@ export default function TerminalCanvas({
                 revealTop(sourcePile);
               }
               solitaireSelectionRef.current = null;
-              solitaireMessageRef.current = `Moved ${solitaireCardLabel(moving)}`;
+              solitaireMessageRef.current = formatMessage(
+                messages.solitaire.movedCard,
+                { card: solitaireCardLabel(moving) },
+              );
             }
           }
           dirtyRef.current = true;
@@ -7552,6 +7810,8 @@ export default function TerminalCanvas({
       startSynthAudio,
       stopSynthAudio,
       stopApp,
+      formatMessage,
+      messages,
     ],
   );
 

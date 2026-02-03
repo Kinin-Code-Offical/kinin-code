@@ -2719,6 +2719,12 @@ export default function HomeClient({
             <div>
               <p className="footer-name">{profile.fullName}</p>
               <p className="footer-role">{profile.jobTitle[language]}</p>
+              <p className="footer-copy">
+                © 2026 {profile.fullName}.{" "}
+                {language === "tr"
+                  ? "Tum haklari saklidir."
+                  : "All rights reserved."}
+              </p>
             </div>
             <div className="footer-links">
               {profile.socials.map((social) => (
