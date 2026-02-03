@@ -19,6 +19,8 @@ import {
   Vector3,
 } from "three";
 
+useGLTF.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(false);
 

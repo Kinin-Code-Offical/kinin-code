@@ -1,12 +1,12 @@
 export const theme = {
   palette: {
-    heroBg: "#0f0b08",
+    heroBg: "#18130f",
     heroAccent: "#f3a143",
     heroAccentSoft: "#f7c27a",
-    terminalBg: "#130c08",
+    terminalBg: "#18130f",
     terminalText: "#f7c87a",
     terminalDim: "#c89a58",
-    contentBg: "#14110c",
+    contentBg: "#18130f",
     contentInk: "#f5e6cf",
     contentMuted: "#c2a87f",
     border: "rgba(243, 161, 67, 0.2)",

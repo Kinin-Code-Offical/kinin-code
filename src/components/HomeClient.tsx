@@ -19,6 +19,7 @@ import TerminalCanvas, {
 import type { SceneDebugInfo } from "@/components/hero/HeroScene";
 import { usePreferences } from "@/components/PreferencesProvider";
 import type { ContentData } from "@/lib/content";
+import { getAlternateLanguage, languageMeta } from "@/lib/i18n";
 import { useI18n } from "@/hooks/useI18n";
 
 function HeroLoading() {
@@ -33,6 +34,7 @@ const HeroScene = dynamic(() => import("@/components/hero/HeroScene"), {
 
 type HomeClientProps = {
   content: ContentData;
+  debugEnabled?: boolean;
 };
 
 function useMediaQuery(query: string) {
@@ -55,10 +57,16 @@ function useSmoothScrollProgress(
 ) {
   const progressRef = useRef(0);
   const targetRef = useRef(0);
-  const rafRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const onUpdateRef = useRef<typeof onUpdate>(onUpdate);
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
 
   useEffect(() => {
     let active = true;
+    let resizeObserver: ResizeObserver | null = null;
 
     const computeTarget = () => {
       if (!ref.current) {
@@ -71,37 +79,52 @@ function useSmoothScrollProgress(
       targetRef.current = raw;
     };
 
+    const epsilon = 0.0008;
+    const smoothing = 0.12;
+
     const tick = () => {
       if (!active) {
         return;
       }
       const diff = targetRef.current - progressRef.current;
-      if (Math.abs(diff) < 0.0008) {
+      if (Math.abs(diff) < epsilon) {
         progressRef.current = targetRef.current;
       } else {
-        progressRef.current += diff * 0.12;
+        progressRef.current += diff * smoothing;
       }
-      onUpdate?.(progressRef.current);
+      onUpdateRef.current?.(progressRef.current);
       rafRef.current = window.requestAnimationFrame(tick);
     };
+
+    computeTarget();
+    rafRef.current = window.requestAnimationFrame(tick);
 
     const schedule = () => {
       computeTarget();
     };
 
-    schedule();
-    rafRef.current = window.requestAnimationFrame(tick);
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
+
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(schedule);
+      if (ref.current) {
+        resizeObserver.observe(ref.current);
+      }
+    }
+
     return () => {
       active = false;
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
-      if (rafRef.current) {
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      if (rafRef.current !== null) {
         window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
     };
-  }, [onUpdate, ref]);
+  }, [ref]);
 
   return progressRef;
 }
@@ -416,7 +439,10 @@ const capabilityIcons: Record<string, ReactElement> = {
 
 type SectionId = ContentData["profile"]["sections"][number];
 
-export default function HomeClient({ content }: HomeClientProps) {
+export default function HomeClient({
+  content,
+  debugEnabled = false,
+}: HomeClientProps) {
   const { profile, projects, theme, pages, capabilities } = content;
   const { t, language, setLanguage } = useI18n();
   const { theme: currentTheme, toggleTheme, isSwitching } = usePreferences();
@@ -424,7 +450,15 @@ export default function HomeClient({ content }: HomeClientProps) {
   const featuredRef = useRef<HTMLElement>(null);
   const featuredHeadingRef = useRef<HTMLHeadingElement>(null);
   const featuredSubtitleRef = useRef<HTMLParagraphElement>(null);
+  const featuredProgressRef = useRef<HTMLDivElement | null>(null);
   const shellRef = useRef<HTMLElement>(null);
+  const [debugHud, setDebugHud] = useState({
+    scroll: 0,
+    reveal: 0,
+    fade: 1,
+    heroActive: true,
+  });
+  const debugLastRef = useRef(0);
   const featuredIndex = useMemo(
     () => profile.sections.indexOf("featured"),
     [profile.sections],
@@ -485,6 +519,18 @@ export default function HomeClient({ content }: HomeClientProps) {
     shellRef.current.style.setProperty("--hero-fade", String(fade));
     shellRef.current.style.setProperty("--content-reveal", String(reveal));
     const nextHeroActive = reveal < 0.98;
+    if (debugEnabled) {
+      const now = typeof performance !== "undefined" ? performance.now() : 0;
+      if (now - debugLastRef.current > 120) {
+        debugLastRef.current = now;
+        setDebugHud({
+          scroll: value,
+          reveal,
+          fade,
+          heroActive: nextHeroActive,
+        });
+      }
+    }
     if (heroActiveRef.current !== nextHeroActive) {
       heroActiveRef.current = nextHeroActive;
       setHeroActive(nextHeroActive);
@@ -506,6 +552,7 @@ export default function HomeClient({ content }: HomeClientProps) {
       setVirtualKeysOpen(false);
     }
   });
+
   const isMobile = useMediaQuery("(max-width: 900px)");
   const isCoarsePointer = useMediaQuery("(pointer: coarse)");
   const reducedMotion = useReducedMotion() ?? false;
@@ -539,6 +586,11 @@ export default function HomeClient({ content }: HomeClientProps) {
   const [terminalBootReadyAt, setTerminalBootReadyAt] = useState<number | null>(
     null,
   );
+  const bootProgressRef = useRef(0);
+  const bootProgressElRef = useRef<HTMLDivElement | null>(null);
+  const bootStartAtRef = useRef<number | null>(null);
+  const bootLoopStartRef = useRef<(() => void) | null>(null);
+  const switchStartAtRef = useRef<number | null>(null);
   const [mobileModifiers, setMobileModifiers] = useState({
     ctrl: false,
     shift: false,
@@ -572,7 +624,7 @@ export default function HomeClient({ content }: HomeClientProps) {
 
   const handleVirtualKey = useCallback(
     (
-      key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight",
+      key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Tab",
       options?: { focus?: boolean },
     ) => {
       if (options?.focus !== false) {
@@ -621,12 +673,291 @@ export default function HomeClient({ content }: HomeClientProps) {
   };
 
   const readyStartAtRef = useRef<number | null>(null);
+  const bootStatusLine = t.boot.statusLine;
+  const bootPhaseLine = useMemo(() => {
+    if (bootDone) {
+      return t.boot.phases.systemReady;
+    }
+    if (!sceneReady) {
+      return t.boot.phases.bootLoading;
+    }
+    if (!modelReady) {
+      return t.boot.phases.computerWarmingUp;
+    }
+    if (!screenAspectReady) {
+      return t.boot.phases.calibratingScreen;
+    }
+    if (!terminalBootReady) {
+      return t.boot.phases.startingTerminal;
+    }
+    return t.boot.phases.finalTouches;
+  }, [
+    bootDone,
+    modelReady,
+    sceneReady,
+    screenAspectReady,
+    terminalBootReady,
+    t.boot.phases,
+  ]);
+
+  const bootFlagsRef = useRef({
+    sceneReady: false,
+    modelReady: false,
+    screenAspectReady: false,
+    terminalBootReady: false,
+    bootDone: false,
+    siteReady: false,
+    isSwitching: false,
+    domReady: false,
+    fontsReady: false,
+  });
 
   useEffect(() => {
+    const flags = bootFlagsRef.current;
+    flags.sceneReady = sceneReady;
+    flags.modelReady = modelReady;
+    flags.screenAspectReady = screenAspectReady;
+    flags.terminalBootReady = terminalBootReady;
+    flags.bootDone = bootDone;
+    flags.siteReady = siteReady;
+    flags.isSwitching = isSwitching;
+  }, [
+    bootDone,
+    isSwitching,
+    modelReady,
+    sceneReady,
+    screenAspectReady,
+    siteReady,
+    terminalBootReady,
+  ]);
+
+  useEffect(() => {
+    const flags = bootFlagsRef.current;
+    flags.domReady = true;
+    if (typeof document !== "undefined") {
+      flags.domReady = document.readyState === "complete";
+      if (!flags.domReady) {
+        window.addEventListener(
+          "load",
+          () => {
+            bootFlagsRef.current.domReady = true;
+            bootLoopStartRef.current?.();
+          },
+          { once: true },
+        );
+      }
+      if (document.fonts?.ready) {
+        void document.fonts.ready
+          .then(() => {
+            bootFlagsRef.current.fontsReady = true;
+            bootLoopStartRef.current?.();
+          })
+          .catch(() => undefined);
+      } else {
+        flags.fontsReady = true;
+      }
+    } else {
+      flags.fontsReady = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isSwitching) {
+      switchStartAtRef.current =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      bootLoopStartRef.current?.();
+    }
+  }, [isSwitching]);
+
+  useEffect(() => {
+    if (bootStartAtRef.current === null) {
+      bootStartAtRef.current =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+    }
+
+    let rafId: number | null = null;
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+    const ease = (t: number) => t * t * (3 - 2 * t);
+
+    const bootSteps = [
+      {
+        id: "dom",
+        weight: 10,
+        cap: 0.85,
+        softMs: 650,
+        done: () => bootFlagsRef.current.domReady,
+      },
+      {
+        id: "fonts",
+        weight: 10,
+        cap: 0.9,
+        softMs: 700,
+        done: () => bootFlagsRef.current.fontsReady,
+      },
+      {
+        id: "scene",
+        weight: 20,
+        cap: 0.92,
+        softMs: 1100,
+        done: () => bootFlagsRef.current.sceneReady,
+      },
+      {
+        id: "model",
+        weight: 25,
+        cap: 0.92,
+        softMs: 1500,
+        done: () => bootFlagsRef.current.modelReady,
+      },
+      {
+        id: "aspect",
+        weight: 10,
+        cap: 0.9,
+        softMs: 900,
+        done: () => bootFlagsRef.current.screenAspectReady,
+      },
+      {
+        id: "terminal",
+        weight: 20,
+        cap: 0.92,
+        softMs: 1400,
+        done: () => bootFlagsRef.current.terminalBootReady,
+      },
+      {
+        id: "final",
+        weight: 5,
+        cap: 0.95,
+        softMs: 700,
+        done: () => bootFlagsRef.current.bootDone,
+      },
+    ] as const;
+
+    const activeStepRef = { id: "" as string, startedAt: 0 };
+    let lastNow =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+
+    const applyProgress = (value: number) => {
+      const next = Math.min(100, Math.max(0, value));
+      if (next < bootProgressRef.current) {
+        return;
+      }
+      bootProgressRef.current = next;
+      if (bootProgressElRef.current) {
+        const clamped = clamp01(next / 100);
+        bootProgressElRef.current.style.setProperty(
+          "--boot-progress",
+          clamped.toString(),
+        );
+      }
+    };
+
+    const computeBootTarget = (now: number) => {
+      if (bootFlagsRef.current.bootDone) {
+        return 100;
+      }
+      let completed = 0;
+      let active: (typeof bootSteps)[number] | null = null;
+      for (const step of bootSteps) {
+        if (step.done()) {
+          completed += step.weight;
+          continue;
+        }
+        active = step;
+        break;
+      }
+      if (!active) {
+        return 100;
+      }
+      if (activeStepRef.id !== active.id) {
+        activeStepRef.id = active.id;
+        activeStepRef.startedAt = now;
+      }
+      const start = completed;
+      const end = completed + active.weight;
+      const cap = start + (end - start) * active.cap;
+      const t = clamp01((now - activeStepRef.startedAt) / active.softMs);
+      const withinStep = start + (cap - start) * ease(t);
+      return Math.max(start, Math.min(cap, withinStep));
+    };
+
+    const computeSwitchTarget = (now: number) => {
+      const start = switchStartAtRef.current ?? now;
+      const elapsed = Math.max(0, now - start);
+      const duration = 900;
+      const t = clamp01(elapsed / duration);
+      const a = 0.22;
+      const b = 0.72;
+      if (t <= a) {
+        const tt = ease(t / a);
+        return 35 * tt;
+      }
+      if (t <= b) {
+        const tt = ease((t - a) / (b - a));
+        return 35 + (80 - 35) * tt;
+      }
+      const tt = ease((t - b) / (1 - b));
+      return 80 + (100 - 80) * tt;
+    };
+
+    const tick = (now: number) => {
+      rafId = null;
+      const dt = Math.max(0, now - lastNow);
+      lastNow = now;
+
+      const visible =
+        !bootFlagsRef.current.siteReady || bootFlagsRef.current.isSwitching;
+      if (!visible) {
+        return;
+      }
+
+      const target =
+        bootFlagsRef.current.siteReady && bootFlagsRef.current.isSwitching
+          ? computeSwitchTarget(now)
+          : computeBootTarget(now);
+
+      const tau = 140;
+      const alpha = tau > 0 ? 1 - Math.exp(-dt / tau) : 1;
+      const next =
+        bootProgressRef.current + (target - bootProgressRef.current) * alpha;
+      applyProgress(next);
+
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    const startLoop = () => {
+      if (rafId !== null) {
+        return;
+      }
+      lastNow =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    bootLoopStartRef.current = startLoop;
+    startLoop();
+
+    return () => {
+      bootLoopStartRef.current = null;
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!siteReady || isSwitching) {
+      bootLoopStartRef.current?.();
+    }
+  }, [isSwitching, siteReady]);
+
+  useEffect(() => {
+    if (bootStartAtRef.current === null) {
+      bootStartAtRef.current = Date.now();
+    }
     if (!sceneReady || !modelReady || !sceneReadyAt || !modelReadyAt) {
       return;
     }
     const stableDelay = 500;
+    const minBootDuration = 1000;
     const maxWait = 12000;
     const lastReadyAt = Math.max(
       sceneReadyAt,
@@ -657,7 +988,12 @@ export default function HomeClient({ content }: HomeClientProps) {
     if (!canFinish) {
       return;
     }
-    const remaining = Math.max(0, stableDelay - elapsed);
+    const bootStart = bootStartAtRef.current ?? Date.now();
+    const bootElapsed = Date.now() - bootStart;
+    const remaining = Math.max(
+      0,
+      Math.max(stableDelay - elapsed, minBootDuration - bootElapsed),
+    );
     const timer = window.setTimeout(() => {
       setBootDone(true);
     }, remaining);
@@ -938,6 +1274,7 @@ export default function HomeClient({ content }: HomeClientProps) {
     const homeDir = `/home/${terminalUser}`;
     const docsDir = `${homeDir}/docs`;
     const scriptsDir = `${homeDir}/scripts`;
+    const mediaDir = `${homeDir}/media`;
     const projectsDir = `${homeDir}/projects`;
     return [
       {
@@ -976,15 +1313,174 @@ export default function HomeClient({ content }: HomeClientProps) {
       },
       {
         path: `${scriptsDir}/calc.py`,
-        content: "# MiniCalc 0.2\n# Usage: calc 2+2\n\nprint('MiniCalc 0.2')\n",
+        content:
+          "# SciCalc demo\nimport math\nexpr = 'sin(pi/2) + cos(0)'\nallowed = {k: getattr(math, k) for k in ['sin','cos','tan','sqrt','log','pi','e']}\nallowed['pow'] = pow\nresult = eval(expr, {'__builtins__': {}}, allowed)\nprint('SciCalc demo:', expr, '=', result)\nprint('Tip: use calc command for interactive mode.')\n",
       },
       {
         path: `${scriptsDir}/snake.py`,
-        content: "# Snake (simulated)\nprint('Launching snake...')\n",
+        content:
+          "# Snake demo\nboard = [\n  '###########',\n  '#.........#',\n  '#..S....@..#',\n  '#.........#',\n  '###########',\n]\nprint('Controls: run `snake` in terminal for full game.')\nprint('\n'.join(board))\n",
       },
       {
         path: `${scriptsDir}/pacman.py`,
-        content: "# Pacman (simulated)\nprint('Launching pacman...')\n",
+        content:
+          "# Pacman demo\nmaze = [\n  '############',\n  '#C....##....#',\n  '#.##..##..##.#',\n  '#....G.....o#',\n  '############',\n]\nprint('Controls: run `pacman` in terminal for full game.')\nprint('\n'.join(maze))\n",
+      },
+      {
+        path: `${scriptsDir}/pong.py`,
+        content:
+          "# Pong demo\nprint('Controls: run `pong` in terminal for full game.')\nprint('Scoreboard: PLAYER 0 - 0 AI')\nprint('Left/Right to move paddle')\n",
+      },
+      {
+        path: `${scriptsDir}/chess.py`,
+        content:
+          "# Chess demo\nprint('Controls: run `chess` in terminal for full game.')\nprint('Tips: 1/2/3 difficulty, B bot, P pvp, C bot color')\n",
+      },
+      {
+        path: `${scriptsDir}/solitaire.py`,
+        content:
+          "# Solitaire demo\nprint('Controls: run `solitaire` in terminal for full game.')\nprint('Keys: D draw, W waste, 1-7 tableau, F foundation')\n",
+      },
+      {
+        path: `${scriptsDir}/dice_roll.py`,
+        content:
+          "import random\nprint('Dice roll:', random.randint(1, 6))\nprint('Try again for a new roll.')\n",
+      },
+      {
+        path: `${scriptsDir}/hello_world.py`,
+        content:
+          "import datetime\nprint('Hello, world!')\nprint('UTC time:', datetime.datetime.utcnow().isoformat())\n",
+      },
+      {
+        path: `${scriptsDir}/media_demo.py`,
+        content:
+          "print('Media demo:')\nprint('image  -> random retro ASCII')\nprint('video  -> random loop')\nprint('mp3    -> random chiptune')\nprint('Tip: image ~/media/nebula.txt')\n",
+      },
+      {
+        path: `${scriptsDir}/ascii_image.py`,
+        content:
+          "art = [\n  '   .-.',\n  '  (o o)',\n  '  | = |',\n  ' (__|__)',\n  'RETRO BOT',\n]\nprint('\\n'.join(art))\n",
+      },
+      {
+        path: `${scriptsDir}/starfield.py`,
+        content:
+          "import random\nfor _ in range(6):\n    line = ''.join(random.choice('.*') if random.random() > 0.7 else ' ' for _ in range(48))\n    print(line)\n",
+      },
+      {
+        path: `${scriptsDir}/quote_bot.py`,
+        content:
+          "import random\nquotes = [\n  'Focus beats luck.',\n  'Ship it.',\n  'Keep it simple.',\n  'Small steps, big wins.',\n]\nprint(random.choice(quotes))\n",
+      },
+      {
+        path: `${mediaDir}/nebula.txt`,
+        content:
+          "        .     .      .\n     .   *  .   .  *   .\n  .  .  .  .***.  .  .  .\n    .   .*'  *  '*.   .\n .    . *   .   . * .   .\n    .    '*.   .*'    .\n .  .  .   '***'   .  .  .\n     .   *  .   .  *   .\n        .     .      .\n",
+      },
+      {
+        path: `${mediaDir}/grid.txt`,
+        content:
+          "|‾‾‾‾‾‾‾‾‾‾‾|\n|  RETRO  |\n|  GRID   |\n|_________|\n\\\\\\\\\\\\\\\n/ / / / / /\n\\\\\\\\\\\\\\\n",
+      },
+      {
+        path: `${mediaDir}/city.txt`,
+        content:
+          "     | | | | | |\n  ___|_|_|_|_|_|___\n /__ NEON SKYLINE __\\\n|_|_|_|_|_|_|_|_|_|_|\n  /_/ /_/ /_/ /_/ /_\n",
+      },
+      {
+        path: `${mediaDir}/arcade.txt`,
+        content:
+          "   .--------------.\n  /   ARCADE 88    /|\n /______________/ |\n | .----------. | |\n | |  READY!  | | |\n | '----------' |/\n '--------------'\n",
+      },
+      {
+        path: `${mediaDir}/loop.vid`,
+        content:
+          "[frame 1]\n  (o)\n /|\\\n / \\\n\n---\n[frame 2]\n  (o)\n /|\\\n /\\ \\\n\n---\n[frame 3]\n  (o)\n /|\\\n / \\\n\n",
+      },
+      {
+        path: `${mediaDir}/loop2.vid`,
+        content:
+          "[frame 1]\n  [#]  \n /|_|\\\n  / \\\n\n---\n[frame 2]\n  [#]  \n /|_|\\\n  /\\ \\\n\n---\n[frame 3]\n  [#]  \n /|_|\\\n  / \\\n\n",
+      },
+      {
+        path: `${mediaDir}/loop3.vid`,
+        content:
+          "[frame 1]\n  <o>  \n  /|\\\n  / \\\n\n---\n[frame 2]\n  <o>  \n  /|\\\n  /\\ \\\n\n---\n[frame 3]\n  <o>  \n  /|\\\n  / \\\n\n",
+      },
+      {
+        path: `${mediaDir}/loop4.vid`,
+        content:
+          "[frame 1]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n---\n[frame 2]\n  /\\_/\\  \n ( o.o )\n  > ~ <\n\n---\n[frame 3]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n",
+      },
+      {
+        path: `${mediaDir}/loop5.vid`,
+        content:
+          "[frame 1]\n  [==]  \n  |  |  \n  |__|  \n\n---\n[frame 2]\n  [==]  \n  |~~|  \n  |__|  \n\n---\n[frame 3]\n  [==]  \n  |  |  \n  |__|  \n\n",
+      },
+      {
+        path: `${mediaDir}/neon_grid.png`,
+        content:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><path d='M0 48 L64 32' stroke='%236fd1ff' stroke-width='2'/><path d='M0 56 L64 40' stroke='%237ef2b2' stroke-width='2'/><circle cx='48' cy='20' r='10' fill='%23ffb36b'/></svg>",
+      },
+      {
+        path: `${mediaDir}/neon_sun.jpg`,
+        content:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23061110'/><rect y='36' width='64' height='28' fill='%23121f2a'/><circle cx='32' cy='30' r='14' fill='%23ff7ad9'/><path d='M0 48 L64 34' stroke='%23ffb36b' stroke-width='2'/></svg>",
+      },
+      {
+        path: `${mediaDir}/circuit_chip.png`,
+        content:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><rect x='14' y='14' width='36' height='36' rx='4' fill='%231a2b2a' stroke='%236fd1ff' stroke-width='2'/><path d='M8 20h8M8 32h8M8 44h8M48 8v8M32 8v8M20 8v8M56 20h-8M56 32h-8M56 44h-8M20 56v-8M32 56v-8M44 56v-8' stroke='%237ef2b2' stroke-width='2'/></svg>",
+      },
+      {
+        path: `${mediaDir}/sunrise.png`,
+        content:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%23070b12'/><rect y='34' width='80' height='30' fill='%23111f2a'/><circle cx='40' cy='30' r='14' fill='%23ffb36b'/><path d='M0 44 L80 32' stroke='%23ff7ad9' stroke-width='2'/><path d='M0 52 L80 38' stroke='%236fd1ff' stroke-width='2'/></svg>",
+      },
+      {
+        path: `${mediaDir}/neon_rain.jpg`,
+        content:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230a0f14'/><path d='M8 0v64M20 0v64M32 0v64M44 0v64M56 0v64M68 0v64' stroke='%236fd1ff' stroke-width='2' opacity='0.7'/><circle cx='62' cy='20' r='8' fill='%23ff7ad9'/></svg>",
+      },
+      {
+        path: `${mediaDir}/grid_horizon.jpg`,
+        content:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230b0f0e'/><path d='M0 44 L80 28' stroke='%237ef2b2' stroke-width='2'/><path d='M0 54 L80 36' stroke='%236fd1ff' stroke-width='2'/><path d='M0 64 L80 44' stroke='%23ffb36b' stroke-width='2'/></svg>",
+      },
+      {
+        path: `${mediaDir}/synth.mp3`,
+        content: "MP3DATA",
+      },
+      {
+        path: `${mediaDir}/synth2.mp3`,
+        content: "MP3DATA_2",
+      },
+      {
+        path: `${mediaDir}/synth3.mp3`,
+        content: "MP3DATA_3",
+      },
+      {
+        path: `${mediaDir}/neon_drive.mp3`,
+        content: "MP3DATA_4",
+      },
+      {
+        path: `${mediaDir}/circuit_beat.mp3`,
+        content: "MP3DATA_5",
+      },
+      {
+        path: `${mediaDir}/glow_shift.mp3`,
+        content: "MP3DATA_6",
+      },
+      {
+        path: `${mediaDir}/horizon_chords.mp3`,
+        content: "MP3DATA_7",
+      },
+      {
+        path: `${mediaDir}/pulse_echo.mp3`,
+        content: "MP3DATA_8",
+      },
+      {
+        path: `${mediaDir}/retro_wave.mp3`,
+        content: "MP3DATA_9",
       },
       {
         path: `${projectsDir}/kinin-portfolio/README.md`,
@@ -1015,15 +1511,39 @@ export default function HomeClient({ content }: HomeClientProps) {
       },
       {
         path: "/usr/bin/python",
-        content: "ELF... (simulated)",
+        content: "ELF...",
       },
       {
         path: "/usr/bin/pacman",
-        content: "ELF... (simulated)",
+        content: "ELF...",
       },
       {
         path: "/usr/bin/snake",
-        content: "ELF... (simulated)",
+        content: "ELF...",
+      },
+      {
+        path: "/usr/bin/pong",
+        content: "ELF...",
+      },
+      {
+        path: "/usr/bin/chess",
+        content: "ELF...",
+      },
+      {
+        path: "/usr/bin/solitaire",
+        content: "ELF...",
+      },
+      {
+        path: "/usr/bin/mp3",
+        content: "ELF...",
+      },
+      {
+        path: "/usr/bin/video",
+        content: "ELF...",
+      },
+      {
+        path: "/usr/bin/image",
+        content: "ELF...",
       },
     ];
   }, [localizedPages, profile.fullName, profile.terminal.prompt, projectsMd]);
@@ -1095,6 +1615,19 @@ export default function HomeClient({ content }: HomeClientProps) {
     featuredCount > 0 ? clampFeaturedIndex(activeFeatured) : 0;
   const activeFeaturedProject =
     featuredCount > 0 ? featuredProjects[safeActiveFeatured] : null;
+  const featuredProgress =
+    featuredProjects.length > 0
+      ? (safeActiveFeatured + 1) / featuredProjects.length
+      : 0;
+  useEffect(() => {
+    if (!featuredProgressRef.current) {
+      return;
+    }
+    featuredProgressRef.current.style.setProperty(
+      "--featured-progress",
+      String(featuredProgress),
+    );
+  }, [featuredProgress]);
   const featuredSliderCss = useMemo(() => {
     if (featuredCount === 0) {
       return "";
@@ -1170,15 +1703,17 @@ export default function HomeClient({ content }: HomeClientProps) {
 
   return (
     <main className="site-shell" ref={shellRef}>
+      {debugEnabled ? (
+        <div className="debug-hud">
+          {`scroll: ${debugHud.scroll.toFixed(3)}\nreveal: ${debugHud.reveal.toFixed(3)}\nfade: ${debugHud.fade.toFixed(3)}\nheroActive: ${debugHud.heroActive}`}
+        </div>
+      ) : null}
       {!siteReady || isSwitching ? (
         <div
           className={`boot-screen ${isSwitching ? "is-switching" : ""}`}
           role="status"
           aria-live="polite">
           <div className="boot-card">
-            <div className="boot-eye" aria-hidden="true">
-              <span className="boot-eye-core" />
-            </div>
             <div className="boot-logo">~&gt;</div>
             <div className="boot-lines">
               {profile.introLines[language]
@@ -1186,8 +1721,10 @@ export default function HomeClient({ content }: HomeClientProps) {
                 .map((line, index) => (
                   <p key={`${line}-${index}`}>{line}</p>
                 ))}
+              <p>{bootStatusLine}</p>
+              <p className="boot-phase">{bootPhaseLine}</p>
             </div>
-            <div className="boot-progress">
+            <div className="boot-progress is-live" ref={bootProgressElRef}>
               <span />
             </div>
           </div>
@@ -1272,9 +1809,9 @@ export default function HomeClient({ content }: HomeClientProps) {
               <button
                 className="dock-button"
                 type="button"
-                onClick={() => applyLanguage(language === "tr" ? "en" : "tr")}
+                onClick={() => applyLanguage(getAlternateLanguage(language))}
                 aria-label={t.ui.language}>
-                {language === "tr" ? "TR" : "EN"}
+                {languageMeta[language].label}
               </button>
             </div>
             <div className="dock-socials" aria-label="Social links">
@@ -1437,14 +1974,14 @@ export default function HomeClient({ content }: HomeClientProps) {
                     type="button"
                     className={language === "tr" ? "active" : ""}
                     onClick={() => applyLanguage("tr")}>
-                    TR
+                    {languageMeta.tr.label}
                   </button>
                   <span aria-hidden="true">/</span>
                   <button
                     type="button"
                     className={language === "en" ? "active" : ""}
                     onClick={() => applyLanguage("en")}>
-                    EN
+                    {languageMeta.en.label}
                   </button>
                 </div>
                 <div className="sidebar-socials" aria-label="Social links">
@@ -1562,14 +2099,14 @@ export default function HomeClient({ content }: HomeClientProps) {
                     type="button"
                     className={language === "tr" ? "active" : ""}
                     onClick={() => applyLanguage("tr")}>
-                    TR
+                    {languageMeta.tr.label}
                   </button>
                   <span aria-hidden="true">/</span>
                   <button
                     type="button"
                     className={language === "en" ? "active" : ""}
                     onClick={() => applyLanguage("en")}>
-                    EN
+                    {languageMeta.en.label}
                   </button>
                 </div>
                 <div className="sidebar-socials" aria-label="Social links">
@@ -1660,6 +2197,16 @@ export default function HomeClient({ content }: HomeClientProps) {
                   handleTerminalInputFocus();
                 }}>
                 ⌨
+              </button>
+              <button
+                type="button"
+                className="hero-key-button hero-key-tab"
+                aria-label="Tab"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  handleVirtualKey("Tab", { focus: true });
+                }}>
+                Tab
               </button>
               <button
                 type="button"
@@ -1756,6 +2303,7 @@ export default function HomeClient({ content }: HomeClientProps) {
             isMobile={isMobile}
             isActive={heroActive}
             screenAspect={screenAspect}
+            scrollProgressRef={scrollProgressRef}
             onNavigateAction={scrollToSection}
             onReadyAction={(api) => {
               setTerminalApi(api);
@@ -1839,11 +2387,16 @@ export default function HomeClient({ content }: HomeClientProps) {
                       {activeFeaturedProject.title}
                     </span>
                   </div>
-                  <progress
+                  <div
                     className="featured-progress"
-                    value={safeActiveFeatured + 1}
-                    max={featuredProjects.length}
-                  />
+                    ref={featuredProgressRef}
+                    role="progressbar"
+                    aria-label={t.sections.featured.title}
+                    aria-valuemin={0}
+                    aria-valuemax={featuredProjects.length}
+                    aria-valuenow={safeActiveFeatured + 1}>
+                    <span />
+                  </div>
                 </div>
               ) : null}
             </div>

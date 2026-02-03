@@ -1,39 +1,116 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
-export default function LoadingBar() {
-  const pathname = usePathname();
-  return <LoadingBarInner key={pathname} />;
-}
+type LoadingBarSnapshot = {
+  progress: number;
+  visible: boolean;
+};
 
-function LoadingBarInner() {
-  const [visible, setVisible] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const timerRef = useRef<number | null>(null);
-  const doneRef = useRef<number | null>(null);
-  const barRef = useRef<HTMLSpanElement | null>(null);
+function createLoadingBarStore() {
+  let progress = 0;
+  let visible = true;
+  let start = 0;
+  let ready = false;
+  let hideTimer: number | null = null;
+  let rafId: number | null = null;
+  let cleanup: (() => void) | null = null;
+  const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    timerRef.current = window.setInterval(() => {
-      setProgress((prev) => (prev < 82 ? prev + Math.random() * 8 : prev));
-    }, 150);
+  const notify = () => {
+    listeners.forEach((listener) => listener());
+  };
 
-    doneRef.current = window.setTimeout(() => {
-      setProgress(100);
-      window.setTimeout(() => setVisible(false), 480);
-    }, 1200);
+  const markReady = () => {
+    if (!ready) {
+      ready = true;
+      notify();
+    }
+  };
+
+  const startLoop = () => {
+    progress = 0;
+    visible = true;
+    ready = false;
+    start = performance.now();
+
+    if (typeof document !== "undefined") {
+      if (document.readyState === "complete") {
+        markReady();
+      } else {
+        window.addEventListener("load", markReady, { once: true });
+      }
+      if (document.fonts?.ready) {
+        void document.fonts.ready.then(markReady).catch(() => undefined);
+      }
+    }
+
+    const minVisibleMs = 350;
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const ramp = Math.min(1, elapsed / 2200);
+      const target = ready ? 100 : 10 + ramp * 80;
+      const speed = ready ? 0.28 : 0.08;
+      const next = progress + (target - progress) * speed;
+      progress = Math.min(100, Math.max(progress, next));
+      notify();
+
+      if (ready && elapsed > minVisibleMs && progress >= 99) {
+        if (!hideTimer) {
+          hideTimer = window.setTimeout(() => {
+            visible = false;
+            notify();
+          }, 180);
+        }
+        return;
+      }
+
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    rafId = window.requestAnimationFrame(tick);
 
     return () => {
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current);
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
       }
-      if (doneRef.current) {
-        window.clearTimeout(doneRef.current);
+      if (hideTimer) {
+        window.clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      window.removeEventListener("load", markReady);
+    };
+  };
+
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    if (listeners.size === 1) {
+      cleanup = startLoop();
+    }
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0 && cleanup) {
+        cleanup();
+        cleanup = null;
       }
     };
-  }, []);
+  };
+
+  const getSnapshot = (): LoadingBarSnapshot => ({ progress, visible });
+
+  return { subscribe, getSnapshot };
+}
+
+const loadingBarStore = createLoadingBarStore();
+
+export default function LoadingBar() {
+  const { progress, visible } = useSyncExternalStore(
+    loadingBarStore.subscribe,
+    loadingBarStore.getSnapshot,
+    loadingBarStore.getSnapshot,
+  );
+  const barRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     if (!barRef.current) {

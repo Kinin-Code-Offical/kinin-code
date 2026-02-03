@@ -4,6 +4,7 @@ import { JetBrains_Mono, Space_Grotesk, Unbounded } from "next/font/google";
 import "./globals.css";
 import { PreferencesProvider } from "@/components/PreferencesProvider";
 import type { Language } from "@/lib/i18n";
+import { getAlternateLanguage } from "@/lib/i18n";
 import { profile } from "@/content/profile";
 import {
   buildAlternates,
@@ -18,16 +19,22 @@ import SeoSchema from "@/components/SeoSchema";
 const display = Unbounded({
   variable: "--font-display",
   subsets: ["latin"],
+  display: "optional",
+  fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
 });
 
 const body = Space_Grotesk({
   variable: "--font-body",
   subsets: ["latin"],
+  display: "optional",
+  fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
 });
 
 const mono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  display: "optional",
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "monospace"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -97,7 +104,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       siteName: fullName,
       locale: getLocale(language),
-      alternateLocale: [getLocale(language === "tr" ? "en" : "tr")],
+      alternateLocale: [getLocale(getAlternateLanguage(language))],
       images: [
         {
           url: ogImage,
