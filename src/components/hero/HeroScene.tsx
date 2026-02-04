@@ -1967,10 +1967,22 @@ function SceneContent({
       if (!allowParallax) {
         parallax.current.lerp(parallaxZeroRef.current, 0.12);
       }
-      const rotY = allowParallax ? parallax.current.x * 0.18 * parallaxDamp : 0;
-      const rotX = allowParallax ? parallax.current.y * 0.14 * parallaxDamp : 0;
-      group.rotation.y = rotY;
-      group.rotation.x = rotX;
+      const maxYaw = 0.08;
+      const maxPitch = 0.06;
+      const targetYaw = allowParallax
+        ? Math.min(
+            maxYaw,
+            Math.max(-maxYaw, parallax.current.x * 0.08 * parallaxDamp),
+          )
+        : 0;
+      const targetPitch = allowParallax
+        ? Math.min(
+            maxPitch,
+            Math.max(-maxPitch, -parallax.current.y * 0.06 * parallaxDamp),
+          )
+        : 0;
+      group.rotation.y = targetYaw;
+      group.rotation.x = targetPitch;
     }
 
     const palette = bgPaletteRef.current;

@@ -1821,7 +1821,11 @@ textarea {
 }
 
 .site-content > #projects.section {
-  background: var(--section-bg, var(--content-bg));
+  background: none;
+}
+
+.site-content > #projects.section::before {
+  background: none;
 }
 
 .section-inner {
