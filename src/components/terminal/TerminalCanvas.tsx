@@ -2479,6 +2479,34 @@ export default function TerminalCanvas({
     return bestIndex >= 0 ? { index: bestIndex, dist: bestDist } : null;
   }, []);
 
+  const findNearestDoomPickupInFront = useCallback(
+    (radius: number, halfFov: number) => {
+      const player = doomPlayerRef.current;
+      let bestIndex = -1;
+      let bestDist = radius;
+      doomPickupsRef.current.forEach((pickup, index) => {
+        const dx = pickup.x - player.x;
+        const dy = pickup.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist >= bestDist) {
+          return;
+        }
+        const angle = Math.atan2(dy, dx);
+        const delta = Math.atan2(
+          Math.sin(angle - player.angle),
+          Math.cos(angle - player.angle),
+        );
+        if (Math.abs(delta) > halfFov) {
+          return;
+        }
+        bestDist = dist;
+        bestIndex = index;
+      });
+      return bestIndex >= 0 ? { index: bestIndex, dist: bestDist } : null;
+    },
+    [],
+  );
+
   const applyDoomPlayerDamage = useCallback(
     (damage: number, flash = 2) => {
       if (doomShieldRef.current > 0) {
@@ -2929,6 +2957,44 @@ export default function TerminalCanvas({
   }, [doomText]);
 
   const interactDoom = useCallback(() => {
+    if (doomGameOverRef.current) {
+      return false;
+    }
+
+    const player = doomPlayerRef.current;
+    const exit = doomExitRef.current;
+    if (exit && Math.hypot(exit.x - player.x, exit.y - player.y) < 1.05) {
+      const nextLevel = doomLevelRef.current + 1;
+      if (nextLevel < doomLevels.length) {
+        doomAmmoRef.current = Math.min(99, doomAmmoRef.current + 8);
+        doomHealthRef.current = Math.min(100, doomHealthRef.current + 10);
+        loadDoomLevel(nextLevel, false);
+      } else {
+        doomMessageRef.current = doomText("clear");
+      }
+      return true;
+    }
+
+    const pickupTarget = findNearestDoomPickupInFront(1.05, 0.55);
+    if (pickupTarget) {
+      const pickup = doomPickupsRef.current[pickupTarget.index];
+      if (pickup) {
+        const angle = Math.atan2(pickup.y - player.y, pickup.x - player.x);
+        const wallDist = castDoomDistance(
+          player,
+          angle,
+          pickupTarget.dist + 0.12,
+        );
+        if (wallDist + 0.05 >= pickupTarget.dist) {
+          applyDoomPickup(pickup);
+          doomPickupsRef.current = doomPickupsRef.current.filter(
+            (_, index) => index !== pickupTarget.index,
+          );
+          return true;
+        }
+      }
+    }
+
     if (openDoomDoor()) {
       return true;
     }
@@ -2945,7 +3011,16 @@ export default function TerminalCanvas({
       (_, index) => index !== nearest.index,
     );
     return true;
-  }, [applyDoomPickup, findNearestDoomPickup, openDoomDoor]);
+  }, [
+    applyDoomPickup,
+    castDoomDistance,
+    doomLevels.length,
+    doomText,
+    findNearestDoomPickup,
+    findNearestDoomPickupInFront,
+    loadDoomLevel,
+    openDoomDoor,
+  ]);
 
   const stepDoom = useCallback(() => {
     const map = doomMapRef.current;
@@ -3049,7 +3124,7 @@ export default function TerminalCanvas({
       door.open = clamp(next, 0, 1);
     });
 
-    const autoPickup = findNearestDoomPickup(0.45);
+    const autoPickup = findNearestDoomPickup(0.6);
     if (autoPickup) {
       const pickup = doomPickupsRef.current[autoPickup.index];
       if (pickup) {
@@ -3061,7 +3136,7 @@ export default function TerminalCanvas({
     }
 
     const pickups = doomPickupsRef.current;
-    const nearestPickup = findNearestDoomPickup(1.15);
+    const nearestPickup = findNearestDoomPickupInFront(1.15, 0.6);
     let hint: string | null = null;
     if (nearestPickup) {
       const pickup = pickups[nearestPickup.index];
@@ -3094,21 +3169,9 @@ export default function TerminalCanvas({
       exit &&
       Math.hypot(exit.x - player.x, exit.y - player.y) < 1.1
     ) {
-      hint = doomText("exitReady");
+      hint = doomText("interactExit");
     }
     doomHintRef.current = hint;
-
-    if (exit && Math.hypot(exit.x - player.x, exit.y - player.y) < 0.6) {
-      const nextLevel = doomLevelRef.current + 1;
-      if (nextLevel < doomLevels.length) {
-        doomAmmoRef.current = Math.min(99, doomAmmoRef.current + 8);
-        doomHealthRef.current = Math.min(100, doomHealthRef.current + 10);
-        loadDoomLevel(nextLevel, false);
-      } else {
-        doomMessageRef.current = doomText("clear");
-      }
-      return;
-    }
 
     const bomb = doomBombRef.current;
     if (bomb?.active) {
@@ -3322,11 +3385,10 @@ export default function TerminalCanvas({
     applyDoomPickup,
     applyDoomPlayerDamage,
     castDoomDistance,
-    doomLevels.length,
     doomText,
     findNearestDoomPickup,
+    findNearestDoomPickupInFront,
     getDoomBootProgress,
-    loadDoomLevel,
     perfTier,
     triggerDoomExplosion,
   ]);
@@ -7273,6 +7335,8 @@ export default function TerminalCanvas({
         ctx.fillStyle = "rgba(255,255,255,0.05)";
         ctx.fillRect(pad + 1, textAreaY - 4, boxW - 2, 1);
 
+        const textFont = `${fontSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.font = textFont;
         const charWidth = Math.max(6, Math.ceil(ctx.measureText("M").width));
         const visibleLines = Math.max(1, Math.floor(textAreaH / lineHeight));
         const maxLineDigits = String(state.buffer.length).length;
@@ -7679,14 +7743,22 @@ export default function TerminalCanvas({
             if (!textures) {
               return null;
             }
-            const v = (tileX * 31 + tileY * 17 + (tileX ^ tileY) * 13) % 3;
-            if (v === 1) {
-              return textures.tech;
+            const level = doomLevelRef.current;
+            const palette = [textures.brick, textures.tech, textures.stone];
+            const base = palette[level % palette.length] ?? textures.brick;
+            const accentA =
+              palette[(level + 1) % palette.length] ?? textures.tech;
+            const accentB =
+              palette[(level + 2) % palette.length] ?? textures.stone;
+            const key =
+              (tileX * 11 + tileY * 7 + (tileX ^ tileY) * 3 + level * 13) % 17;
+            if (key === 0) {
+              return accentA;
             }
-            if (v === 2) {
-              return textures.stone;
+            if (key === 1) {
+              return accentB;
             }
-            return textures.brick;
+            return base;
           };
           const now =
             typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -8277,7 +8349,10 @@ export default function TerminalCanvas({
                                         : sprite.kind === "bomb"
                                           ? 0.34
                                           : 0.48;
-            const spriteH = Math.max(10, Math.floor(baseH * scale));
+            const spriteH = Math.min(
+              Math.floor(viewH * 0.78),
+              Math.max(10, Math.floor(baseH * scale)),
+            );
             const aspect =
               sprite.kind === "pillar"
                 ? 0.35
@@ -8380,7 +8455,10 @@ export default function TerminalCanvas({
                   : enemy.type === "spitter"
                     ? 1.05
                     : 0.96;
-            const spriteH = Math.max(22, Math.floor(baseH * 0.92 * enemyScale));
+            const spriteH = Math.min(
+              Math.floor(viewH * 0.92),
+              Math.max(22, Math.floor(baseH * 0.92 * enemyScale)),
+            );
             const spriteW = Math.max(
               18,
               Math.floor(spriteH * (enemy.type === "brute" ? 0.62 : 0.55)),
@@ -8592,9 +8670,12 @@ export default function TerminalCanvas({
             }
             const baseH = Math.min(viewH, Math.floor(viewH / dist));
             const isRocket = projectile.kind === "rocket";
-            const size = Math.max(
-              isRocket ? 10 : 8,
-              Math.floor(baseH * (isRocket ? 0.22 : 0.16)),
+            const size = Math.min(
+              Math.floor(viewH * 0.28),
+              Math.max(
+                isRocket ? 10 : 8,
+                Math.floor(baseH * (isRocket ? 0.22 : 0.16)),
+              ),
             );
             const top = Math.floor(
               viewY + viewH * 0.48 - size / 2 + cameraBob * 0.2,
@@ -8693,7 +8774,10 @@ export default function TerminalCanvas({
                 const screenX =
                   viewX + (0.5 + delta / fov) * Math.max(1, viewW);
                 const spriteH = Math.min(viewH, Math.floor(viewH / dist));
-                const size = Math.max(6, Math.floor(spriteH * 0.15));
+                const size = Math.min(
+                  Math.floor(viewH * 0.18),
+                  Math.max(6, Math.floor(spriteH * 0.15)),
+                );
                 const top = Math.floor(viewY + (viewH - size) / 2);
                 ctx.fillStyle = "#f4d35e";
                 ctx.beginPath();
@@ -8724,7 +8808,10 @@ export default function TerminalCanvas({
                 const screenX =
                   viewX + (0.5 + delta / fov) * Math.max(1, viewW);
                 const spriteH = Math.min(viewH, Math.floor(viewH / dist));
-                const size = Math.max(16, Math.floor(spriteH * 0.35));
+                const size = Math.min(
+                  Math.floor(viewH * 0.45),
+                  Math.max(16, Math.floor(spriteH * 0.35)),
+                );
                 const top = Math.floor(viewY + (viewH - size) / 2);
                 ctx.fillStyle = "rgba(246,194,122,0.6)";
                 ctx.beginPath();
