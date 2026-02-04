@@ -12,6 +12,8 @@
   --terminal-text: #f7c87a;
   --terminal-dim: #c89a58;
   --content-bg: #14110c;
+  --content-bg-alt: #17130d;
+  --reveal-bg: var(--hero-bg-deep);
   --content-ink: #f5e6cf;
   --content-muted: #c2a87f;
   --content-border: rgba(243, 161, 67, 0.2);
@@ -44,6 +46,8 @@
   --terminal-text: #e2a85b;
   --terminal-dim: #b87d3f;
   --content-bg: #f0e0c6;
+  --content-bg-alt: #f7eed9;
+  --reveal-bg: var(--hero-bg-mid);
   --content-ink: #2a1b0f;
   --content-muted: #8b6a46;
   --content-border: rgba(216, 131, 40, 0.35);
@@ -134,7 +138,7 @@ textarea {
   content: "";
   position: fixed;
   inset: 0;
-  background: var(--content-bg);
+  background: var(--reveal-bg);
   opacity: var(--content-reveal);
   pointer-events: none;
   z-index: 1;
@@ -1769,20 +1773,40 @@ textarea {
   background:
     radial-gradient(
       circle at 10% 10%,
-      rgba(var(--hero-accent-rgb), 0.12),
+      var(--section-overlay-a, rgba(var(--hero-accent-rgb), 0.12)),
       transparent 48%
     ),
     radial-gradient(
       circle at 90% 0%,
-      rgba(255, 211, 138, 0.08),
+      var(--section-overlay-b, rgba(255, 211, 138, 0.08)),
       transparent 52%
     ),
-    linear-gradient(180deg, rgba(10, 8, 6, 0.6), transparent 40%),
-    var(--content-bg);
+    linear-gradient(
+      180deg,
+      var(--section-overlay-c, rgba(10, 8, 6, 0.6)),
+      transparent 40%
+    ),
+    var(--section-bg, var(--content-bg));
+}
+
+.site-content > section.section {
+  --section-bg: var(--content-bg);
+  --section-overlay-a: rgba(var(--hero-accent-rgb), 0.12);
+  --section-overlay-b: rgba(255, 211, 138, 0.08);
+  --section-overlay-c: rgba(10, 8, 6, 0.6);
+}
+
+:root[data-theme="dark"] .site-content > section.section:nth-of-type(even),
+:root[data-theme="light"] .site-content > section.section:nth-of-type(even) {
+  --section-bg: var(--content-bg-alt);
 }
 
 .section + .section {
   border-top: 1px solid var(--content-border);
+}
+
+.site-content > #projects.section {
+  background: transparent;
 }
 
 .section-inner {
@@ -1876,19 +1900,13 @@ textarea {
 }
 
 .section-featured {
-  background: var(--content-bg);
+  background: var(--section-bg, var(--content-bg));
   min-height: 0;
   position: relative;
   overflow-x: visible;
   overflow-y: visible;
   padding-top: clamp(56px, 8vw, 96px);
   padding-bottom: clamp(56px, 8vw, 96px);
-}
-
-.section-featured + .section,
-.section-featured ~ .section,
-.section-featured ~ .site-footer {
-  background: var(--content-bg);
 }
 
 .featured-layout {
@@ -2067,11 +2085,55 @@ textarea {
   width: 100%;
 }
 
+@media (max-width: 768px) {
+  .featured-slider {
+    /* Mobilde kartları daha da incelt (daha dikey form) */
+    --featured-card-width: 72vw;
+    /* Kartların birbirine açıklığını ayarla */
+    --featured-offset-1: 65vw;
+  }
+
+  .featured-card {
+    /* Dikey oranı artır, daha modern mobil kart görünümü */
+    min-height: 520px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Başlık fontunu biraz daha dengeli yap */
+  .featured-card h3 {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  
+  .featured-summary {
+    /* Mobilde açıklamayı biraz kısalt */
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    font-size: 14px;
+  }
+
+  .featured-links {
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px dashed rgba(var(--hero-accent-rgb), 0.2);
+  }
+  
+  /* Mobilde ortalamayı garantiye al */
+  .featured-track {
+    place-items: center;
+    justify-content: center;
+  }
+}
+
 .featured-controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
+  margin-top: 10px;
 }
 
 .featured-controls .featured-dots {

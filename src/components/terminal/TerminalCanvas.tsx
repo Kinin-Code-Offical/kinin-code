@@ -256,7 +256,8 @@ type AppMode =
   | "chess"
   | "solitaire"
   | "player"
-  | "doom";
+  | "doom"
+  | "editor";
 
 type FsNode =
   | { type: "dir"; children: Record<string, FsNode> }
@@ -956,6 +957,16 @@ export default function TerminalCanvas({
     l: "ls",
   });
   const editorRef = useRef<EditorState | null>(null);
+  const editorCursorRef = useRef({ row: 0, col: 0 });
+  const editorScrollRef = useRef(0);
+  const editorCommandRef = useRef({ active: false, value: "" });
+  const editorSelectionRef = useRef<{
+    start: { row: number; col: number };
+    end: { row: number; col: number };
+  } | null>(null);
+  const editorStatusRef = useRef<string | null>(null);
+  const editorQuitArmedRef = useRef(false);
+  const editorClipboardRef = useRef<string | null>(null);
   const sessionStartRef = useRef(Date.now());
   const lastCanvasSizeRef = useRef({ width: 0, height: 0 });
   const dirtyRef = useRef(true);
@@ -1065,16 +1076,13 @@ export default function TerminalCanvas({
   const doomHintWindowRef = useRef(true);
   const doomMuzzleRef = useRef(0);
   const doomHurtRef = useRef(0);
-  const doomTexturesRef = useRef<
-    | {
-        size: number;
-        brick: HTMLCanvasElement;
-        tech: HTMLCanvasElement;
-        stone: HTMLCanvasElement;
-        door: HTMLCanvasElement;
-      }
-    | null
-  >(null);
+  const doomTexturesRef = useRef<{
+    size: number;
+    brick: HTMLCanvasElement;
+    tech: HTMLCanvasElement;
+    stone: HTMLCanvasElement;
+    door: HTMLCanvasElement;
+  } | null>(null);
   const doomWeaponRef = useRef<
     "fist" | "chainsaw" | "pistol" | "shotgun" | "chaingun" | "launcher"
   >("pistol");
@@ -1308,7 +1316,8 @@ export default function TerminalCanvas({
           rocketsLabel: "ROCKETS",
           bombLabel: "BOMBS",
           scoreLabel: "SCORE",
-          controls1: "W/S: move  A/D: strafe  ←/→: turn  Shift: run  Space: attack",
+          controls1:
+            "W/S: move  A/D: strafe  ←/→: turn  Shift: run  Space: attack",
           controls2:
             "1: fists/saw  2: pistol  3: shotgun  4: chaingun  5: launcher  B: bomb  E: interact  M: map  H: hint  R: reset  Q: quit",
           gameOver: "YOU DIED - R: restart",
@@ -2741,7 +2750,9 @@ export default function TerminalCanvas({
     if (weapon === "fist" || weapon === "chainsaw") {
       doomCooldownRef.current = weapon === "chainsaw" ? 4 : 14;
       doomMuzzleRef.current = weapon === "chainsaw" ? 10 : 8;
-      doomMessageRef.current = doomText(weapon === "chainsaw" ? "saw" : "punch");
+      doomMessageRef.current = doomText(
+        weapon === "chainsaw" ? "saw" : "punch",
+      );
       const enemyTarget = pickEnemyTarget(
         player.angle,
         weapon === "chainsaw" ? 1.35 : 1.05,
@@ -3047,27 +3058,27 @@ export default function TerminalCanvas({
       }
     }
 
-      const pickups = doomPickupsRef.current;
-      const nearestPickup = findNearestDoomPickup(1.15);
-      let hint: string | null = null;
-      if (nearestPickup) {
-        const pickup = pickups[nearestPickup.index];
-        const labelMap: Record<string, string> = {
-          ammo: "AMMO",
-          shells: "SHELLS",
-          rockets: "ROCKETS",
-          med: "MED",
-          shield: "SHIELD",
-          bomb: "BOMB",
-          chest: "CHEST",
-          shotgun: "SHOTGUN",
-          chainsaw: "CHAINSAW",
-          chaingun: "CHAINGUN",
-          launcher: "LAUNCHER",
-        };
-        hint =
-          `${doomText("interactPickup")} ${labelMap[pickup.type] ?? ""}`.trim();
-      }
+    const pickups = doomPickupsRef.current;
+    const nearestPickup = findNearestDoomPickup(1.15);
+    let hint: string | null = null;
+    if (nearestPickup) {
+      const pickup = pickups[nearestPickup.index];
+      const labelMap: Record<string, string> = {
+        ammo: "AMMO",
+        shells: "SHELLS",
+        rockets: "ROCKETS",
+        med: "MED",
+        shield: "SHIELD",
+        bomb: "BOMB",
+        chest: "CHEST",
+        shotgun: "SHOTGUN",
+        chainsaw: "CHAINSAW",
+        chaingun: "CHAINGUN",
+        launcher: "LAUNCHER",
+      };
+      hint =
+        `${doomText("interactPickup")} ${labelMap[pickup.type] ?? ""}`.trim();
+    }
     const lookX = player.x + Math.cos(player.angle) * 0.9;
     const lookY = player.y + Math.sin(player.angle) * 0.9;
     const lookGX = Math.floor(lookX);
@@ -3141,7 +3152,9 @@ export default function TerminalCanvas({
           let hit = false;
           for (let e = 0; e < enemies.length; e += 1) {
             const enemy = enemies[e];
-            if (Math.hypot(enemy.x - projectile.x, enemy.y - projectile.y) < 0.25) {
+            if (
+              Math.hypot(enemy.x - projectile.x, enemy.y - projectile.y) < 0.25
+            ) {
               hit = true;
               break;
             }
@@ -3177,7 +3190,11 @@ export default function TerminalCanvas({
         return true;
       }
       const angle = Math.atan2(dy, dx);
-      const wallDist = castDoomDistance({ x: enemyX, y: enemyY }, angle, dist + 0.05);
+      const wallDist = castDoomDistance(
+        { x: enemyX, y: enemyY },
+        angle,
+        dist + 0.05,
+      );
       return wallDist + 0.05 >= dist;
     };
     enemies.forEach((enemy, index) => {
@@ -4741,6 +4758,8 @@ export default function TerminalCanvas({
         scheduleChessBotMove();
       } else if (mode === "solitaire") {
         resetSolitaire();
+      } else if (mode === "editor") {
+        // editor runs without a game loop
       }
       dirtyRef.current = true;
     },
@@ -5405,6 +5424,240 @@ export default function TerminalCanvas({
     [],
   );
 
+  const normalizeEditorSelection = useCallback(
+    (selection: {
+      start: { row: number; col: number };
+      end: { row: number; col: number };
+    }) => {
+      const { start, end } = selection;
+      if (start.row < end.row) {
+        return selection;
+      }
+      if (start.row > end.row) {
+        return { start: end, end: start };
+      }
+      if (start.col <= end.col) {
+        return selection;
+      }
+      return { start: end, end: start };
+    },
+    [],
+  );
+
+  const ensureEditorBuffer = useCallback((state: EditorState) => {
+    if (!state.buffer.length) {
+      state.buffer.push("");
+    }
+  }, []);
+
+  const clampEditorCursor = useCallback(
+    (state: EditorState, row: number, col: number) => {
+      const safeRow = clamp(row, 0, Math.max(0, state.buffer.length - 1));
+      const line = state.buffer[safeRow] ?? "";
+      const safeCol = clamp(col, 0, line.length);
+      return { row: safeRow, col: safeCol };
+    },
+    [],
+  );
+
+  const updateEditorScroll = useCallback((visibleLines: number) => {
+    const state = editorRef.current;
+    if (!state) {
+      return;
+    }
+    const cursor = editorCursorRef.current;
+    const top = editorScrollRef.current;
+    const bottom = top + Math.max(1, visibleLines - 1);
+    if (cursor.row < top) {
+      editorScrollRef.current = cursor.row;
+    } else if (cursor.row > bottom) {
+      editorScrollRef.current = cursor.row - Math.max(1, visibleLines - 1);
+    }
+  }, []);
+
+  const clearEditorSelection = useCallback(() => {
+    editorSelectionRef.current = null;
+  }, []);
+
+  const deleteEditorSelection = useCallback(() => {
+    const state = editorRef.current;
+    const selection = editorSelectionRef.current;
+    if (!state || !selection) {
+      return false;
+    }
+    const normalized = normalizeEditorSelection(selection);
+    const { start, end } = normalized;
+    if (start.row === end.row) {
+      const line = state.buffer[start.row] ?? "";
+      state.buffer[start.row] = line.slice(0, start.col) + line.slice(end.col);
+    } else {
+      const first = state.buffer[start.row] ?? "";
+      const last = state.buffer[end.row] ?? "";
+      const merged = first.slice(0, start.col) + last.slice(end.col);
+      state.buffer.splice(start.row, end.row - start.row + 1, merged);
+    }
+    editorCursorRef.current = { row: start.row, col: start.col };
+    clearEditorSelection();
+    state.modified = true;
+    return true;
+  }, [clearEditorSelection, normalizeEditorSelection]);
+
+  const insertEditorText = useCallback(
+    (text: string) => {
+      const state = editorRef.current;
+      if (!state) {
+        return;
+      }
+      ensureEditorBuffer(state);
+      if (editorSelectionRef.current) {
+        deleteEditorSelection();
+      }
+      const cursor = editorCursorRef.current;
+      const line = state.buffer[cursor.row] ?? "";
+      const next = line.slice(0, cursor.col) + text + line.slice(cursor.col);
+      state.buffer[cursor.row] = next;
+      editorCursorRef.current = {
+        row: cursor.row,
+        col: cursor.col + text.length,
+      };
+      state.modified = true;
+    },
+    [deleteEditorSelection, ensureEditorBuffer],
+  );
+
+  const insertEditorNewline = useCallback(() => {
+    const state = editorRef.current;
+    if (!state) {
+      return;
+    }
+    ensureEditorBuffer(state);
+    if (editorSelectionRef.current) {
+      deleteEditorSelection();
+    }
+    const cursor = editorCursorRef.current;
+    const line = state.buffer[cursor.row] ?? "";
+    const left = line.slice(0, cursor.col);
+    const right = line.slice(cursor.col);
+    state.buffer.splice(cursor.row, 1, left, right);
+    editorCursorRef.current = { row: cursor.row + 1, col: 0 };
+    state.modified = true;
+  }, [deleteEditorSelection, ensureEditorBuffer]);
+
+  const deleteEditorChar = useCallback(
+    (direction: "back" | "forward") => {
+      const state = editorRef.current;
+      if (!state) {
+        return;
+      }
+      ensureEditorBuffer(state);
+      if (editorSelectionRef.current) {
+        deleteEditorSelection();
+        return;
+      }
+      const cursor = editorCursorRef.current;
+      const line = state.buffer[cursor.row] ?? "";
+      if (direction === "back") {
+        if (cursor.col > 0) {
+          state.buffer[cursor.row] =
+            line.slice(0, cursor.col - 1) + line.slice(cursor.col);
+          editorCursorRef.current = {
+            row: cursor.row,
+            col: cursor.col - 1,
+          };
+          state.modified = true;
+        } else if (cursor.row > 0) {
+          const prevLine = state.buffer[cursor.row - 1] ?? "";
+          state.buffer[cursor.row - 1] = prevLine + line;
+          state.buffer.splice(cursor.row, 1);
+          editorCursorRef.current = {
+            row: cursor.row - 1,
+            col: prevLine.length,
+          };
+          state.modified = true;
+        }
+        return;
+      }
+      if (cursor.col < line.length) {
+        state.buffer[cursor.row] =
+          line.slice(0, cursor.col) + line.slice(cursor.col + 1);
+        state.modified = true;
+      } else if (cursor.row < state.buffer.length - 1) {
+        const nextLine = state.buffer[cursor.row + 1] ?? "";
+        state.buffer[cursor.row] = line + nextLine;
+        state.buffer.splice(cursor.row + 1, 1);
+        state.modified = true;
+      }
+    },
+    [deleteEditorSelection, ensureEditorBuffer],
+  );
+
+  const moveEditorCursor = useCallback(
+    (
+      deltaRow: number,
+      deltaCol: number,
+      options?: { extend?: boolean; byWord?: boolean },
+    ) => {
+      const state = editorRef.current;
+      if (!state) {
+        return;
+      }
+      ensureEditorBuffer(state);
+      const { row: currentRow, col: currentCol } = editorCursorRef.current;
+      const nextRow = currentRow + deltaRow;
+      let nextCol = currentCol + deltaCol;
+      if (options?.byWord) {
+        const line = state.buffer[currentRow] ?? "";
+        if (deltaCol < 0) {
+          nextCol = findPrevWord(line, currentCol);
+        } else if (deltaCol > 0) {
+          nextCol = findNextWord(line, currentCol);
+        }
+      }
+      const next = clampEditorCursor(state, nextRow, nextCol);
+      editorCursorRef.current = next;
+      if (options?.extend) {
+        const selection = editorSelectionRef.current;
+        if (!selection) {
+          editorSelectionRef.current = {
+            start: { row: currentRow, col: currentCol },
+            end: { ...next },
+          };
+        } else {
+          editorSelectionRef.current = {
+            start: selection.start,
+            end: { ...next },
+          };
+        }
+      } else {
+        clearEditorSelection();
+      }
+    },
+    [clampEditorCursor, clearEditorSelection, ensureEditorBuffer],
+  );
+
+  const getEditorSelectionText = useCallback(() => {
+    const state = editorRef.current;
+    const selection = editorSelectionRef.current;
+    if (!state || !selection) {
+      return "";
+    }
+    const normalized = normalizeEditorSelection(selection);
+    const { start, end } = normalized;
+    if (start.row === end.row) {
+      const line = state.buffer[start.row] ?? "";
+      return line.slice(start.col, end.col);
+    }
+    const parts: string[] = [];
+    const firstLine = state.buffer[start.row] ?? "";
+    parts.push(firstLine.slice(start.col));
+    for (let row = start.row + 1; row < end.row; row += 1) {
+      parts.push(state.buffer[row] ?? "");
+    }
+    const lastLine = state.buffer[end.row] ?? "";
+    parts.push(lastLine.slice(0, end.col));
+    return parts.join("\n");
+  }, [normalizeEditorSelection]);
+
   const printEditorBuffer = useCallback(
     (state: EditorState) => {
       appendLine(
@@ -5568,6 +5821,92 @@ export default function TerminalCanvas({
       syncInputValue,
       writeFile,
     ],
+  );
+
+  const executeEditorCommand = useCallback(
+    (value: string) => {
+      const state = editorRef.current;
+      if (!state) {
+        return;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return;
+      }
+      const parts = trimmed.split(/\s+/).filter(Boolean);
+      const cmd = parts[0] ?? "";
+      const arg = parts.slice(1).join(" ");
+
+      const closeEditor = (message?: string) => {
+        editorRef.current = null;
+        editorCommandRef.current = { active: false, value: "" };
+        editorSelectionRef.current = null;
+        editorQuitArmedRef.current = false;
+        stopApp(message ?? messages.editor.exit);
+      };
+
+      const saveTo = (path: string) => {
+        const ok = writeFile(path, state.buffer.join("\n"), { create: true });
+        if (!ok) {
+          editorStatusRef.current = messages.editor.saveFailed;
+          return false;
+        }
+        state.modified = false;
+        editorQuitArmedRef.current = false;
+        editorStatusRef.current = messages.editor.saved;
+        return true;
+      };
+
+      if (cmd === "q") {
+        if (state.modified) {
+          editorStatusRef.current = messages.editor.unsavedChanges;
+          editorQuitArmedRef.current = true;
+        } else {
+          closeEditor(messages.editor.exit);
+        }
+        return;
+      }
+      if (cmd === "q!") {
+        closeEditor(messages.editor.exit);
+        return;
+      }
+      if (cmd === "wq") {
+        if (saveTo(arg || state.path)) {
+          if (arg) {
+            state.path = arg;
+          }
+          closeEditor(messages.editor.exit);
+        }
+        return;
+      }
+      if (cmd === "w") {
+        if (saveTo(arg || state.path) && arg) {
+          state.path = arg;
+          editorStatusRef.current = formatMessage(messages.editor.savedAs, {
+            path: arg,
+          });
+        }
+        return;
+      }
+      if (cmd === "set") {
+        if (arg === "nu" || arg === "number") {
+          state.showLineNumbers = true;
+          editorStatusRef.current = messages.editor.lineNumbersOn;
+        } else if (arg === "nonu" || arg === "nonumber") {
+          state.showLineNumbers = false;
+          editorStatusRef.current = messages.editor.lineNumbersOff;
+        } else {
+          editorStatusRef.current = messages.editor.usageSet;
+        }
+        return;
+      }
+      if (cmd === "help") {
+        editorStatusRef.current = messages.editor.help;
+        return;
+      }
+      editorStatusRef.current = messages.editor.unknownCommand;
+    },
+    [formatMessage, messages.editor, stopApp, writeFile],
   );
 
   const runCommand = useCallback(
@@ -5970,15 +6309,18 @@ export default function TerminalCanvas({
             refreshed && refreshed.type === "file" ? refreshed.content : "";
           editorRef.current = {
             path: arg,
-            buffer: content ? content.split("\n") : [],
+            buffer: content ? content.split("\n") : [""],
             showLineNumbers: true,
             modified: false,
           };
+          editorCursorRef.current = { row: 0, col: 0 };
+          editorScrollRef.current = 0;
+          editorSelectionRef.current = null;
+          editorCommandRef.current = { active: false, value: "" };
+          editorStatusRef.current = messages.editor.help;
+          editorQuitArmedRef.current = false;
           appendLine(formatMessage(messages.editor.editing, { path: arg }));
-          appendLine(messages.editor.help);
-          if (content) {
-            printEditorBuffer(editorRef.current);
-          }
+          startApp("editor");
           break;
         }
         case "head":
@@ -6623,7 +6965,6 @@ export default function TerminalCanvas({
       loadImageAscii,
       messages,
       printFile,
-      printEditorBuffer,
       profileName,
       removeNode,
       runPipCommand,
@@ -6899,7 +7240,182 @@ export default function TerminalCanvas({
       ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
       ctx.textBaseline = "top";
 
-      if (mode === "player") {
+      if (mode === "editor") {
+        const pad = Math.floor(Math.min(width, height) * 0.1);
+        const boxW = width - pad * 2;
+        const boxH = height - pad * 2;
+        const headerHeight = Math.floor(lineHeight * 1.2) + 8;
+        const footerHeight = Math.floor(lineHeight * 1.6) + 10;
+        const textAreaY = pad + headerHeight;
+        const textAreaH = boxH - headerHeight - footerHeight;
+
+        ctx.strokeStyle = dim;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(pad, pad, boxW, boxH);
+
+        const state = editorRef.current;
+        if (!state) {
+          ctx.fillStyle = accent;
+          ctx.fillText("NANO", pad + 12, pad + 8);
+          ctx.fillStyle = dim;
+          ctx.fillText("(no buffer)", pad + 12, pad + 32);
+          finalizeFrame();
+          return;
+        }
+
+        ensureEditorBuffer(state);
+
+        ctx.fillStyle = accent;
+        ctx.fillText(`NANO  ${state.path}`, pad + 12, pad + 8);
+
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.fillRect(pad + 1, textAreaY - 4, boxW - 2, 1);
+
+        const charWidth = Math.max(6, Math.ceil(ctx.measureText("M").width));
+        const visibleLines = Math.max(1, Math.floor(textAreaH / lineHeight));
+        const maxLineDigits = String(state.buffer.length).length;
+        const lineNumberWidth = state.showLineNumbers
+          ? (maxLineDigits + 2) * charWidth
+          : 0;
+
+        updateEditorScroll(visibleLines);
+        const top = clamp(
+          editorScrollRef.current,
+          0,
+          Math.max(0, state.buffer.length - 1),
+        );
+        editorScrollRef.current = top;
+
+        const cursor = editorCursorRef.current;
+        const selection = editorSelectionRef.current
+          ? normalizeEditorSelection(editorSelectionRef.current)
+          : null;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(pad + 6, textAreaY, boxW - 12, textAreaH);
+        ctx.clip();
+
+        for (let i = 0; i < visibleLines; i += 1) {
+          const lineIndex = top + i;
+          if (lineIndex >= state.buffer.length) {
+            continue;
+          }
+          const line = state.buffer[lineIndex] ?? "";
+          const y = textAreaY + i * lineHeight;
+          if (state.showLineNumbers) {
+            ctx.fillStyle = dim;
+            const numberText = String(lineIndex + 1).padStart(maxLineDigits);
+            ctx.fillText(numberText, pad + 12, y);
+          }
+
+          const textX = pad + 12 + lineNumberWidth;
+          ctx.fillStyle = accent;
+          ctx.fillText(line, textX, y);
+
+          if (selection) {
+            const { start, end } = selection;
+            if (lineIndex >= start.row && lineIndex <= end.row) {
+              const startCol = lineIndex === start.row ? start.col : 0;
+              const endCol = lineIndex === end.row ? end.col : line.length;
+              if (endCol > startCol) {
+                ctx.fillStyle = "rgba(246,194,122,0.18)";
+                ctx.fillRect(
+                  textX + startCol * charWidth,
+                  y - 1,
+                  Math.max(1, (endCol - startCol) * charWidth),
+                  lineHeight,
+                );
+                ctx.fillStyle = accent;
+                ctx.fillText(line, textX, y);
+              }
+            }
+          }
+
+          if (
+            cursorVisible &&
+            lineIndex === cursor.row &&
+            !editorCommandRef.current.active
+          ) {
+            const cursorX = textX + cursor.col * charWidth;
+            ctx.fillStyle = accent;
+            ctx.fillRect(cursorX, y - 1, 2, lineHeight);
+          }
+        }
+
+        ctx.restore();
+
+        const statusY = pad + boxH - footerHeight + 6;
+        ctx.fillStyle = "rgba(255,255,255,0.08)";
+        ctx.fillRect(pad + 1, statusY - 4, boxW - 2, footerHeight - 6);
+
+        const modifiedMark = state.modified ? "*" : "";
+        const statusText =
+          editorStatusRef.current ??
+          (language === "tr"
+            ? `SATIR ${cursor.row + 1}, SUTUN ${cursor.col + 1}`
+            : `LINE ${cursor.row + 1}, COL ${cursor.col + 1}`);
+        const trimToWidth = (text: string, maxWidth: number) => {
+          if (ctx.measureText(text).width <= maxWidth) {
+            return text;
+          }
+          let trimmed = text;
+          while (
+            trimmed.length > 3 &&
+            ctx.measureText(`${trimmed}…`).width > maxWidth
+          ) {
+            trimmed = trimmed.slice(0, -1);
+          }
+          return `${trimmed}…`;
+        };
+        const statusMaxW = boxW - 24;
+        const safePath = trimToWidth(
+          `${modifiedMark}${state.path}`,
+          statusMaxW,
+        );
+        const safeStatus = trimToWidth(statusText, statusMaxW);
+        ctx.fillStyle = accent;
+        ctx.fillText(safePath, pad + 12, statusY);
+        ctx.fillStyle = dim;
+        ctx.fillText(safeStatus, pad + 12, statusY + lineHeight);
+
+        const helpText =
+          language === "tr"
+            ? "^S Kaydet  ^Q Çıkış  ^W Komut  : komut"
+            : "^S Save  ^Q Quit  ^W Command  : cmd";
+        const footerFont = Math.max(9, Math.floor(fontSize * 0.7));
+        ctx.font = `${footerFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        const helpY = pad + boxH - Math.max(8, Math.floor(footerFont * 0.6));
+        const helpMaxW = boxW - 24;
+        if (helpMaxW > 240) {
+          const safeHelp = trimToWidth(helpText, helpMaxW);
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(
+            pad + 6,
+            pad + boxH - footerHeight + 4,
+            boxW - 12,
+            footerHeight - 8,
+          );
+          ctx.clip();
+          ctx.fillStyle = dim;
+          ctx.fillText(safeHelp, pad + 12, helpY);
+          ctx.restore();
+        }
+
+        ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+
+        if (editorCommandRef.current.active) {
+          const cmdLine = `:${editorCommandRef.current.value}`;
+          const safeCmd = trimToWidth(cmdLine, statusMaxW);
+          ctx.fillStyle = accent;
+          ctx.fillText(
+            safeCmd,
+            pad + boxW - 12 - ctx.measureText(safeCmd).width,
+            statusY + lineHeight,
+          );
+        }
+      } else if (mode === "player") {
         const pad = Math.floor(Math.min(width, height) * 0.12);
         const boxW = width - pad * 2;
         const boxH = height - pad * 2;
@@ -7318,7 +7834,7 @@ export default function TerminalCanvas({
             }
             const wallTex =
               wall.type === 2
-                ? textures?.door ?? null
+                ? (textures?.door ?? null)
                 : pickWallTexture(wall.x, wall.y);
             if (wallTex) {
               ctx.drawImage(
@@ -7698,29 +8214,29 @@ export default function TerminalCanvas({
                   ? 0.7
                   : sprite.kind === "barrel"
                     ? 0.75
-                  : sprite.kind === "torch"
-                    ? 0.8
-                    : sprite.kind === "ammo"
-                      ? 0.32
-                      : sprite.kind === "shells"
-                        ? 0.34
-                        : sprite.kind === "rockets"
-                          ? 0.38
-                      : sprite.kind === "med"
-                        ? 0.36
-                        : sprite.kind === "shield"
-                          ? 0.42
-                          : sprite.kind === "chainsaw"
-                            ? 0.44
-                            : sprite.kind === "chaingun"
-                              ? 0.44
-                              : sprite.kind === "launcher"
-                                ? 0.44
-                          : sprite.kind === "shotgun"
-                            ? 0.4
-                          : sprite.kind === "bomb"
-                            ? 0.34
-                            : 0.48;
+                    : sprite.kind === "torch"
+                      ? 0.8
+                      : sprite.kind === "ammo"
+                        ? 0.32
+                        : sprite.kind === "shells"
+                          ? 0.34
+                          : sprite.kind === "rockets"
+                            ? 0.38
+                            : sprite.kind === "med"
+                              ? 0.36
+                              : sprite.kind === "shield"
+                                ? 0.42
+                                : sprite.kind === "chainsaw"
+                                  ? 0.44
+                                  : sprite.kind === "chaingun"
+                                    ? 0.44
+                                    : sprite.kind === "launcher"
+                                      ? 0.44
+                                      : sprite.kind === "shotgun"
+                                        ? 0.4
+                                        : sprite.kind === "bomb"
+                                          ? 0.34
+                                          : 0.48;
             const spriteH = Math.max(10, Math.floor(baseH * scale));
             const aspect =
               sprite.kind === "pillar"
@@ -7731,19 +8247,19 @@ export default function TerminalCanvas({
                     ? 0.6
                     : sprite.kind === "barrel"
                       ? 0.5
-                    : sprite.kind === "shotgun"
-                      ? 0.8
-                      : sprite.kind === "chainsaw"
-                        ? 0.9
-                        : sprite.kind === "chaingun"
-                          ? 0.85
-                          : sprite.kind === "launcher"
-                            ? 0.9
-                            : sprite.kind === "rockets"
-                              ? 0.7
-                              : sprite.kind === "shells"
+                      : sprite.kind === "shotgun"
+                        ? 0.8
+                        : sprite.kind === "chainsaw"
+                          ? 0.9
+                          : sprite.kind === "chaingun"
+                            ? 0.85
+                            : sprite.kind === "launcher"
+                              ? 0.9
+                              : sprite.kind === "rockets"
                                 ? 0.7
-                    : 0.65;
+                                : sprite.kind === "shells"
+                                  ? 0.7
+                                  : 0.65;
             const spriteW = Math.max(10, Math.floor(spriteH * aspect));
             const floorY = Math.floor(viewY + (viewH + baseH) / 2 + cameraBob);
             const top = floorY - spriteH;
@@ -7834,9 +8350,14 @@ export default function TerminalCanvas({
 
             const drawEnemy = () => {
               const localLight = sampleDoomLight(enemy.x, enemy.y);
-              const shade = clamp(1 - dist / 8 + localLight.boost * 0.35, 0.18, 1);
+              const shade = clamp(
+                1 - dist / 8 + localLight.boost * 0.35,
+                0.18,
+                1,
+              );
               const base = Math.floor(170 * shade);
-              const clampC = (value: number) => clamp(Math.round(value), 0, 255);
+              const clampC = (value: number) =>
+                clamp(Math.round(value), 0, 255);
               const bodyW = Math.floor(spriteW * 0.78);
               const headW = Math.floor(spriteW * 0.52);
               const left = Math.floor(screenX - spriteW / 2);
@@ -7928,15 +8449,33 @@ export default function TerminalCanvas({
               if (enemy.type === "charger") {
                 ctx.fillStyle = "#f4d35e";
                 ctx.beginPath();
-                ctx.moveTo(left + Math.floor(spriteW * 0.22), top + Math.floor(spriteH * 0.1));
-                ctx.lineTo(left + Math.floor(spriteW * 0.34), top + Math.floor(spriteH * 0.04));
-                ctx.lineTo(left + Math.floor(spriteW * 0.4), top + Math.floor(spriteH * 0.12));
+                ctx.moveTo(
+                  left + Math.floor(spriteW * 0.22),
+                  top + Math.floor(spriteH * 0.1),
+                );
+                ctx.lineTo(
+                  left + Math.floor(spriteW * 0.34),
+                  top + Math.floor(spriteH * 0.04),
+                );
+                ctx.lineTo(
+                  left + Math.floor(spriteW * 0.4),
+                  top + Math.floor(spriteH * 0.12),
+                );
                 ctx.closePath();
                 ctx.fill();
                 ctx.beginPath();
-                ctx.moveTo(left + Math.floor(spriteW * 0.78), top + Math.floor(spriteH * 0.1));
-                ctx.lineTo(left + Math.floor(spriteW * 0.66), top + Math.floor(spriteH * 0.04));
-                ctx.lineTo(left + Math.floor(spriteW * 0.6), top + Math.floor(spriteH * 0.12));
+                ctx.moveTo(
+                  left + Math.floor(spriteW * 0.78),
+                  top + Math.floor(spriteH * 0.1),
+                );
+                ctx.lineTo(
+                  left + Math.floor(spriteW * 0.66),
+                  top + Math.floor(spriteH * 0.04),
+                );
+                ctx.lineTo(
+                  left + Math.floor(spriteW * 0.6),
+                  top + Math.floor(spriteH * 0.12),
+                );
                 ctx.closePath();
                 ctx.fill();
               } else if (enemy.type === "spitter") {
@@ -8171,7 +8710,14 @@ export default function TerminalCanvas({
           const cx = viewX + viewW / 2;
           const cy = viewY + viewH / 2;
           const radius = Math.max(viewW, viewH) * 0.58;
-          const gradient = ctx.createRadialGradient(cx, cy, radius * 0.18, cx, cy, radius);
+          const gradient = ctx.createRadialGradient(
+            cx,
+            cy,
+            radius * 0.18,
+            cx,
+            cy,
+            radius,
+          );
           gradient.addColorStop(0, "rgba(214,115,91,0)");
           gradient.addColorStop(1, `rgba(214,115,91,${injuryAlpha})`);
           ctx.fillStyle = gradient;
@@ -8215,7 +8761,7 @@ export default function TerminalCanvas({
           ctx.fillRect(x, y + Math.floor(h * 0.18), w, Math.floor(h * 0.12));
           ctx.fillStyle = "rgba(0,0,0,0.22)";
           for (let i = 0; i < 4; i += 1) {
-            const fx = x + Math.floor((w * (0.18 + i * 0.2)));
+            const fx = x + Math.floor(w * (0.18 + i * 0.2));
             ctx.fillRect(fx, y + Math.floor(h * 0.34), 2, Math.floor(h * 0.36));
           }
         };
@@ -8230,7 +8776,12 @@ export default function TerminalCanvas({
           ctx.arc(mx, my, base * (0.75 + glow * 0.35), 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = `rgba(255,255,255,${0.55 * glow})`;
-          ctx.fillRect(mx - base * 0.35, my - base * 0.35, base * 0.7, base * 0.7);
+          ctx.fillRect(
+            mx - base * 0.35,
+            my - base * 0.35,
+            base * 0.7,
+            base * 0.7,
+          );
         };
 
         if (weapon === "fist") {
@@ -8257,7 +8808,8 @@ export default function TerminalCanvas({
           const handY = weaponY + weaponH - handH;
           const leftHandX = weaponX + Math.floor(weaponW * 0.14);
           const rightHandX = weaponX + Math.floor(weaponW * 0.62);
-          const sawJitter = attack > 0 ? Math.sin(doomBobRef.current * 6) * 2 : 0;
+          const sawJitter =
+            attack > 0 ? Math.sin(doomBobRef.current * 6) * 2 : 0;
           ctx.fillStyle = "rgba(0,0,0,0.18)";
           ctx.fillRect(
             weaponX + Math.floor(weaponW * 0.12),
@@ -8283,7 +8835,8 @@ export default function TerminalCanvas({
           );
           ctx.fillStyle = "#8f7b6a";
           const bladeX = bodyX + bodyW;
-          const bladeY = bodyY - Math.floor(bodyH * 0.1) + Math.floor(sawJitter);
+          const bladeY =
+            bodyY - Math.floor(bodyH * 0.1) + Math.floor(sawJitter);
           const bladeW = Math.floor(weaponW * 0.28);
           const bladeH = Math.floor(bodyH * 1.2);
           ctx.fillRect(bladeX, bladeY, bladeW, bladeH);
@@ -8562,7 +9115,11 @@ export default function TerminalCanvas({
         ctx.font = `${valueFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillStyle = "#f4d35e";
         ctx.fillText(String(ammo).padStart(3, "0"), ammoX + statPad, valueY);
-        ctx.fillText(String(shells).padStart(2, "0"), shellsX + statPad, valueY);
+        ctx.fillText(
+          String(shells).padStart(2, "0"),
+          shellsX + statPad,
+          valueY,
+        );
         ctx.fillText(
           `${String(Math.max(0, health)).padStart(3, "0")}%`,
           healthX + statPad,
@@ -8575,7 +9132,11 @@ export default function TerminalCanvas({
           valueY,
         );
         ctx.fillStyle = "#f4d35e";
-        ctx.fillText(String(rockets).padStart(2, "0"), rocketsX + statPad, valueY);
+        ctx.fillText(
+          String(rockets).padStart(2, "0"),
+          rocketsX + statPad,
+          valueY,
+        );
         ctx.fillStyle = "#f4d35e";
         ctx.fillText(String(bombs).padStart(2, "0"), bombsX + statPad, valueY);
 
@@ -9449,6 +10010,9 @@ export default function TerminalCanvas({
     finalizeFrame();
   }, [
     cursorVisible,
+    ensureEditorBuffer,
+    normalizeEditorSelection,
+    updateEditorScroll,
     fontScale,
     homePath,
     getChessLegalMoves,
@@ -9571,7 +10135,7 @@ export default function TerminalCanvas({
       }
       const { key } = event;
       const lower = key.toLowerCase();
-      if (key === "Escape" || lower === "q") {
+      if (mode !== "editor" && (key === "Escape" || lower === "q")) {
         stopApp(messages.system.exitLine);
         event.preventDefault();
         return true;
@@ -9593,6 +10157,212 @@ export default function TerminalCanvas({
           resetDoom();
         } else if (mode === "solitaire") {
           resetSolitaire();
+        }
+        event.preventDefault();
+        return true;
+      }
+
+      if (mode === "editor") {
+        const state = editorRef.current;
+        if (!state) {
+          event.preventDefault();
+          return true;
+        }
+        ensureEditorBuffer(state);
+
+        const lowerKey = key.toLowerCase();
+        if (editorCommandRef.current.active) {
+          if (key === "Enter") {
+            executeEditorCommand(editorCommandRef.current.value);
+            editorCommandRef.current = { active: false, value: "" };
+            dirtyRef.current = true;
+            event.preventDefault();
+            return true;
+          }
+          if (key === "Escape") {
+            editorCommandRef.current = { active: false, value: "" };
+            dirtyRef.current = true;
+            event.preventDefault();
+            return true;
+          }
+          if (key === "Backspace") {
+            editorCommandRef.current.value =
+              editorCommandRef.current.value.slice(0, -1);
+            dirtyRef.current = true;
+            event.preventDefault();
+            return true;
+          }
+          if (key.length === 1 && !event.ctrlKey && !event.metaKey) {
+            editorCommandRef.current.value += key;
+            dirtyRef.current = true;
+            event.preventDefault();
+            return true;
+          }
+          event.preventDefault();
+          return true;
+        }
+
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "s") {
+          executeEditorCommand("w");
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "q") {
+          if (state.modified && !editorQuitArmedRef.current) {
+            editorStatusRef.current = messages.editor.unsavedChanges;
+            editorQuitArmedRef.current = true;
+          } else {
+            executeEditorCommand("q!");
+          }
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "w") {
+          editorCommandRef.current = { active: true, value: "" };
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "g") {
+          editorStatusRef.current = messages.editor.help;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "n") {
+          state.showLineNumbers = !state.showLineNumbers;
+          editorStatusRef.current = state.showLineNumbers
+            ? messages.editor.lineNumbersOn
+            : messages.editor.lineNumbersOff;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "c") {
+          const text = getEditorSelectionText();
+          if (text) {
+            editorClipboardRef.current = text;
+            if (navigator.clipboard?.writeText) {
+              void navigator.clipboard.writeText(text).catch(() => null);
+            }
+            editorStatusRef.current =
+              language === "tr" ? "Kopyalandı" : "Copied";
+          }
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "x") {
+          const text = getEditorSelectionText();
+          if (text) {
+            editorClipboardRef.current = text;
+            if (navigator.clipboard?.writeText) {
+              void navigator.clipboard.writeText(text).catch(() => null);
+            }
+            deleteEditorSelection();
+            editorStatusRef.current = language === "tr" ? "Kesildi" : "Cut";
+          }
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if ((event.ctrlKey || event.metaKey) && lowerKey === "v") {
+          const clip = editorClipboardRef.current;
+          if (clip) {
+            insertEditorText(clip);
+            editorStatusRef.current = null;
+            editorQuitArmedRef.current = false;
+          }
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+
+        if (key === ":") {
+          editorCommandRef.current = { active: true, value: "" };
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+
+        if (key === "ArrowUp" || key === "ArrowDown") {
+          const delta = key === "ArrowUp" ? -1 : 1;
+          const byWord = false;
+          moveEditorCursor(delta, 0, {
+            extend: Boolean(event.shiftKey),
+            byWord,
+          });
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "ArrowLeft" || key === "ArrowRight") {
+          const delta = key === "ArrowLeft" ? -1 : 1;
+          moveEditorCursor(0, delta, {
+            extend: Boolean(event.shiftKey),
+            byWord: Boolean(event.ctrlKey || event.metaKey),
+          });
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "Home") {
+          moveEditorCursor(0, -9999, { extend: Boolean(event.shiftKey) });
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "End") {
+          moveEditorCursor(0, 9999, { extend: Boolean(event.shiftKey) });
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "PageUp" || key === "PageDown") {
+          const delta = key === "PageUp" ? -8 : 8;
+          moveEditorCursor(delta, 0, { extend: Boolean(event.shiftKey) });
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "Enter") {
+          insertEditorNewline();
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "Tab") {
+          insertEditorText("  ");
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "Backspace") {
+          deleteEditorChar("back");
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key === "Delete") {
+          deleteEditorChar("forward");
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
+        if (key.length === 1 && !event.ctrlKey && !event.metaKey) {
+          insertEditorText(key);
+          editorQuitArmedRef.current = false;
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
         }
         event.preventDefault();
         return true;
@@ -10315,10 +11085,17 @@ export default function TerminalCanvas({
       attemptChessMove,
       beginDoomBoot,
       cycleImage,
+      deleteEditorChar,
+      deleteEditorSelection,
       doomText,
+      ensureEditorBuffer,
+      executeEditorCommand,
+      getEditorSelectionText,
       getDoomBootProgress,
       getSolitaireRankIndex,
       isSolitaireRed,
+      insertEditorNewline,
+      insertEditorText,
       placeSnakeFood,
       resetCalc,
       resetChess,
@@ -10328,6 +11105,7 @@ export default function TerminalCanvas({
       resetSnake,
       resetSolitaire,
       scheduleChessBotMove,
+      moveEditorCursor,
       interactDoom,
       shootDoom,
       throwDoomBomb,
@@ -10339,6 +11117,7 @@ export default function TerminalCanvas({
       stopApp,
       formatMessage,
       messages,
+      language,
     ],
   );
 

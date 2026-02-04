@@ -1968,10 +1968,9 @@ function SceneContent({
         parallax.current.lerp(parallaxZeroRef.current, 0.12);
       }
       const rotY = allowParallax ? parallax.current.x * 0.18 * parallaxDamp : 0;
-      const rotZ =
-        allowParallax ? parallax.current.y * 0.14 * parallaxDamp : 0;
+      const rotX = allowParallax ? parallax.current.y * 0.14 * parallaxDamp : 0;
       group.rotation.y = rotY;
-      group.rotation.z = -rotZ;
+      group.rotation.x = rotX;
     }
 
     const palette = bgPaletteRef.current;
