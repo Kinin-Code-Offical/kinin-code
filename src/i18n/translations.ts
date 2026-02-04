@@ -257,7 +257,7 @@ export const translations = {
           "←/→: onceki/sonraki  +/-: zoom  0: sifirla  Q: cikis",
         sciCalc: "BILIMSEL-CALC",
         calcControls: "Oklar: gezin  Enter: sec  Q: cikis",
-        retroFps: "RETRO FPS",
+        retroFps: "HELLRUN",
         chessControls:
           "Oklar/WASD: gezin  Enter: sec/hamle  X: temizle  Q: cikis",
         chessMeta: "1/2/3: zorluk  B: bot  P: pvp  C: bot rengi",
@@ -558,7 +558,7 @@ export const translations = {
           "←/→: previous/next  +/-: zoom  0: reset  Q: quit",
         sciCalc: "SCI-CALC",
         calcControls: "Arrow keys: move  Enter: select  Q: quit",
-        retroFps: "RETRO FPS",
+        retroFps: "HELLRUN",
         chessControls:
           "Arrows/WASD: move  Enter: select/move  X: clear  Q: quit",
         chessMeta: "1/2/3: difficulty  B: bot  P: pvp  C: bot color",

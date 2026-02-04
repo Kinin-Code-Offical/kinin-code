@@ -27,23 +27,36 @@ export default function Markdown({
     return -1;
   })();
   const renderInline = (text: string) => {
-    const parts: Array<string | { label: string; href: string }> = [];
-    const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const parts: Array<
+      | { type: "text"; value: string }
+      | { type: "link"; label: string; href: string }
+      | { type: "bold"; value: string }
+    > = [];
+    const regex = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|__([^_]+)__/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(text)) !== null) {
       if (match.index > lastIndex) {
-        parts.push(text.slice(lastIndex, match.index));
+        parts.push({ type: "text", value: text.slice(lastIndex, match.index) });
       }
-      parts.push({ label: match[1], href: match[2] });
+      if (match[1] && match[2]) {
+        parts.push({ type: "link", label: match[1], href: match[2] });
+      } else if (match[3]) {
+        parts.push({ type: "bold", value: match[3] });
+      } else if (match[4]) {
+        parts.push({ type: "bold", value: match[4] });
+      }
       lastIndex = match.index + match[0].length;
     }
     if (lastIndex < text.length) {
-      parts.push(text.slice(lastIndex));
+      parts.push({ type: "text", value: text.slice(lastIndex) });
     }
     return parts.map((part, index) => {
-      if (typeof part === "string") {
-        return <span key={index}>{part}</span>;
+      if (part.type === "text") {
+        return <span key={index}>{part.value}</span>;
+      }
+      if (part.type === "bold") {
+        return <strong key={index}>{part.value}</strong>;
       }
       return (
         <a key={index} href={part.href} target="_blank" rel="noreferrer">

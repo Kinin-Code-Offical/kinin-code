@@ -57,6 +57,8 @@ function useSmoothScrollProgress(
 ) {
   const progressRef = useRef(0);
   const targetRef = useRef(0);
+  const lastTargetRef = useRef(0);
+  const lastScrollAtRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const onUpdateRef = useRef<typeof onUpdate>(onUpdate);
 
@@ -67,6 +69,7 @@ function useSmoothScrollProgress(
   useEffect(() => {
     let active = true;
     let resizeObserver: ResizeObserver | null = null;
+    let running = false;
 
     const computeTarget = () => {
       if (!ref.current) {
@@ -74,8 +77,19 @@ function useSmoothScrollProgress(
         return;
       }
       const rect = ref.current.getBoundingClientRect();
+      if (!Number.isFinite(rect.top) || rect.height <= 1) {
+        return;
+      }
       const total = rect.height - window.innerHeight;
       const raw = total > 0 ? Math.min(Math.max(-rect.top / total, 0), 1) : 0;
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      const sinceScroll = now - lastScrollAtRef.current;
+      if (sinceScroll > 140 && Math.abs(raw - lastTargetRef.current) > 0.35) {
+        targetRef.current = lastTargetRef.current;
+        return;
+      }
+      lastTargetRef.current = raw;
       targetRef.current = raw;
     };
 
@@ -83,31 +97,59 @@ function useSmoothScrollProgress(
     const smoothing = 0.12;
 
     const tick = () => {
-      if (!active) {
+      if (!active || document.hidden) {
+        running = false;
+        rafRef.current = null;
         return;
       }
       const diff = targetRef.current - progressRef.current;
       if (Math.abs(diff) < epsilon) {
         progressRef.current = targetRef.current;
-      } else {
-        progressRef.current += diff * smoothing;
+        onUpdateRef.current?.(progressRef.current);
+        running = false;
+        rafRef.current = null;
+        return;
       }
+      progressRef.current += diff * smoothing;
       onUpdateRef.current?.(progressRef.current);
       rafRef.current = window.requestAnimationFrame(tick);
     };
 
-    computeTarget();
-    rafRef.current = window.requestAnimationFrame(tick);
-
-    const schedule = () => {
-      computeTarget();
+    const startLoop = () => {
+      if (running) {
+        return;
+      }
+      running = true;
+      rafRef.current = window.requestAnimationFrame(tick);
     };
 
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
+    computeTarget();
+    startLoop();
+
+    const schedule = (fromScroll = false) => {
+      if (fromScroll) {
+        lastScrollAtRef.current =
+          typeof performance !== "undefined" ? performance.now() : Date.now();
+      }
+      computeTarget();
+      startLoop();
+    };
+
+    const handleScroll: EventListener = () => schedule(true);
+    const handleResize: EventListener = () => schedule(false);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        schedule();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
     if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(schedule);
+      const handleResizeObserver: ResizeObserverCallback = () =>
+        schedule(false);
+      resizeObserver = new ResizeObserver(handleResizeObserver);
       if (ref.current) {
         resizeObserver.observe(ref.current);
       }
@@ -115,8 +157,9 @@ function useSmoothScrollProgress(
 
     return () => {
       active = false;
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibility);
       resizeObserver?.disconnect();
       resizeObserver = null;
       if (rafRef.current !== null) {
@@ -459,6 +502,8 @@ export default function HomeClient({
     heroActive: true,
   });
   const debugLastRef = useRef(0);
+  const revealRef = useRef(0);
+  const fadeRef = useRef(1);
   const featuredIndex = useMemo(
     () => profile.sections.indexOf("featured"),
     [profile.sections],
@@ -488,9 +533,12 @@ export default function HomeClient({
     if (!shellRef.current) {
       return;
     }
+    if (typeof document !== "undefined" && document.hidden) {
+      return;
+    }
     const activeId = activeSectionRef.current ?? "home";
     const activeIndex = profile.sections.indexOf(activeId);
-    const forceOpaque = featuredIndex >= 0 && activeIndex > featuredIndex;
+    const forceOpaque = featuredIndex >= 0 && activeIndex >= featuredIndex;
     const clamp = (val: number, min: number, max: number) =>
       Math.min(max, Math.max(min, val));
     let reveal = 0;
@@ -500,22 +548,37 @@ export default function HomeClient({
       featuredRef.current;
     if (featuredEl) {
       const rect = featuredEl.getBoundingClientRect();
-      const elementCenter = rect.top + rect.height / 2;
-      const offsetCenter = elementCenter - window.innerHeight;
-      const triggerStart = window.innerHeight * 0.8;
-      const triggerEnd = window.innerHeight * 0.5;
-      if (triggerStart !== triggerEnd) {
-        reveal = clamp(
-          (triggerStart - offsetCenter) / (triggerStart - triggerEnd),
-          0,
-          1,
-        );
+      if (Number.isFinite(rect.top) && rect.height > 1) {
+        const elementCenter = rect.top + rect.height / 2;
+        const offsetCenter = elementCenter - window.innerHeight;
+        const triggerStart = window.innerHeight * 0.8;
+        const triggerEnd = window.innerHeight * 0.5;
+        if (triggerStart !== triggerEnd) {
+          reveal = clamp(
+            (triggerStart - offsetCenter) / (triggerStart - triggerEnd),
+            0,
+            1,
+          );
+        }
+        if (rect.top <= window.innerHeight * 0.1) {
+          reveal = 1;
+        }
+      } else {
+        reveal = revealRef.current;
       }
     } else {
       reveal = clamp((value - 0.85) / 0.12, 0, 1);
     }
     reveal = forceOpaque ? 1 : reveal;
-    const fade = forceOpaque ? 0 : 1 - reveal;
+    let fade = forceOpaque ? 0 : 1 - reveal;
+    if (!Number.isFinite(reveal)) {
+      reveal = revealRef.current;
+    }
+    if (!Number.isFinite(fade)) {
+      fade = fadeRef.current;
+    }
+    revealRef.current = reveal;
+    fadeRef.current = fade;
     shellRef.current.style.setProperty("--hero-fade", String(fade));
     shellRef.current.style.setProperty("--content-reveal", String(reveal));
     const nextHeroActive = reveal < 0.98;
@@ -1488,9 +1551,9 @@ export default function HomeClient({
           "# Kinin Portfolio\n\nStatus: active\nStack: Next.js, Three.js, WebGL\n",
       },
       {
-        path: `${projectsDir}/retro-os/README.md`,
+        path: `${projectsDir}/kinin-os/README.md`,
         content:
-          "# Retro OS\n\nExperimenting with terminal UX and CRT shaders.\n",
+          "# Kinin OS\n\nExperimenting with terminal UX and CRT shaders.\n",
       },
       {
         path: `${homeDir}/.bashrc`,

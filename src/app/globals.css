@@ -1876,7 +1876,7 @@ textarea {
 }
 
 .section-featured {
-  background: linear-gradient(180deg, rgba(15, 12, 8, 0.95) 0%, rgba(12, 9, 6, 0.95) 100%);
+  background: var(--content-bg);
   min-height: 0;
   position: relative;
   overflow-x: visible;
@@ -1885,8 +1885,10 @@ textarea {
   padding-bottom: clamp(56px, 8vw, 96px);
 }
 
-:root[data-theme="light"] .section-featured {
-  background: linear-gradient(180deg, rgba(250, 240, 222, 0.96) 0%, rgba(242, 226, 200, 0.96) 100%);
+.section-featured + .section,
+.section-featured ~ .section,
+.section-featured ~ .site-footer {
+  background: var(--content-bg);
 }
 
 .featured-layout {
@@ -2025,7 +2027,11 @@ textarea {
   top: 0;
   left: 50%;
   width: var(--featured-card-width);
-  transform: translateX(calc(-50% + var(--featured-offset)))
+  transform: translateX(
+      calc(
+        -50% + var(--featured-offset) + var(--featured-center-nudge, 0px)
+      )
+    )
     scale(var(--featured-scale));
   opacity: var(--featured-opacity);
   z-index: var(--featured-z);
@@ -2040,11 +2046,13 @@ textarea {
   width: var(--featured-card-width);
   border: none;
   background: transparent;
-  z-index: 3;
+  z-index: 1;
   cursor: pointer;
   padding: 0;
   left: 50%;
-  transform: translateX(calc(-50% + var(--featured-hit-offset)));
+  transform: translateX(
+    calc(-50% + var(--featured-hit-offset) + var(--featured-center-nudge, 0px))
+  );
 }
 
 .featured-hit-prev {
@@ -3094,16 +3102,21 @@ textarea {
   .featured-viewer {
     min-height: 0;
     overflow: visible;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
   }
 
   .featured-slider {
-    --featured-card-width: min(440px, 82vw);
-    --featured-offset-1: 26vw;
-    --featured-offset-2: 52vw;
+    width: 100vw;
+    --featured-card-width: min(380px, 86vw);
+    --featured-offset-1: 22vw;
+    --featured-offset-2: 44vw;
+    --featured-center-nudge: 0px;
   }
 
   .featured-track {
-    min-height: clamp(280px, 42vh, 480px);
+    min-height: clamp(300px, 42vh, 520px);
+    padding: 6px 0 18px;
   }
 
   .featured-item {
@@ -3121,8 +3134,14 @@ textarea {
   }
 
   .featured-card {
-    padding: 22px;
+    padding: 20px;
+    min-height: clamp(240px, 34vh, 320px);
     box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+  }
+
+  .featured-card-header {
+    align-items: start;
+    flex-wrap: wrap;
   }
 
   .featured-summary {
@@ -3146,7 +3165,33 @@ textarea {
   }
 
   .featured-dots {
-    margin-top: 16px;
+    margin-top: 0;
+  }
+
+  .featured-controls {
+    display: grid;
+    grid-template-columns: 40px 1fr 40px;
+    align-items: center;
+    justify-items: center;
+    gap: 12px;
+    width: min(520px, 92vw);
+    margin: 0 auto;
+  }
+
+  .featured-controls .featured-dots {
+    margin: 0;
+    gap: 8px;
+  }
+
+  .featured-dot {
+    width: 10px;
+    height: 10px;
+    border-width: 2px;
+  }
+
+  .featured-arrow {
+    width: 38px;
+    height: 38px;
   }
 
   .featured-ghost {

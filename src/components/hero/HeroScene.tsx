@@ -827,9 +827,13 @@ function ComputerModel({
         red: red ?? fallback[0] ?? null,
         blue: blue ?? fallback[1] ?? null,
       };
-      if (showNotes) {
-        noteMeshes.forEach((mesh) => ensurePlanarUv(mesh));
-      }
+      noteMeshes.forEach((mesh) => {
+        mesh.frustumCulled = false;
+        mesh.renderOrder = 2;
+        if (showNotes) {
+          ensurePlanarUv(mesh);
+        }
+      });
     } else {
       noteMeshesRef.current = { red: null, blue: null };
       if (showNotes) {
@@ -852,8 +856,10 @@ function ComputerModel({
           bounds.max.y - fallbackSize * 0.7,
           bounds.max.z - fallbackSize * 0.22,
         );
-        redPlane.renderOrder = 1;
-        bluePlane.renderOrder = 1;
+        redPlane.frustumCulled = false;
+        bluePlane.frustumCulled = false;
+        redPlane.renderOrder = 2;
+        bluePlane.renderOrder = 2;
         scene.add(redPlane);
         scene.add(bluePlane);
         noteFallbackRef.current = { red: redPlane, blue: bluePlane };
@@ -1380,9 +1386,6 @@ function SceneContent({
   const screenNormalRef = useRef(new Vector3());
   const cameraTempRef = useRef(new Vector3());
   const cameraDesiredRef = useRef(new Vector3());
-  const cameraForwardRef = useRef(new Vector3());
-  const cameraRightRef = useRef(new Vector3());
-  const cameraUpRef = useRef(new Vector3());
   const lastScrollValueRef = useRef(0);
   const lastScrollTimeRef = useRef(0);
   const smoothScrollRef = useRef(0);
@@ -1771,13 +1774,21 @@ function SceneContent({
     const handleVisibility = () => {
       if (document.hidden) {
         gl.info.reset();
+        return;
       }
+      lastFrameTimeRef.current = 0;
+      const scroll = scrollProgressRef.current;
+      smoothScrollRef.current = scroll;
+      lastRawScrollRef.current = scroll;
+      scrollVelocityRef.current = 0;
+      parallax.current.set(0, 0);
+      invalidate();
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [gl]);
+  }, [gl, invalidate, parallax, scrollProgressRef]);
 
   useEffect(() => {
     if (!active) {
@@ -1819,9 +1830,12 @@ function SceneContent({
     if (!active) {
       return;
     }
+    if (typeof document !== "undefined" && document.hidden) {
+      return;
+    }
     const now = performance.now();
     const lastFrame = lastFrameTimeRef.current || now;
-    const dt = Math.max(8, now - lastFrame);
+    const dt = Math.min(32, Math.max(8, now - lastFrame));
     lastFrameTimeRef.current = now;
     const rawScroll = scrollProgressRef.current;
     const rawDelta = rawScroll - lastRawScrollRef.current;
@@ -1946,28 +1960,18 @@ function SceneContent({
       camera.updateProjectionMatrix();
     }
 
-    if (allowPointerParallax) {
+    if (allowPointerParallax && group) {
       const inHeroZone = scroll < 0.65;
       const parallaxDamp = Math.max(0, 1 - Math.min(1, speedNorm * 1.2));
       const allowParallax = inHeroZone && parallaxDamp > 0.15;
       if (!allowParallax) {
         parallax.current.lerp(parallaxZeroRef.current, 0.12);
       }
-      if (allowParallax) {
-        const offsetX = parallax.current.x * 0.12 * parallaxDamp;
-        const offsetY = parallax.current.y * 0.08 * parallaxDamp;
-        if (offsetX !== 0 || offsetY !== 0) {
-          camera.getWorldDirection(cameraForwardRef.current).normalize();
-          cameraRightRef.current
-            .copy(camera.up)
-            .cross(cameraForwardRef.current)
-            .normalize();
-          cameraUpRef.current.copy(camera.up).normalize();
-          camera.position
-            .addScaledVector(cameraRightRef.current, offsetX)
-            .addScaledVector(cameraUpRef.current, offsetY);
-        }
-      }
+      const rotY = allowParallax ? parallax.current.x * 0.18 * parallaxDamp : 0;
+      const rotZ =
+        allowParallax ? parallax.current.y * 0.14 * parallaxDamp : 0;
+      group.rotation.y = rotY;
+      group.rotation.z = -rotZ;
     }
 
     const palette = bgPaletteRef.current;
@@ -2093,7 +2097,7 @@ function SceneContent({
               allowTerminalTexture={true}
               active={active}
               lowPower={lowPower}
-              showNotes={!lowPower && !performanceMode && !isMobile}
+              showNotes={true}
               setPlaneColor={bgColor}
             />
           </Suspense>

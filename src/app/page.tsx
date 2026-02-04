@@ -29,7 +29,17 @@ export async function generateMetadata({
   };
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<{ dev?: string; debug?: string }>;
+}) {
   const content = await getContent();
-  return <HomeClient content={content} />;
+  const params = searchParams ? await searchParams : undefined;
+  const debugEnabled =
+    params?.dev === "1" ||
+    params?.dev === "true" ||
+    params?.debug === "1" ||
+    params?.debug === "true";
+  return <HomeClient content={content} debugEnabled={debugEnabled} />;
 }
