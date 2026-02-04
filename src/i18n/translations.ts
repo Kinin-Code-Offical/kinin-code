@@ -140,6 +140,11 @@ export const translations = {
         exitLine: "-- CIKIS --",
         historyCleared: "gecmis temizlendi",
         noOutput: "(cikti yok)",
+        moreResults: "... {count} daha",
+        userFallback: "user",
+        unameShort: "KininOS",
+        unameLong: "KininOS 0.9.4 kinin-term x86_64",
+        uptime: "calisma suresi {time}",
       },
       pip: {
         help: "pip (simule) - komutlar: list, install, uninstall, freeze",
@@ -150,6 +155,8 @@ export const translations = {
         unknownCommand: "pip: bilinmeyen komut '{cmd}'",
       },
       editor: {
+        title: "NANO",
+        noBuffer: "(buffer yok)",
         header: "-- {path} ({lines} satir) --",
         editing: "-- DUZENLE {path} --",
         saveFailed: "edit: kaydetme basarisiz",
@@ -161,6 +168,9 @@ export const translations = {
         lineNumbersOff: "edit: satir numaralari kapali",
         usageSet: "edit: kullanim :set nu|nonu",
         help: "Duzenleme modu: yardim icin help yaz",
+        statusLine: "SATIR {row}, SUTUN {col}",
+        copied: "Kopyalandı",
+        cut: "Kesildi",
         invalidLineNumber: "edit: gecersiz satir numarasi",
         lineDeleted: "edit: satir {line} silindi",
         lineInserted: "edit: satir {line} eklendi",
@@ -171,6 +181,7 @@ export const translations = {
         targetIsDirectory: "edit: hedef bir dizin",
       },
       commands: {
+        aliasDefinition: "alias {name}='{value}'",
         echoMissingFile: "echo: dosya eksik",
         mkdirCannotCreate: "mkdir: dizin olusturulamadi '{dir}'",
         rmMissingOperand: "rm: operand eksik",
@@ -189,8 +200,81 @@ export const translations = {
         manMissingTopic: "man: konu eksik",
         manNoEntry: "{topic} icin manual yok",
       },
+      manuals: {
+        help: ["help - komut listesi", "Kullanım: help"],
+        man: ["man - komut yardım sayfası", "Kullanım: man <komut>"],
+        ls: [
+          "ls - dizin içeriğini listeler",
+          "Kullanım: ls [-a] [-l] [dizin]",
+          "-a: gizli dosyaları göster  -l: uzun liste",
+        ],
+        cd: ["cd - dizin değiştir", "Kullanım: cd [dizin|-]"],
+        pwd: ["pwd - mevcut dizini yazdır", "Kullanım: pwd"],
+        cat: ["cat - dosya içeriklerini yazdır", "Kullanım: cat <dosya>"],
+        less: ["less - dosya görüntüle", "Kullanım: less <dosya>"],
+        head: [
+          "head - dosyanın başından satır alır",
+          "Kullanım: head [-n N] <dosya>",
+        ],
+        tail: [
+          "tail - dosyanın sonundan satır alır",
+          "Kullanım: tail [-n N] <dosya>",
+        ],
+        tree: ["tree - dizin ağacı", "Kullanım: tree [-L N] [dizin]"],
+        find: [
+          "find - dosya/dizin ara",
+          "Kullanım: find [dizin] -name <kalip>",
+        ],
+        grep: [
+          "grep - içerikte ara",
+          "Kullanım: grep [-i] [-r] <kalip> <dosya|dizin>",
+        ],
+        mkdir: ["mkdir - dizin oluştur", "Kullanım: mkdir [-p] <ad>"],
+        touch: ["touch - dosya oluştur", "Kullanım: touch <dosya>"],
+        rm: ["rm - dosya/dizin sil", "Kullanım: rm [-r] [-f] <yol>"],
+        rmdir: ["rmdir - boş dizin sil", "Kullanım: rmdir <dizin>"],
+        mv: ["mv - taşı/yeniden adlandır", "Kullanım: mv <kaynak> <hedef>"],
+        cp: ["cp - kopyala", "Kullanım: cp [-r] <kaynak> <hedef>"],
+        echo: ["echo - metin yazdır", "Kullanım: echo <metin> [> dosya]"],
+        clear: ["clear - ekran temizle", "Kullanım: clear"],
+        history: ["history - komut geçmişi", "Kullanım: history [-c]"],
+        env: ["env - ortam değişkenleri", "Kullanım: env"],
+        export: [
+          "export - ortam değişkeni ayarla",
+          "Kullanım: export KEY=VALUE",
+        ],
+        alias: ["alias - kısayol tanımla", "Kullanım: alias isim=komut"],
+        unalias: ["unalias - kısayol sil", "Kullanım: unalias isim"],
+        which: ["which - komut yolunu göster", "Kullanım: which <komut>"],
+        python: [
+          "python - runtime",
+          "Kullanım: python -c <code> | python <file.py>",
+        ],
+        pip: [
+          "pip - paket yöneticisi (simülasyon)",
+          "Kullanım: pip list | pip install <paket>",
+        ],
+        calc: ["calc - hesap makinesi", "Kullanım: calc [ifade]"],
+        snake: ["snake - mini oyun"],
+        pacman: ["pacman - mini oyun"],
+        pong: ["pong - mini oyun"],
+        hellrun: ["hellrun - retro FPS mini oyun"],
+        chess: [
+          "chess - minimalist satranç",
+          "Kullanım: chess [--pvp|--bot[=white|black]] [--easy|--medium|--hard]",
+          "Oyun içi: 1/2/3 zorluk, B bot, P pvp, C bot rengi",
+        ],
+        solitaire: ["solitaire - mini kart oyunu"],
+        mp3: ["mp3 - ascii player", "Kullanım: mp3 [dosya.mp3]"],
+        video: ["video - ascii player", "Kullanım: video [dosya.vid]"],
+        image: [
+          "image - ascii görüntüleyici",
+          "Kullanım: image <dosya.png|dosya.jpg|dosya.txt>",
+        ],
+        edit: ["edit - basit düzenleyici", "Kullanım: edit <dosya>"],
+      },
       python: {
-        version: "Python 3.11 (pyodide)",
+        version: "Python 3.11",
         usage: "Kullanim: python -c <code> | python <file.py>",
         missingCode: "python: -c sonrasi kod eksik",
         loading: "python: runtime yukleniyor...",
@@ -218,6 +302,8 @@ export const translations = {
         evalError: "calc: ifade hesaplanamadi",
         invalid: "Gecersiz",
         error: "Hata",
+        hintLine1: "Terminalde kullan: calc 2+2",
+        hintLine2: "C: temizle  Q: çıkış",
       },
       apps: {
         launchSnake: "Snake baslatiliyor...",
@@ -226,6 +312,67 @@ export const translations = {
         launchChess: "Chess baslatiliyor...",
         launchSolitaire: "Solitaire baslatiliyor...",
         modeStatus: "Mod: {mode}  Zorluk: {difficulty}",
+      },
+      doom: {
+        ready: "HAZIR",
+        noAmmo: "MERMİ YOK",
+        noShells: "FİŞEK YOK",
+        noRockets: "ROKET YOK",
+        fire: "ATEŞ!",
+        punch: "YUMRUK!",
+        saw: "TESTERE!",
+        rocket: "ROKET!",
+        targetDown: "HEDEF İNDİ",
+        hit: "İSABET",
+        noBombs: "BOMBA YOK",
+        boom: "PATLAMA",
+        reload: "ŞARJÖR",
+        doorOpen: "KAPI AÇILDI",
+        doorClose: "KAPI KAPANDI",
+        noDoor: "KAPI YOK",
+        interactDoor: "E: Kapı",
+        interactPickup: "E: Al",
+        interactExit: "E: Çıkış",
+        exitReady: "ÇIKIŞ",
+        nextLevel: "BÖLÜM",
+        ammoPlus: "MERMİ +",
+        shellsPlus: "FİŞEK +",
+        rocketsPlus: "ROKET +",
+        healthPlus: "CAN +",
+        shieldPlus: "KALKAN +",
+        bombPlus: "BOMBA +",
+        chest: "SANDIK!",
+        shotgun: "POMPALI!",
+        chainsaw: "TESTERE!",
+        chaingun: "MİNİGUN!",
+        launcher: "ROKETATAR!",
+        weaponFist: "YUMRUK",
+        weaponChainsaw: "TESTERE",
+        weaponPistol: "TABANCA",
+        weaponShotgun: "POMPALI",
+        weaponChaingun: "MİNİGUN",
+        weaponLauncher: "ROKETATAR",
+        noShotgun: "POMPALI YOK",
+        noChainsaw: "TESTERE YOK",
+        noChaingun: "MİNİGUN YOK",
+        noLauncher: "ROKETATAR YOK",
+        damage: "HASAR!",
+        died: "ÖLDÜN",
+        clear: "TEMİZ",
+        launch: "HELLRUN başlatılıyor...",
+        loading: "YÜKLENİYOR...",
+        hudLabel: "CAN",
+        shieldLabel: "KALKAN",
+        ammoLabel: "MERMİ",
+        shellsLabel: "FİŞEK",
+        rocketsLabel: "ROKET",
+        bombLabel: "BOMBA",
+        scoreLabel: "SKOR",
+        controls1:
+          "W/S: hareket  A/D: kay  ←/→: dön  Shift: koş  Boşluk: saldırı",
+        controls2:
+          "1: yumruk/testere  2: tabanca  3: pompalı  4: minigun  5: roketatar  B: bomba  E: etkileşim  R: şarjör  M: harita  H: ipucu  Shift+R: reset  Q: çıkış",
+        gameOver: "ÖLDÜN - R: yeniden",
       },
       chess: {
         selectPiece: "Tas sec",
@@ -269,6 +416,7 @@ export const translations = {
         playerControlsMedia: "Space: oynat/duraklat  ←/→: sar  Q: cikis",
         playerControlsImage:
           "←/→: onceki/sonraki  +/-: zoom  0: sifirla  Q: cikis",
+        inputLabel: "Terminal girişi",
         sciCalc: "BILIMSEL-CALC",
         calcControls: "Oklar: gezin  Enter: sec  Q: cikis",
         retroFps: "HELLRUN",
@@ -292,6 +440,87 @@ export const translations = {
         pongControls: "Sol/Sag: hareket  R: yeniden  Q: cikis",
         pongGameOver: "OYUN BITTI",
       },
+      files: {
+        readme:
+          "# {name}\n\nWelcome to KININ-TERM.\n\nQuick links:\n- docs/about.md\n- docs/projects.md\n- docs/contact.md\n",
+        notesTodo:
+          "- finalize terminal sim\n- tune hero camera\n- deploy to cloud run\n- add new 3d scene\n",
+        notesIdeas:
+          "Ideas:\n- retro mini games\n- hardware blog posts\n- terminal theme switch\n",
+        scriptsCalc:
+          "# SciCalc demo\nimport math\nexpr = 'sin(pi/2) + cos(0)'\nallowed = {k: getattr(math, k) for k in ['sin','cos','tan','sqrt','log','pi','e']}\nallowed['pow'] = pow\nresult = eval(expr, {'__builtins__': {}}, allowed)\nprint('SciCalc demo:', expr, '=', result)\nprint('Tip: use calc command for interactive mode.')\n",
+        scriptsSnake:
+          "# Snake demo\nboard = [\n  '###########',\n  '#.........#',\n  '#..S....@..#',\n  '#.........#',\n  '###########',\n]\nprint('Controls: run `snake` in terminal for full game.')\nprint('\\n'.join(board))\n",
+        scriptsPacman:
+          "# Pacman demo\nmaze = [\n  '############',\n  '#C....##....#',\n  '#.##..##..##.#',\n  '#....G.....o#',\n  '############',\n]\nprint('Controls: run `pacman` in terminal for full game.')\nprint('\\n'.join(maze))\n",
+        scriptsPong:
+          "# Pong demo\nprint('Controls: run `pong` in terminal for full game.')\nprint('Scoreboard: PLAYER 0 - 0 AI')\nprint('Left/Right to move paddle')\n",
+        scriptsChess:
+          "# Chess demo\nprint('Controls: run `chess` in terminal for full game.')\nprint('Tips: 1/2/3 difficulty, B bot, P pvp, C bot color')\n",
+        scriptsSolitaire:
+          "# Solitaire demo\nprint('Controls: run `solitaire` in terminal for full game.')\nprint('Keys: D draw, W waste, 1-7 tableau, F foundation')\n",
+        scriptsDiceRoll:
+          "import random\nprint('Dice roll:', random.randint(1, 6))\nprint('Try again for a new roll.')\n",
+        scriptsHelloWorld:
+          "import datetime\nprint('Hello, world!')\nprint('UTC time:', datetime.datetime.utcnow().isoformat())\n",
+        scriptsMediaDemo:
+          "print('Media demo:')\nprint('image  -> random retro ASCII')\nprint('video  -> random loop')\nprint('mp3    -> random chiptune')\nprint('Tip: image ~/media/nebula.txt')\n",
+        scriptsAsciiImage:
+          "art = [\n  '   .-.',\n  '  (o o)',\n  '  | = |',\n  ' (__|__)',\n  'RETRO BOT',\n]\nprint('\\n'.join(art))\n",
+        scriptsStarfield:
+          "import random\nfor _ in range(6):\n    line = ''.join(random.choice('.*') if random.random() > 0.7 else ' ' for _ in range(48))\n    print(line)\n",
+        scriptsQuoteBot:
+          "import random\nquotes = [\n  'Focus beats luck.',\n  'Ship it.',\n  'Keep it simple.',\n  'Small steps, big wins.',\n]\nprint(random.choice(quotes))\n",
+        mediaNebula:
+          "        .     .      .\n     .   *  .   .  *   .\n  .  .  .  .***.  .  .  .\n    .   .*'  *  '*.   .\n .    . *   .   . * .   .\n    .    '*.   .*'    .\n .  .  .   '***'   .  .  .\n     .   *  .   .  *   .\n        .     .      .\n",
+        mediaGrid:
+          "|‾‾‾‾‾‾‾‾‾‾‾|\n|  RETRO  |\n|  GRID   |\n|_________|\n\\\\\\\\\\\n/ / / / / /\n\\\\\\\\\\\n",
+        mediaCity:
+          "     | | | | | |\n  ___|_|_|_|_|_|___\n /__ NEON SKYLINE __\\\n|_|_|_|_|_|_|_|_|_|_|\n  /_/ /_/ /_/ /_/ /_\n",
+        mediaArcade:
+          "   .--------------.\n  /   ARCADE 88    /|\n /______________/ |\n | .----------. | |\n | |  READY!  | | |\n | '----------' |/\n '--------------'\n",
+        mediaLoop1:
+          "[frame 1]\n  (o)\n /|\\\n / \\\n\n---\n[frame 2]\n  (o)\n /|\\\n /\\ \\\n\n---\n[frame 3]\n  (o)\n /|\\\n / \\\n\n",
+        mediaLoop2:
+          "[frame 1]\n  [#]  \n /|_|\\\n  / \\\n\n---\n[frame 2]\n  [#]  \n /|_|\\\n  /\\ \\\n\n---\n[frame 3]\n  [#]  \n /|_|\\\n  / \\\n\n",
+        mediaLoop3:
+          "[frame 1]\n  <o>  \n  /|\\\n  / \\\n\n---\n[frame 2]\n  <o>  \n  /|\\\n  /\\ \\\n\n---\n[frame 3]\n  <o>  \n  /|\\\n  / \\\n\n",
+        mediaLoop4:
+          "[frame 1]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n---\n[frame 2]\n  /\\_/\\  \n ( o.o )\n  > ~ <\n\n---\n[frame 3]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n",
+        mediaLoop5:
+          "[frame 1]\n  [==]  \n  |  |  \n  |__|  \n\n---\n[frame 2]\n  [==]  \n  |~~|  \n  |__|  \n\n---\n[frame 3]\n  [==]  \n  |  |  \n  |__|  \n\n",
+        mediaNeonGrid:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><path d='M0 48 L64 32' stroke='%236fd1ff' stroke-width='2'/><path d='M0 56 L64 40' stroke='%237ef2b2' stroke-width='2'/><circle cx='48' cy='20' r='10' fill='%23ffb36b'/></svg>",
+        mediaNeonSun:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23061110'/><rect y='36' width='64' height='28' fill='%23121f2a'/><circle cx='32' cy='30' r='14' fill='%23ff7ad9'/><path d='M0 48 L64 34' stroke='%23ffb36b' stroke-width='2'/></svg>",
+        mediaCircuitChip:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><rect x='14' y='14' width='36' height='36' rx='4' fill='%231a2b2a' stroke='%236fd1ff' stroke-width='2'/><path d='M8 20h8M8 32h8M8 44h8M48 8v8M32 8v8M20 8v8M56 20h-8M56 32h-8M56 44h-8M20 56v-8M32 56v-8M44 56v-8' stroke='%237ef2b2' stroke-width='2'/></svg>",
+        mediaSunrise:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%23070b12'/><rect y='34' width='80' height='30' fill='%23111f2a'/><circle cx='40' cy='30' r='14' fill='%23ffb36b'/><path d='M0 44 L80 32' stroke='%23ff7ad9' stroke-width='2'/><path d='M0 52 L80 38' stroke='%236fd1ff' stroke-width='2'/></svg>",
+        mediaNeonRain:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230a0f14'/><path d='M8 0v64M20 0v64M32 0v64M44 0v64M56 0v64M68 0v64' stroke='%236fd1ff' stroke-width='2' opacity='0.7'/><circle cx='62' cy='20' r='8' fill='%23ff7ad9'/></svg>",
+        mediaGridHorizon:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230b0f0e'/><path d='M0 44 L80 28' stroke='%237ef2b2' stroke-width='2'/><path d='M0 54 L80 36' stroke='%236fd1ff' stroke-width='2'/><path d='M0 64 L80 44' stroke='%23ffb36b' stroke-width='2'/></svg>",
+        mediaSynth1: "MP3DATA",
+        mediaSynth2: "MP3DATA_2",
+        mediaSynth3: "MP3DATA_3",
+        mediaNeonDrive: "MP3DATA_4",
+        mediaCircuitBeat: "MP3DATA_5",
+        mediaGlowShift: "MP3DATA_6",
+        mediaHorizonChords: "MP3DATA_7",
+        mediaPulseEcho: "MP3DATA_8",
+        mediaRetroWave: "MP3DATA_9",
+        projectPortfolio:
+          "# Kinin Portfolio\n\nStatus: active\nStack: Next.js, Three.js, WebGL\n",
+        projectKininOs:
+          "# Kinin OS\n\nExperimenting with terminal UX and CRT shaders.\n",
+        bashrc: "alias ll='ls -al'\nalias la='ls -a'\n",
+        profile: "export LANG=en_US.UTF-8\nexport TERM=kinin-term\n",
+        osRelease:
+          "NAME=KininOS\nVERSION=0.9.4\nID=kininos\nPRETTY_NAME=\"KininOS 0.9.4\"\n",
+        bootLog: "boot: ok\nservices: ready\n",
+        elfPlaceholder: "ELF...",
+      },
     },
     ui: {
       scroll: "Aşağı kaydır",
@@ -299,6 +528,8 @@ export const translations = {
       themeDark: "Koyu tema",
       language: "Dil değiştir",
       socialLinksLabel: "Sosyal bağlantılar",
+      threeStageLoading: "Sahne yükleniyor",
+      footerRights: "© {year} {name}. Tum haklari saklidir.",
       debugHud: {
         scroll: "scroll",
         reveal: "reveal",
@@ -326,6 +557,7 @@ export const translations = {
       home: "Home",
       intro: "Intro",
       featured: "Featured",
+      inputLabel: "Terminal input",
       capabilities: "Capabilities",
       about: "About",
       projects: "Projects",
@@ -462,6 +694,11 @@ export const translations = {
         exitLine: "-- EXIT --",
         historyCleared: "history cleared",
         noOutput: "(no output)",
+        moreResults: "... {count} more",
+        userFallback: "user",
+        unameShort: "KininOS",
+        unameLong: "KininOS 0.9.4 kinin-term x86_64",
+        uptime: "uptime {time}",
       },
       pip: {
         help: "pip (simulated) - commands: list, install, uninstall, freeze",
@@ -472,6 +709,8 @@ export const translations = {
         unknownCommand: "pip: unknown command '{cmd}'",
       },
       editor: {
+        title: "NANO",
+        noBuffer: "(no buffer)",
         header: "-- {path} ({lines} lines) --",
         editing: "-- EDIT {path} --",
         saveFailed: "edit: save failed",
@@ -483,6 +722,9 @@ export const translations = {
         lineNumbersOff: "edit: line numbers off",
         usageSet: "edit: usage :set nu|nonu",
         help: "Edit mode: type help for tips",
+        statusLine: "LINE {row}, COL {col}",
+        copied: "Copied",
+        cut: "Cut",
         invalidLineNumber: "edit: invalid line number",
         lineDeleted: "edit: line {line} deleted",
         lineInserted: "edit: line {line} inserted",
@@ -493,6 +735,7 @@ export const translations = {
         targetIsDirectory: "edit: target is a directory",
       },
       commands: {
+        aliasDefinition: "alias {name}='{value}'",
         echoMissingFile: "echo: missing file",
         mkdirCannotCreate: "mkdir: cannot create directory '{dir}'",
         rmMissingOperand: "rm: missing operand",
@@ -511,8 +754,69 @@ export const translations = {
         manMissingTopic: "man: missing topic",
         manNoEntry: "No manual entry for {topic}",
       },
+      manuals: {
+        help: ["help - command list", "Usage: help"],
+        man: ["man - command help", "Usage: man <cmd>"],
+        ls: [
+          "ls - list directory contents",
+          "Usage: ls [-a] [-l] [dir]",
+          "-a: show hidden  -l: long list",
+        ],
+        cd: ["cd - change directory", "Usage: cd [dir|-]"],
+        pwd: ["pwd - print working directory", "Usage: pwd"],
+        cat: ["cat - print files", "Usage: cat <file>"],
+        less: ["less - view file", "Usage: less <file>"],
+        head: ["head - print first lines", "Usage: head [-n N] <file>"],
+        tail: ["tail - print last lines", "Usage: tail [-n N] <file>"],
+        tree: ["tree - directory tree", "Usage: tree [-L N] [dir]"],
+        find: ["find - search files", "Usage: find [dir] -name <pattern>"],
+        grep: [
+          "grep - search content",
+          "Usage: grep [-i] [-r] <pattern> <file|dir>",
+        ],
+        mkdir: ["mkdir - create directory", "Usage: mkdir [-p] <name>"],
+        touch: ["touch - create file", "Usage: touch <file>"],
+        rm: ["rm - remove file/dir", "Usage: rm [-r] [-f] <path>"],
+        rmdir: ["rmdir - remove empty dir", "Usage: rmdir <dir>"],
+        mv: ["mv - move/rename", "Usage: mv <src> <dest>"],
+        cp: ["cp - copy", "Usage: cp [-r] <src> <dest>"],
+        echo: ["echo - print text", "Usage: echo <text> [> file]"],
+        clear: ["clear - clear screen", "Usage: clear"],
+        history: ["history - command history", "Usage: history [-c]"],
+        env: ["env - list env vars", "Usage: env"],
+        export: ["export - set env var", "Usage: export KEY=VALUE"],
+        alias: ["alias - define alias", "Usage: alias name=cmd"],
+        unalias: ["unalias - remove alias", "Usage: unalias name"],
+        which: ["which - show command path", "Usage: which <cmd>"],
+        python: [
+          "python - runtime",
+          "Usage: python -c <code> | python <file.py>",
+        ],
+        pip: [
+          "pip - simulated package manager",
+          "Usage: pip list | pip install <pkg>",
+        ],
+        calc: ["calc - calculator", "Usage: calc [expression]"],
+        snake: ["snake - mini game"],
+        pacman: ["pacman - mini game"],
+        pong: ["pong - mini game"],
+        hellrun: ["hellrun - retro FPS mini game"],
+        chess: [
+          "chess - minimalist board",
+          "Usage: chess [--pvp|--bot[=white|black]] [--easy|--medium|--hard]",
+          "In-game: 1/2/3 difficulty, B bot, P pvp, C bot color",
+        ],
+        solitaire: ["solitaire - mini card game"],
+        mp3: ["mp3 - ascii player", "Usage: mp3 [file.mp3]"],
+        video: ["video - ascii player", "Usage: video [file.vid]"],
+        image: [
+          "image - ascii viewer",
+          "Usage: image <file.png|file.jpg|file.txt>",
+        ],
+        edit: ["edit - simple editor", "Usage: edit <file>"],
+      },
       python: {
-        version: "Python 3.11 (pyodide)",
+        version: "Python 3.11",
         usage: "Usage: python -c <code> | python <file.py>",
         missingCode: "python: missing code after -c",
         loading: "python: loading runtime...",
@@ -540,6 +844,8 @@ export const translations = {
         evalError: "calc: error evaluating expression",
         invalid: "Invalid",
         error: "Error",
+        hintLine1: "Use in terminal: calc 2+2",
+        hintLine2: "C: clear  Q: quit",
       },
       apps: {
         launchSnake: "Launching snake...",
@@ -548,6 +854,67 @@ export const translations = {
         launchChess: "Launching chess...",
         launchSolitaire: "Launching solitaire...",
         modeStatus: "Mode: {mode}  Difficulty: {difficulty}",
+      },
+      doom: {
+        ready: "READY",
+        noAmmo: "NO AMMO",
+        noShells: "NO SHELLS",
+        noRockets: "NO ROCKETS",
+        fire: "FIRE!",
+        punch: "PUNCH!",
+        saw: "SAW!",
+        rocket: "ROCKET!",
+        targetDown: "TARGET DOWN",
+        hit: "HIT",
+        noBombs: "NO BOMBS",
+        boom: "BOOM",
+        reload: "RELOAD",
+        doorOpen: "DOOR OPEN",
+        doorClose: "DOOR CLOSED",
+        noDoor: "NO DOOR",
+        interactDoor: "E: Door",
+        interactPickup: "E: Pickup",
+        interactExit: "E: Exit",
+        exitReady: "EXIT",
+        nextLevel: "LEVEL",
+        ammoPlus: "AMMO +",
+        shellsPlus: "SHELLS +",
+        rocketsPlus: "ROCKETS +",
+        healthPlus: "HEALTH +",
+        shieldPlus: "SHIELD +",
+        bombPlus: "BOMB +",
+        chest: "CHEST!",
+        shotgun: "SHOTGUN!",
+        chainsaw: "CHAINSAW!",
+        chaingun: "CHAINGUN!",
+        launcher: "LAUNCHER!",
+        weaponFist: "FISTS",
+        weaponChainsaw: "CHAINSAW",
+        weaponPistol: "PISTOL",
+        weaponShotgun: "SHOTGUN",
+        weaponChaingun: "CHAINGUN",
+        weaponLauncher: "LAUNCHER",
+        noShotgun: "NO SHOTGUN",
+        noChainsaw: "NO CHAINSAW",
+        noChaingun: "NO CHAINGUN",
+        noLauncher: "NO LAUNCHER",
+        damage: "HIT!",
+        died: "YOU DIED",
+        clear: "ALL CLEAR",
+        launch: "Launching HELLRUN...",
+        loading: "LOADING...",
+        hudLabel: "HP",
+        shieldLabel: "SHIELD",
+        ammoLabel: "AMMO",
+        shellsLabel: "SHELLS",
+        rocketsLabel: "ROCKETS",
+        bombLabel: "BOMBS",
+        scoreLabel: "SCORE",
+        controls1:
+          "W/S: move  A/D: strafe  ←/→: turn  Shift: run  Space: attack",
+        controls2:
+          "1: fists/saw  2: pistol  3: shotgun  4: chaingun  5: launcher  B: bomb  E: interact  R: reload  M: map  H: hint  Shift+R: reset  Q: quit",
+        gameOver: "YOU DIED - R: restart",
       },
       chess: {
         selectPiece: "Select a piece",
@@ -614,6 +981,87 @@ export const translations = {
         pongControls: "Left/Right: move  R: restart  Q: quit",
         pongGameOver: "GAME OVER",
       },
+      files: {
+        readme:
+          "# {name}\n\nWelcome to KININ-TERM.\n\nQuick links:\n- docs/about.md\n- docs/projects.md\n- docs/contact.md\n",
+        notesTodo:
+          "- finalize terminal sim\n- tune hero camera\n- deploy to cloud run\n- add new 3d scene\n",
+        notesIdeas:
+          "Ideas:\n- retro mini games\n- hardware blog posts\n- terminal theme switch\n",
+        scriptsCalc:
+          "# SciCalc demo\nimport math\nexpr = 'sin(pi/2) + cos(0)'\nallowed = {k: getattr(math, k) for k in ['sin','cos','tan','sqrt','log','pi','e']}\nallowed['pow'] = pow\nresult = eval(expr, {'__builtins__': {}}, allowed)\nprint('SciCalc demo:', expr, '=', result)\nprint('Tip: use calc command for interactive mode.')\n",
+        scriptsSnake:
+          "# Snake demo\nboard = [\n  '###########',\n  '#.........#',\n  '#..S....@..#',\n  '#.........#',\n  '###########',\n]\nprint('Controls: run `snake` in terminal for full game.')\nprint('\\n'.join(board))\n",
+        scriptsPacman:
+          "# Pacman demo\nmaze = [\n  '############',\n  '#C....##....#',\n  '#.##..##..##.#',\n  '#....G.....o#',\n  '############',\n]\nprint('Controls: run `pacman` in terminal for full game.')\nprint('\\n'.join(maze))\n",
+        scriptsPong:
+          "# Pong demo\nprint('Controls: run `pong` in terminal for full game.')\nprint('Scoreboard: PLAYER 0 - 0 AI')\nprint('Left/Right to move paddle')\n",
+        scriptsChess:
+          "# Chess demo\nprint('Controls: run `chess` in terminal for full game.')\nprint('Tips: 1/2/3 difficulty, B bot, P pvp, C bot color')\n",
+        scriptsSolitaire:
+          "# Solitaire demo\nprint('Controls: run `solitaire` in terminal for full game.')\nprint('Keys: D draw, W waste, 1-7 tableau, F foundation')\n",
+        scriptsDiceRoll:
+          "import random\nprint('Dice roll:', random.randint(1, 6))\nprint('Try again for a new roll.')\n",
+        scriptsHelloWorld:
+          "import datetime\nprint('Hello, world!')\nprint('UTC time:', datetime.datetime.utcnow().isoformat())\n",
+        scriptsMediaDemo:
+          "print('Media demo:')\nprint('image  -> random retro ASCII')\nprint('video  -> random loop')\nprint('mp3    -> random chiptune')\nprint('Tip: image ~/media/nebula.txt')\n",
+        scriptsAsciiImage:
+          "art = [\n  '   .-.',\n  '  (o o)',\n  '  | = |',\n  ' (__|__)',\n  'RETRO BOT',\n]\nprint('\\n'.join(art))\n",
+        scriptsStarfield:
+          "import random\nfor _ in range(6):\n    line = ''.join(random.choice('.*') if random.random() > 0.7 else ' ' for _ in range(48))\n    print(line)\n",
+        scriptsQuoteBot:
+          "import random\nquotes = [\n  'Focus beats luck.',\n  'Ship it.',\n  'Keep it simple.',\n  'Small steps, big wins.',\n]\nprint(random.choice(quotes))\n",
+        mediaNebula:
+          "        .     .      .\n     .   *  .   .  *   .\n  .  .  .  .***.  .  .  .\n    .   .*'  *  '*.   .\n .    . *   .   . * .   .\n    .    '*.   .*'    .\n .  .  .   '***'   .  .  .\n     .   *  .   .  *   .\n        .     .      .\n",
+        mediaGrid:
+          "|‾‾‾‾‾‾‾‾‾‾‾|\n|  RETRO  |\n|  GRID   |\n|_________|\n\\\\\\\\\\\n/ / / / / /\n\\\\\\\\\\\n",
+        mediaCity:
+          "     | | | | | |\n  ___|_|_|_|_|_|___\n /__ NEON SKYLINE __\\\n|_|_|_|_|_|_|_|_|_|_|\n  /_/ /_/ /_/ /_/ /_\n",
+        mediaArcade:
+          "   .--------------.\n  /   ARCADE 88    /|\n /______________/ |\n | .----------. | |\n | |  READY!  | | |\n | '----------' |/\n '--------------'\n",
+        mediaLoop1:
+          "[frame 1]\n  (o)\n /|\\\n / \\\n\n---\n[frame 2]\n  (o)\n /|\\\n /\\ \\\n\n---\n[frame 3]\n  (o)\n /|\\\n / \\\n\n",
+        mediaLoop2:
+          "[frame 1]\n  [#]  \n /|_|\\\n  / \\\n\n---\n[frame 2]\n  [#]  \n /|_|\\\n  /\\ \\\n\n---\n[frame 3]\n  [#]  \n /|_|\\\n  / \\\n\n",
+        mediaLoop3:
+          "[frame 1]\n  <o>  \n  /|\\\n  / \\\n\n---\n[frame 2]\n  <o>  \n  /|\\\n  /\\ \\\n\n---\n[frame 3]\n  <o>  \n  /|\\\n  / \\\n\n",
+        mediaLoop4:
+          "[frame 1]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n---\n[frame 2]\n  /\\_/\\  \n ( o.o )\n  > ~ <\n\n---\n[frame 3]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n",
+        mediaLoop5:
+          "[frame 1]\n  [==]  \n  |  |  \n  |__|  \n\n---\n[frame 2]\n  [==]  \n  |~~|  \n  |__|  \n\n---\n[frame 3]\n  [==]  \n  |  |  \n  |__|  \n\n",
+        mediaNeonGrid:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><path d='M0 48 L64 32' stroke='%236fd1ff' stroke-width='2'/><path d='M0 56 L64 40' stroke='%237ef2b2' stroke-width='2'/><circle cx='48' cy='20' r='10' fill='%23ffb36b'/></svg>",
+        mediaNeonSun:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23061110'/><rect y='36' width='64' height='28' fill='%23121f2a'/><circle cx='32' cy='30' r='14' fill='%23ff7ad9'/><path d='M0 48 L64 34' stroke='%23ffb36b' stroke-width='2'/></svg>",
+        mediaCircuitChip:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><rect x='14' y='14' width='36' height='36' rx='4' fill='%231a2b2a' stroke='%236fd1ff' stroke-width='2'/><path d='M8 20h8M8 32h8M8 44h8M48 8v8M32 8v8M20 8v8M56 20h-8M56 32h-8M56 44h-8M20 56v-8M32 56v-8M44 56v-8' stroke='%237ef2b2' stroke-width='2'/></svg>",
+        mediaSunrise:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%23070b12'/><rect y='34' width='80' height='30' fill='%23111f2a'/><circle cx='40' cy='30' r='14' fill='%23ffb36b'/><path d='M0 44 L80 32' stroke='%23ff7ad9' stroke-width='2'/><path d='M0 52 L80 38' stroke='%236fd1ff' stroke-width='2'/></svg>",
+        mediaNeonRain:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230a0f14'/><path d='M8 0v64M20 0v64M32 0v64M44 0v64M56 0v64M68 0v64' stroke='%236fd1ff' stroke-width='2' opacity='0.7'/><circle cx='62' cy='20' r='8' fill='%23ff7ad9'/></svg>",
+        mediaGridHorizon:
+          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230b0f0e'/><path d='M0 44 L80 28' stroke='%237ef2b2' stroke-width='2'/><path d='M0 54 L80 36' stroke='%236fd1ff' stroke-width='2'/><path d='M0 64 L80 44' stroke='%23ffb36b' stroke-width='2'/></svg>",
+        mediaSynth1: "MP3DATA",
+        mediaSynth2: "MP3DATA_2",
+        mediaSynth3: "MP3DATA_3",
+        mediaNeonDrive: "MP3DATA_4",
+        mediaCircuitBeat: "MP3DATA_5",
+        mediaGlowShift: "MP3DATA_6",
+        mediaHorizonChords: "MP3DATA_7",
+        mediaPulseEcho: "MP3DATA_8",
+        mediaRetroWave: "MP3DATA_9",
+        projectPortfolio:
+          "# Kinin Portfolio\n\nStatus: active\nStack: Next.js, Three.js, WebGL\n",
+        projectKininOs:
+          "# Kinin OS\n\nExperimenting with terminal UX and CRT shaders.\n",
+        bashrc: "alias ll='ls -al'\nalias la='ls -a'\n",
+        profile: "export LANG=en_US.UTF-8\nexport TERM=kinin-term\n",
+        osRelease:
+          "NAME=KininOS\nVERSION=0.9.4\nID=kininos\nPRETTY_NAME=\"KininOS 0.9.4\"\n",
+        bootLog: "boot: ok\nservices: ready\n",
+        elfPlaceholder: "ELF...",
+      },
     },
     ui: {
       scroll: "Scroll down",
@@ -621,6 +1069,8 @@ export const translations = {
       themeDark: "Dark theme",
       language: "Switch language",
       socialLinksLabel: "Social links",
+      threeStageLoading: "Loading scene",
+      footerRights: "© {year} {name}. All rights reserved.",
       debugHud: {
         scroll: "scroll",
         reveal: "reveal",

@@ -328,6 +328,14 @@ function slugify(value: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+function formatTemplate(value: string, vars: Record<string, string | number>) {
+  return Object.entries(vars).reduce(
+    (acc, [key, replacement]) =>
+      acc.replaceAll(`{${key}}`, String(replacement)),
+    value,
+  );
+}
+
 type LocalizedProject = {
   title: string;
   year: string;
@@ -1333,7 +1341,8 @@ export default function HomeClient({
   }, [latestProjects, t.projects.latestTitle]);
 
   const files = useMemo(() => {
-    const terminalUser = profile.terminal.prompt.split("@")[0] || "user";
+    const terminalUser =
+      profile.terminal.prompt.split("@")[0] || t.terminal.system.userFallback;
     const homeDir = `/home/${terminalUser}`;
     const docsDir = `${homeDir}/docs`;
     const scriptsDir = `${homeDir}/scripts`;
@@ -1342,7 +1351,9 @@ export default function HomeClient({
     return [
       {
         path: `${homeDir}/README.md`,
-        content: `# ${profile.fullName}\n\nWelcome to KININ-TERM.\n\nQuick links:\n- docs/about.md\n- docs/projects.md\n- docs/contact.md\n`,
+        content: formatTemplate(t.terminal.files.readme, {
+          name: profile.fullName,
+        }),
       },
       {
         path: `${docsDir}/title.md`,
@@ -1366,250 +1377,225 @@ export default function HomeClient({
       },
       {
         path: `${homeDir}/notes/todo.txt`,
-        content:
-          "- finalize terminal sim\n- tune hero camera\n- deploy to cloud run\n- add new 3d scene\n",
+        content: t.terminal.files.notesTodo,
       },
       {
         path: `${homeDir}/notes/ideas.txt`,
-        content:
-          "Ideas:\n- retro mini games\n- hardware blog posts\n- terminal theme switch\n",
+        content: t.terminal.files.notesIdeas,
       },
       {
         path: `${scriptsDir}/calc.py`,
-        content:
-          "# SciCalc demo\nimport math\nexpr = 'sin(pi/2) + cos(0)'\nallowed = {k: getattr(math, k) for k in ['sin','cos','tan','sqrt','log','pi','e']}\nallowed['pow'] = pow\nresult = eval(expr, {'__builtins__': {}}, allowed)\nprint('SciCalc demo:', expr, '=', result)\nprint('Tip: use calc command for interactive mode.')\n",
+        content: t.terminal.files.scriptsCalc,
       },
       {
         path: `${scriptsDir}/snake.py`,
-        content:
-          "# Snake demo\nboard = [\n  '###########',\n  '#.........#',\n  '#..S....@..#',\n  '#.........#',\n  '###########',\n]\nprint('Controls: run `snake` in terminal for full game.')\nprint('\n'.join(board))\n",
+        content: t.terminal.files.scriptsSnake,
       },
       {
         path: `${scriptsDir}/pacman.py`,
-        content:
-          "# Pacman demo\nmaze = [\n  '############',\n  '#C....##....#',\n  '#.##..##..##.#',\n  '#....G.....o#',\n  '############',\n]\nprint('Controls: run `pacman` in terminal for full game.')\nprint('\n'.join(maze))\n",
+        content: t.terminal.files.scriptsPacman,
       },
       {
         path: `${scriptsDir}/pong.py`,
-        content:
-          "# Pong demo\nprint('Controls: run `pong` in terminal for full game.')\nprint('Scoreboard: PLAYER 0 - 0 AI')\nprint('Left/Right to move paddle')\n",
+        content: t.terminal.files.scriptsPong,
       },
       {
         path: `${scriptsDir}/chess.py`,
-        content:
-          "# Chess demo\nprint('Controls: run `chess` in terminal for full game.')\nprint('Tips: 1/2/3 difficulty, B bot, P pvp, C bot color')\n",
+        content: t.terminal.files.scriptsChess,
       },
       {
         path: `${scriptsDir}/solitaire.py`,
-        content:
-          "# Solitaire demo\nprint('Controls: run `solitaire` in terminal for full game.')\nprint('Keys: D draw, W waste, 1-7 tableau, F foundation')\n",
+        content: t.terminal.files.scriptsSolitaire,
       },
       {
         path: `${scriptsDir}/dice_roll.py`,
-        content:
-          "import random\nprint('Dice roll:', random.randint(1, 6))\nprint('Try again for a new roll.')\n",
+        content: t.terminal.files.scriptsDiceRoll,
       },
       {
         path: `${scriptsDir}/hello_world.py`,
-        content:
-          "import datetime\nprint('Hello, world!')\nprint('UTC time:', datetime.datetime.utcnow().isoformat())\n",
+        content: t.terminal.files.scriptsHelloWorld,
       },
       {
         path: `${scriptsDir}/media_demo.py`,
-        content:
-          "print('Media demo:')\nprint('image  -> random retro ASCII')\nprint('video  -> random loop')\nprint('mp3    -> random chiptune')\nprint('Tip: image ~/media/nebula.txt')\n",
+        content: t.terminal.files.scriptsMediaDemo,
       },
       {
         path: `${scriptsDir}/ascii_image.py`,
-        content:
-          "art = [\n  '   .-.',\n  '  (o o)',\n  '  | = |',\n  ' (__|__)',\n  'RETRO BOT',\n]\nprint('\\n'.join(art))\n",
+        content: t.terminal.files.scriptsAsciiImage,
       },
       {
         path: `${scriptsDir}/starfield.py`,
-        content:
-          "import random\nfor _ in range(6):\n    line = ''.join(random.choice('.*') if random.random() > 0.7 else ' ' for _ in range(48))\n    print(line)\n",
+        content: t.terminal.files.scriptsStarfield,
       },
       {
         path: `${scriptsDir}/quote_bot.py`,
-        content:
-          "import random\nquotes = [\n  'Focus beats luck.',\n  'Ship it.',\n  'Keep it simple.',\n  'Small steps, big wins.',\n]\nprint(random.choice(quotes))\n",
+        content: t.terminal.files.scriptsQuoteBot,
       },
       {
         path: `${mediaDir}/nebula.txt`,
-        content:
-          "        .     .      .\n     .   *  .   .  *   .\n  .  .  .  .***.  .  .  .\n    .   .*'  *  '*.   .\n .    . *   .   . * .   .\n    .    '*.   .*'    .\n .  .  .   '***'   .  .  .\n     .   *  .   .  *   .\n        .     .      .\n",
+        content: t.terminal.files.mediaNebula,
       },
       {
         path: `${mediaDir}/grid.txt`,
-        content:
-          "|‾‾‾‾‾‾‾‾‾‾‾|\n|  RETRO  |\n|  GRID   |\n|_________|\n\\\\\\\\\\\\\\\n/ / / / / /\n\\\\\\\\\\\\\\\n",
+        content: t.terminal.files.mediaGrid,
       },
       {
         path: `${mediaDir}/city.txt`,
-        content:
-          "     | | | | | |\n  ___|_|_|_|_|_|___\n /__ NEON SKYLINE __\\\n|_|_|_|_|_|_|_|_|_|_|\n  /_/ /_/ /_/ /_/ /_\n",
+        content: t.terminal.files.mediaCity,
       },
       {
         path: `${mediaDir}/arcade.txt`,
-        content:
-          "   .--------------.\n  /   ARCADE 88    /|\n /______________/ |\n | .----------. | |\n | |  READY!  | | |\n | '----------' |/\n '--------------'\n",
+        content: t.terminal.files.mediaArcade,
       },
       {
         path: `${mediaDir}/loop.vid`,
-        content:
-          "[frame 1]\n  (o)\n /|\\\n / \\\n\n---\n[frame 2]\n  (o)\n /|\\\n /\\ \\\n\n---\n[frame 3]\n  (o)\n /|\\\n / \\\n\n",
+        content: t.terminal.files.mediaLoop1,
       },
       {
         path: `${mediaDir}/loop2.vid`,
-        content:
-          "[frame 1]\n  [#]  \n /|_|\\\n  / \\\n\n---\n[frame 2]\n  [#]  \n /|_|\\\n  /\\ \\\n\n---\n[frame 3]\n  [#]  \n /|_|\\\n  / \\\n\n",
+        content: t.terminal.files.mediaLoop2,
       },
       {
         path: `${mediaDir}/loop3.vid`,
-        content:
-          "[frame 1]\n  <o>  \n  /|\\\n  / \\\n\n---\n[frame 2]\n  <o>  \n  /|\\\n  /\\ \\\n\n---\n[frame 3]\n  <o>  \n  /|\\\n  / \\\n\n",
+        content: t.terminal.files.mediaLoop3,
       },
       {
         path: `${mediaDir}/loop4.vid`,
-        content:
-          "[frame 1]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n---\n[frame 2]\n  /\\_/\\  \n ( o.o )\n  > ~ <\n\n---\n[frame 3]\n  /\\_/\\  \n ( o.o )\n  > ^ <\n\n",
+        content: t.terminal.files.mediaLoop4,
       },
       {
         path: `${mediaDir}/loop5.vid`,
-        content:
-          "[frame 1]\n  [==]  \n  |  |  \n  |__|  \n\n---\n[frame 2]\n  [==]  \n  |~~|  \n  |__|  \n\n---\n[frame 3]\n  [==]  \n  |  |  \n  |__|  \n\n",
+        content: t.terminal.files.mediaLoop5,
       },
       {
         path: `${mediaDir}/neon_grid.png`,
-        content:
-          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><path d='M0 48 L64 32' stroke='%236fd1ff' stroke-width='2'/><path d='M0 56 L64 40' stroke='%237ef2b2' stroke-width='2'/><circle cx='48' cy='20' r='10' fill='%23ffb36b'/></svg>",
+        content: t.terminal.files.mediaNeonGrid,
       },
       {
         path: `${mediaDir}/neon_sun.jpg`,
-        content:
-          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%23061110'/><rect y='36' width='64' height='28' fill='%23121f2a'/><circle cx='32' cy='30' r='14' fill='%23ff7ad9'/><path d='M0 48 L64 34' stroke='%23ffb36b' stroke-width='2'/></svg>",
+        content: t.terminal.files.mediaNeonSun,
       },
       {
         path: `${mediaDir}/circuit_chip.png`,
-        content:
-          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='%230b0f0e'/><rect x='14' y='14' width='36' height='36' rx='4' fill='%231a2b2a' stroke='%236fd1ff' stroke-width='2'/><path d='M8 20h8M8 32h8M8 44h8M48 8v8M32 8v8M20 8v8M56 20h-8M56 32h-8M56 44h-8M20 56v-8M32 56v-8M44 56v-8' stroke='%237ef2b2' stroke-width='2'/></svg>",
+        content: t.terminal.files.mediaCircuitChip,
       },
       {
         path: `${mediaDir}/sunrise.png`,
-        content:
-          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%23070b12'/><rect y='34' width='80' height='30' fill='%23111f2a'/><circle cx='40' cy='30' r='14' fill='%23ffb36b'/><path d='M0 44 L80 32' stroke='%23ff7ad9' stroke-width='2'/><path d='M0 52 L80 38' stroke='%236fd1ff' stroke-width='2'/></svg>",
+        content: t.terminal.files.mediaSunrise,
       },
       {
         path: `${mediaDir}/neon_rain.jpg`,
-        content:
-          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230a0f14'/><path d='M8 0v64M20 0v64M32 0v64M44 0v64M56 0v64M68 0v64' stroke='%236fd1ff' stroke-width='2' opacity='0.7'/><circle cx='62' cy='20' r='8' fill='%23ff7ad9'/></svg>",
+        content: t.terminal.files.mediaNeonRain,
       },
       {
         path: `${mediaDir}/grid_horizon.jpg`,
-        content:
-          "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='64'><rect width='80' height='64' fill='%230b0f0e'/><path d='M0 44 L80 28' stroke='%237ef2b2' stroke-width='2'/><path d='M0 54 L80 36' stroke='%236fd1ff' stroke-width='2'/><path d='M0 64 L80 44' stroke='%23ffb36b' stroke-width='2'/></svg>",
+        content: t.terminal.files.mediaGridHorizon,
       },
       {
         path: `${mediaDir}/synth.mp3`,
-        content: "MP3DATA",
+        content: t.terminal.files.mediaSynth1,
       },
       {
         path: `${mediaDir}/synth2.mp3`,
-        content: "MP3DATA_2",
+        content: t.terminal.files.mediaSynth2,
       },
       {
         path: `${mediaDir}/synth3.mp3`,
-        content: "MP3DATA_3",
+        content: t.terminal.files.mediaSynth3,
       },
       {
         path: `${mediaDir}/neon_drive.mp3`,
-        content: "MP3DATA_4",
+        content: t.terminal.files.mediaNeonDrive,
       },
       {
         path: `${mediaDir}/circuit_beat.mp3`,
-        content: "MP3DATA_5",
+        content: t.terminal.files.mediaCircuitBeat,
       },
       {
         path: `${mediaDir}/glow_shift.mp3`,
-        content: "MP3DATA_6",
+        content: t.terminal.files.mediaGlowShift,
       },
       {
         path: `${mediaDir}/horizon_chords.mp3`,
-        content: "MP3DATA_7",
+        content: t.terminal.files.mediaHorizonChords,
       },
       {
         path: `${mediaDir}/pulse_echo.mp3`,
-        content: "MP3DATA_8",
+        content: t.terminal.files.mediaPulseEcho,
       },
       {
         path: `${mediaDir}/retro_wave.mp3`,
-        content: "MP3DATA_9",
+        content: t.terminal.files.mediaRetroWave,
       },
       {
         path: `${projectsDir}/kinin-portfolio/README.md`,
-        content:
-          "# Kinin Portfolio\n\nStatus: active\nStack: Next.js, Three.js, WebGL\n",
+        content: t.terminal.files.projectPortfolio,
       },
       {
         path: `${projectsDir}/kinin-os/README.md`,
-        content:
-          "# Kinin OS\n\nExperimenting with terminal UX and CRT shaders.\n",
+        content: t.terminal.files.projectKininOs,
       },
       {
         path: `${homeDir}/.bashrc`,
-        content: "alias ll='ls -al'\nalias la='ls -a'\n",
+        content: t.terminal.files.bashrc,
       },
       {
         path: `${homeDir}/.profile`,
-        content: "export LANG=en_US.UTF-8\nexport TERM=kinin-term\n",
+        content: t.terminal.files.profile,
       },
       {
         path: "/etc/os-release",
-        content:
-          'NAME=KininOS\nVERSION=0.9.4\nID=kininos\nPRETTY_NAME="KininOS 0.9.4"\n',
+        content: t.terminal.files.osRelease,
       },
       {
         path: "/var/log/boot.log",
-        content: "boot: ok\nservices: ready\n",
+        content: t.terminal.files.bootLog,
       },
       {
         path: "/usr/bin/python",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/pacman",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/snake",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/pong",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/chess",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/solitaire",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/mp3",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/video",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
       {
         path: "/usr/bin/image",
-        content: "ELF...",
+        content: t.terminal.files.elfPlaceholder,
       },
     ];
-  }, [localizedPages, profile.fullName, profile.terminal.prompt, projectsMd]);
+  }, [
+    localizedPages,
+    profile.fullName,
+    profile.terminal.prompt,
+    projectsMd,
+    t.terminal.files,
+    t.terminal.system.userFallback,
+  ]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -2844,10 +2830,10 @@ export default function HomeClient({
               <p className="footer-name">{profile.fullName}</p>
               <p className="footer-role">{profile.jobTitle[language]}</p>
               <p className="footer-copy">
-                © 2026 {profile.fullName}.{" "}
-                {language === "tr"
-                  ? "Tum haklari saklidir."
-                  : "All rights reserved."}
+                {formatTemplate(t.ui.footerRights, {
+                  year: new Date().getFullYear(),
+                  name: profile.fullName,
+                })}
               </p>
             </div>
             <div className="footer-links">

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Markdown from "@/components/Markdown";
+import { useI18n } from "@/hooks/useI18n";
 
 type MarkdownCollapsibleProps = {
   content: string;
@@ -15,12 +16,15 @@ type MarkdownCollapsibleProps = {
 export default function MarkdownCollapsible({
   content,
   marker = "<!--more-->",
-  moreLabel = "More",
-  lessLabel = "Less",
+  moreLabel,
+  lessLabel,
   initialExpanded = false,
   buttonClassName = "button ghost",
 }: MarkdownCollapsibleProps) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(initialExpanded);
+  const resolvedMoreLabel = moreLabel ?? t.projects.more;
+  const resolvedLessLabel = lessLabel ?? t.projects.less;
   const { intro, rest } = useMemo(() => {
     const parts = content.split(marker);
     const [first, ...tail] = parts;
@@ -42,7 +46,7 @@ export default function MarkdownCollapsible({
         type="button"
         className={buttonClassName}
         onClick={() => setExpanded((current) => !current)}>
-        {expanded ? lessLabel : moreLabel}
+        {expanded ? resolvedLessLabel : resolvedMoreLabel}
       </button>
     </div>
   );

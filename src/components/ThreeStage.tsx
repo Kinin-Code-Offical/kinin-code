@@ -18,6 +18,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from "three";
+import { useI18n } from "@/hooks/useI18n";
 
 useGLTF.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
 
@@ -126,9 +127,10 @@ function Placeholder({
 }
 
 function Loader() {
+  const { t } = useI18n();
   return (
     <Html center>
-      <div className="three-stage-loading">LOADING SCENE</div>
+      <div className="three-stage-loading">{t.ui.threeStageLoading}</div>
     </Html>
   );
 }

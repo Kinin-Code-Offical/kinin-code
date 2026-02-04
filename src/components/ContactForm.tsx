@@ -44,7 +44,7 @@ export default function ContactForm({ labels }: { labels: Labels }) {
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        throw new Error("Request failed");
+        throw new Error(labels.error);
       }
 
       setStatus("success");

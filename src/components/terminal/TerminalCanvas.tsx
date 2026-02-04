@@ -81,6 +81,11 @@ type TerminalCanvasProps = {
       exitLine: string;
       historyCleared: string;
       noOutput: string;
+      moreResults: string;
+      userFallback: string;
+      unameShort: string;
+      unameLong: string;
+      uptime: string;
     };
     pip: {
       help: string;
@@ -91,6 +96,8 @@ type TerminalCanvasProps = {
       unknownCommand: string;
     };
     editor: {
+      title: string;
+      noBuffer: string;
       header: string;
       editing: string;
       saveFailed: string;
@@ -102,6 +109,9 @@ type TerminalCanvasProps = {
       lineNumbersOff: string;
       usageSet: string;
       help: string;
+      statusLine: string;
+      copied: string;
+      cut: string;
       invalidLineNumber: string;
       lineDeleted: string;
       lineInserted: string;
@@ -112,6 +122,7 @@ type TerminalCanvasProps = {
       targetIsDirectory: string;
     };
     commands: {
+      aliasDefinition: string;
       echoMissingFile: string;
       mkdirCannotCreate: string;
       rmMissingOperand: string;
@@ -130,6 +141,7 @@ type TerminalCanvasProps = {
       manMissingTopic: string;
       manNoEntry: string;
     };
+    manuals: Record<string, readonly string[]>;
     python: {
       version: string;
       usage: string;
@@ -158,6 +170,8 @@ type TerminalCanvasProps = {
       evalError: string;
       invalid: string;
       error: string;
+      hintLine1: string;
+      hintLine2: string;
     };
     apps: {
       launchSnake: string;
@@ -166,6 +180,65 @@ type TerminalCanvasProps = {
       launchChess: string;
       launchSolitaire: string;
       modeStatus: string;
+    };
+    doom: {
+      ready: string;
+      noAmmo: string;
+      noShells: string;
+      noRockets: string;
+      fire: string;
+      punch: string;
+      saw: string;
+      rocket: string;
+      targetDown: string;
+      hit: string;
+      noBombs: string;
+      boom: string;
+      reload: string;
+      doorOpen: string;
+      doorClose: string;
+      noDoor: string;
+      interactDoor: string;
+      interactPickup: string;
+      interactExit: string;
+      exitReady: string;
+      nextLevel: string;
+      ammoPlus: string;
+      shellsPlus: string;
+      rocketsPlus: string;
+      healthPlus: string;
+      shieldPlus: string;
+      bombPlus: string;
+      chest: string;
+      shotgun: string;
+      chainsaw: string;
+      chaingun: string;
+      launcher: string;
+      weaponFist: string;
+      weaponChainsaw: string;
+      weaponPistol: string;
+      weaponShotgun: string;
+      weaponChaingun: string;
+      weaponLauncher: string;
+      noShotgun: string;
+      noChainsaw: string;
+      noChaingun: string;
+      noLauncher: string;
+      damage: string;
+      died: string;
+      clear: string;
+      launch: string;
+      loading: string;
+      hudLabel: string;
+      shieldLabel: string;
+      ammoLabel: string;
+      shellsLabel: string;
+      rocketsLabel: string;
+      bombLabel: string;
+      scoreLabel: string;
+      controls1: string;
+      controls2: string;
+      gameOver: string;
     };
     chess: {
       selectPiece: string;
@@ -208,6 +281,7 @@ type TerminalCanvasProps = {
       player: string;
       playerControlsMedia: string;
       playerControlsImage: string;
+      inputLabel: string;
       sciCalc: string;
       calcControls: string;
       retroFps: string;
@@ -868,7 +942,10 @@ export default function TerminalCanvas({
   onFocusChangeAction,
   onDebugAction,
 }: TerminalCanvasProps) {
-  const userName = useMemo(() => prompt.split("@")[0] || "user", [prompt]);
+  const userName = useMemo(
+    () => prompt.split("@")[0] || messages.system.userFallback,
+    [messages.system.userFallback, prompt],
+  );
   const homePath = useMemo(() => `/home/${userName}`, [userName]);
   const builtinCommands = useMemo(
     () => [
@@ -1225,135 +1302,10 @@ export default function TerminalCanvas({
   const isActiveRef = useRef(isActive);
 
   const doomText = useCallback(
-    (key: string) => {
-      const dict = {
-        tr: {
-          ready: "HAZIR",
-          noAmmo: "MERMİ YOK",
-          noShells: "FİŞEK YOK",
-          noRockets: "ROKET YOK",
-          fire: "ATEŞ!",
-          punch: "YUMRUK!",
-          saw: "TESTERE!",
-          rocket: "ROKET!",
-          targetDown: "HEDEF İNDİ",
-          hit: "İSABET",
-          noBombs: "BOMBA YOK",
-          boom: "PATLAMA",
-          reload: "ŞARJÖR",
-          doorOpen: "KAPI AÇILDI",
-          doorClose: "KAPI KAPANDI",
-          noDoor: "KAPI YOK",
-          interactDoor: "E: Kapı",
-          interactPickup: "E: Al",
-          interactExit: "E: Çıkış",
-          exitReady: "ÇIKIŞ",
-          nextLevel: "BÖLÜM",
-          ammoPlus: "MERMİ +",
-          shellsPlus: "FİŞEK +",
-          rocketsPlus: "ROKET +",
-          healthPlus: "CAN +",
-          shieldPlus: "KALKAN +",
-          bombPlus: "BOMBA +",
-          chest: "SANDIK!",
-          shotgun: "POMPALI!",
-          chainsaw: "TESTERE!",
-          chaingun: "MİNİGUN!",
-          launcher: "ROKETATAR!",
-          weaponFist: "YUMRUK",
-          weaponChainsaw: "TESTERE",
-          weaponPistol: "TABANCA",
-          weaponShotgun: "POMPALI",
-          weaponChaingun: "MİNİGUN",
-          weaponLauncher: "ROKETATAR",
-          noShotgun: "POMPALI YOK",
-          noChainsaw: "TESTERE YOK",
-          noChaingun: "MİNİGUN YOK",
-          noLauncher: "ROKETATAR YOK",
-          damage: "HASAR!",
-          died: "ÖLDÜN",
-          clear: "TEMİZ",
-          launch: "HELLRUN başlatılıyor...",
-          loading: "YÜKLENİYOR...",
-          hudLabel: "CAN",
-          shieldLabel: "KALKAN",
-          ammoLabel: "MERMİ",
-          shellsLabel: "FİŞEK",
-          rocketsLabel: "ROKET",
-          bombLabel: "BOMBA",
-          scoreLabel: "SKOR",
-          controls1:
-            "W/S: hareket  A/D: kay  ←/→: dön  Shift: koş  Boşluk: saldırı",
-          controls2:
-            "1: yumruk/testere  2: tabanca  3: pompalı  4: minigun  5: roketatar  B: bomba  E: etkileşim  R: şarjör  M: harita  H: ipucu  Shift+R: reset  Q: çıkış",
-          gameOver: "ÖLDÜN - R: yeniden",
-        },
-        en: {
-          ready: "READY",
-          noAmmo: "NO AMMO",
-          noShells: "NO SHELLS",
-          noRockets: "NO ROCKETS",
-          fire: "FIRE!",
-          punch: "PUNCH!",
-          saw: "SAW!",
-          rocket: "ROCKET!",
-          targetDown: "TARGET DOWN",
-          hit: "HIT",
-          noBombs: "NO BOMBS",
-          boom: "BOOM",
-          reload: "RELOAD",
-          doorOpen: "DOOR OPEN",
-          doorClose: "DOOR CLOSED",
-          noDoor: "NO DOOR",
-          interactDoor: "E: Door",
-          interactPickup: "E: Pickup",
-          interactExit: "E: Exit",
-          exitReady: "EXIT",
-          nextLevel: "LEVEL",
-          ammoPlus: "AMMO +",
-          shellsPlus: "SHELLS +",
-          rocketsPlus: "ROCKETS +",
-          healthPlus: "HEALTH +",
-          shieldPlus: "SHIELD +",
-          bombPlus: "BOMB +",
-          chest: "CHEST!",
-          shotgun: "SHOTGUN!",
-          chainsaw: "CHAINSAW!",
-          chaingun: "CHAINGUN!",
-          launcher: "LAUNCHER!",
-          weaponFist: "FISTS",
-          weaponChainsaw: "CHAINSAW",
-          weaponPistol: "PISTOL",
-          weaponShotgun: "SHOTGUN",
-          weaponChaingun: "CHAINGUN",
-          weaponLauncher: "LAUNCHER",
-          noShotgun: "NO SHOTGUN",
-          noChainsaw: "NO CHAINSAW",
-          noChaingun: "NO CHAINGUN",
-          noLauncher: "NO LAUNCHER",
-          damage: "HIT!",
-          died: "YOU DIED",
-          clear: "ALL CLEAR",
-          launch: "Launching HELLRUN...",
-          loading: "LOADING...",
-          hudLabel: "HP",
-          shieldLabel: "SHIELD",
-          ammoLabel: "AMMO",
-          shellsLabel: "SHELLS",
-          rocketsLabel: "ROCKETS",
-          bombLabel: "BOMBS",
-          scoreLabel: "SCORE",
-          controls1:
-            "W/S: move  A/D: strafe  ←/→: turn  Shift: run  Space: attack",
-          controls2:
-            "1: fists/saw  2: pistol  3: shotgun  4: chaingun  5: launcher  B: bomb  E: interact  R: reload  M: map  H: hint  Shift+R: reset  Q: quit",
-          gameOver: "YOU DIED - R: restart",
-        },
-      } as const;
-      const lang = language === "tr" ? "tr" : "en";
-      return dict[lang][key as keyof (typeof dict)["tr"]] ?? key;
-    },
-    [language],
+    (key: keyof TerminalCanvasProps["messages"]["doom"] | string) =>
+      messages.doom[key as keyof TerminalCanvasProps["messages"]["doom"]] ??
+      key,
+    [messages.doom],
   );
 
   const ensureDoomTextures = useCallback(() => {
@@ -6334,11 +6286,13 @@ export default function TerminalCanvas({
           break;
         }
         case "whoami":
-          appendLine(env.USER || "user");
+          appendLine(env.USER || messages.system.userFallback);
           break;
         case "uname":
           appendLine(
-            hasFlag("a") ? "KininOS 0.9.4 kinin-term x86_64" : "KininOS",
+            hasFlag("a")
+              ? messages.system.unameLong
+              : messages.system.unameShort,
           );
           break;
         case "date":
@@ -6349,7 +6303,11 @@ export default function TerminalCanvas({
             1,
             Math.floor((Date.now() - sessionStartRef.current) / 1000),
           );
-          appendLine(`up ${formatUptime(seconds)}`);
+          appendLine(
+            formatMessage(messages.system.uptime, {
+              time: formatUptime(seconds),
+            }),
+          );
           break;
         }
         case "env":
@@ -6374,7 +6332,14 @@ export default function TerminalCanvas({
           if (!args.length) {
             Object.entries(aliasRef.current)
               .sort(([a], [b]) => a.localeCompare(b))
-              .forEach(([key, value]) => appendLine(`alias ${key}='${value}'`));
+              .forEach(([key, value]) =>
+                appendLine(
+                  formatMessage(messages.commands.aliasDefinition, {
+                    name: key,
+                    value,
+                  }),
+                ),
+              );
             break;
           }
           args.forEach((entry) => {
@@ -6718,7 +6683,11 @@ export default function TerminalCanvas({
           walk(node, resolveArg(target));
           results.slice(0, 120).forEach((line) => appendLine(line));
           if (results.length > 120) {
-            appendLine(`... ${results.length - 120} more`);
+            appendLine(
+              formatMessage(messages.system.moreResults, {
+                count: String(results.length - 120),
+              }),
+            );
           }
           break;
         }
@@ -6765,7 +6734,10 @@ export default function TerminalCanvas({
             Object.prototype.hasOwnProperty.call(aliasRef.current, commandName)
           ) {
             appendLine(
-              `alias ${commandName}='${aliasRef.current[commandName]}'`,
+              formatMessage(messages.commands.aliasDefinition, {
+                name: commandName,
+                value: aliasRef.current[commandName],
+              }),
             );
             break;
           }
@@ -6806,141 +6778,7 @@ export default function TerminalCanvas({
             appendLine(messages.commands.manMissingTopic);
             break;
           }
-          const manualsTr: Record<string, string[]> = {
-            help: ["help - komut listesi", "Kullanım: help"],
-            man: ["man - komut yardım sayfası", "Kullanım: man <komut>"],
-            ls: [
-              "ls - dizin içeriğini listeler",
-              "Kullanım: ls [-a] [-l] [dizin]",
-              "-a: gizli dosyaları göster  -l: uzun liste",
-            ],
-            cd: ["cd - dizin değiştir", "Kullanım: cd [dizin|-]"],
-            pwd: ["pwd - mevcut dizini yazdır", "Kullanım: pwd"],
-            cat: ["cat - dosya içeriklerini yazdır", "Kullanım: cat <dosya>"],
-            less: ["less - dosya görüntüle", "Kullanım: less <dosya>"],
-            head: [
-              "head - dosyanın başından satır alır",
-              "Kullanım: head [-n N] <dosya>",
-            ],
-            tail: [
-              "tail - dosyanın sonundan satır alır",
-              "Kullanım: tail [-n N] <dosya>",
-            ],
-            tree: ["tree - dizin ağacı", "Kullanım: tree [-L N] [dizin]"],
-            find: [
-              "find - dosya/dizin ara",
-              "Kullanım: find [dizin] -name <kalip>",
-            ],
-            grep: [
-              "grep - içerikte ara",
-              "Kullanım: grep [-i] [-r] <kalip> <dosya|dizin>",
-            ],
-            mkdir: ["mkdir - dizin oluştur", "Kullanım: mkdir [-p] <ad>"],
-            touch: ["touch - dosya oluştur", "Kullanım: touch <dosya>"],
-            rm: ["rm - dosya/dizin sil", "Kullanım: rm [-r] [-f] <yol>"],
-            rmdir: ["rmdir - boş dizin sil", "Kullanım: rmdir <dizin>"],
-            mv: ["mv - taşı/yeniden adlandır", "Kullanım: mv <kaynak> <hedef>"],
-            cp: ["cp - kopyala", "Kullanım: cp [-r] <kaynak> <hedef>"],
-            echo: ["echo - metin yazdır", "Kullanım: echo <metin> [> dosya]"],
-            clear: ["clear - ekran temizle", "Kullanım: clear"],
-            history: ["history - komut geçmişi", "Kullanım: history [-c]"],
-            env: ["env - ortam değişkenleri", "Kullanım: env"],
-            export: [
-              "export - ortam değişkeni ayarla",
-              "Kullanım: export KEY=VALUE",
-            ],
-            alias: ["alias - kısayol tanımla", "Kullanım: alias isim=komut"],
-            unalias: ["unalias - kısayol sil", "Kullanım: unalias isim"],
-            which: ["which - komut yolunu göster", "Kullanım: which <komut>"],
-            python: [
-              "python - runtime (pyodide)",
-              "Kullanım: python -c <code> | python <file.py>",
-            ],
-            pip: [
-              "pip - paket yöneticisi (simülasyon)",
-              "Kullanım: pip list | pip install <paket>",
-            ],
-            calc: ["calc - hesap makinesi", "Kullanım: calc [ifade]"],
-            snake: ["snake - mini oyun"],
-            pacman: ["pacman - mini oyun"],
-            pong: ["pong - mini oyun"],
-            hellrun: ["hellrun - retro FPS mini oyun"],
-            chess: [
-              "chess - minimalist satranç",
-              "Kullanım: chess [--pvp|--bot[=white|black]] [--easy|--medium|--hard]",
-              "Oyun içi: 1/2/3 zorluk, B bot, P pvp, C bot rengi",
-            ],
-            solitaire: ["solitaire - mini kart oyunu"],
-            mp3: ["mp3 - ascii player", "Kullanım: mp3 [dosya.mp3]"],
-            video: ["video - ascii player", "Kullanım: video [dosya.vid]"],
-            image: [
-              "image - ascii görüntüleyici",
-              "Kullanım: image <dosya.png|dosya.jpg|dosya.txt>",
-            ],
-            edit: ["edit - basit düzenleyici", "Kullanım: edit <dosya>"],
-          };
-          const manualsEn: Record<string, string[]> = {
-            help: ["help - command list", "Usage: help"],
-            man: ["man - command help", "Usage: man <cmd>"],
-            ls: [
-              "ls - list directory contents",
-              "Usage: ls [-a] [-l] [dir]",
-              "-a: show hidden  -l: long list",
-            ],
-            cd: ["cd - change directory", "Usage: cd [dir|-]"],
-            pwd: ["pwd - print working directory", "Usage: pwd"],
-            cat: ["cat - print files", "Usage: cat <file>"],
-            less: ["less - view file", "Usage: less <file>"],
-            head: ["head - print first lines", "Usage: head [-n N] <file>"],
-            tail: ["tail - print last lines", "Usage: tail [-n N] <file>"],
-            tree: ["tree - directory tree", "Usage: tree [-L N] [dir]"],
-            find: ["find - search files", "Usage: find [dir] -name <pattern>"],
-            grep: [
-              "grep - search content",
-              "Usage: grep [-i] [-r] <pattern> <file|dir>",
-            ],
-            mkdir: ["mkdir - create directory", "Usage: mkdir [-p] <name>"],
-            touch: ["touch - create file", "Usage: touch <file>"],
-            rm: ["rm - remove file/dir", "Usage: rm [-r] [-f] <path>"],
-            rmdir: ["rmdir - remove empty dir", "Usage: rmdir <dir>"],
-            mv: ["mv - move/rename", "Usage: mv <src> <dest>"],
-            cp: ["cp - copy", "Usage: cp [-r] <src> <dest>"],
-            echo: ["echo - print text", "Usage: echo <text> [> file]"],
-            clear: ["clear - clear screen", "Usage: clear"],
-            history: ["history - command history", "Usage: history [-c]"],
-            env: ["env - list env vars", "Usage: env"],
-            export: ["export - set env var", "Usage: export KEY=VALUE"],
-            alias: ["alias - define alias", "Usage: alias name=cmd"],
-            unalias: ["unalias - remove alias", "Usage: unalias name"],
-            which: ["which - show command path", "Usage: which <cmd>"],
-            python: [
-              "python - runtime (pyodide)",
-              "Usage: python -c <code> | python <file.py>",
-            ],
-            pip: [
-              "pip - simulated package manager",
-              "Usage: pip list | pip install <pkg>",
-            ],
-            calc: ["calc - calculator", "Usage: calc [expression]"],
-            snake: ["snake - mini game"],
-            pacman: ["pacman - mini game"],
-            pong: ["pong - mini game"],
-            hellrun: ["hellrun - retro FPS mini game"],
-            chess: [
-              "chess - minimalist board",
-              "Usage: chess [--pvp|--bot[=white|black]] [--easy|--medium|--hard]",
-              "In-game: 1/2/3 difficulty, B bot, P pvp, C bot color",
-            ],
-            solitaire: ["solitaire - mini card game"],
-            mp3: ["mp3 - ascii player", "Usage: mp3 [file.mp3]"],
-            video: ["video - ascii player", "Usage: video [file.vid]"],
-            image: [
-              "image - ascii viewer",
-              "Usage: image <file.png|file.jpg|file.txt>",
-            ],
-            edit: ["edit - simple editor", "Usage: edit <file>"],
-          };
-          const manuals = language === "tr" ? manualsTr : manualsEn;
+          const { manuals } = messages;
           const manual = manuals[target];
           if (manual) {
             manual.forEach((line) => appendLine(line));
@@ -7567,9 +7405,9 @@ export default function TerminalCanvas({
         const state = editorRef.current;
         if (!state) {
           ctx.fillStyle = accent;
-          ctx.fillText("NANO", pad + 12, pad + 8);
+          ctx.fillText(messages.editor.title, pad + 12, pad + 8);
           ctx.fillStyle = dim;
-          ctx.fillText("(no buffer)", pad + 12, pad + 32);
+          ctx.fillText(messages.editor.noBuffer, pad + 12, pad + 32);
           finalizeFrame();
           return;
         }
@@ -7577,7 +7415,11 @@ export default function TerminalCanvas({
         ensureEditorBuffer(state);
 
         ctx.fillStyle = accent;
-        ctx.fillText(`NANO  ${state.path}`, pad + 12, pad + 8);
+        ctx.fillText(
+          `${messages.editor.title}  ${state.path}`,
+          pad + 12,
+          pad + 8,
+        );
 
         ctx.fillStyle = "rgba(255,255,255,0.05)";
         ctx.fillRect(pad + 1, textAreaY - 4, boxW - 2, 1);
@@ -7703,9 +7545,10 @@ export default function TerminalCanvas({
         const modifiedMark = state.modified ? "*" : "";
         const statusText =
           editorStatusRef.current ??
-          (language === "tr"
-            ? `SATIR ${cursor.row + 1}, SUTUN ${cursor.col + 1}`
-            : `LINE ${cursor.row + 1}, COL ${cursor.col + 1}`);
+          formatMessage(messages.editor.statusLine, {
+            row: String(cursor.row + 1),
+            col: String(cursor.col + 1),
+          });
         const trimToWidth = (text: string, maxWidth: number) => {
           if (ctx.measureText(text).width <= maxWidth) {
             return text;
@@ -7889,14 +7732,8 @@ export default function TerminalCanvas({
           });
         });
         ctx.fillStyle = dim;
-        const hintLine1 =
-          language === "tr"
-            ? "Terminalde kullan: calc 2+2"
-            : "Use in terminal: calc 2+2";
-        const hintLine2 =
-          language === "tr" ? "C: temizle  Q: çıkış" : "C: clear  Q: quit";
-        ctx.fillText(hintLine1, pad + 12, height - 54);
-        ctx.fillText(hintLine2, pad + 12, height - 36);
+        ctx.fillText(messages.calc.hintLine1, pad + 12, height - 54);
+        ctx.fillText(messages.calc.hintLine2, pad + 12, height - 36);
       } else if (mode === "doom") {
         const map = doomMapRef.current;
         const pad = Math.floor(Math.min(width, height) * 0.1);
@@ -10853,8 +10690,7 @@ export default function TerminalCanvas({
             if (navigator.clipboard?.writeText) {
               void navigator.clipboard.writeText(text).catch(() => null);
             }
-            editorStatusRef.current =
-              language === "tr" ? "Kopyalandı" : "Copied";
+            editorStatusRef.current = messages.editor.copied;
           }
           dirtyRef.current = true;
           event.preventDefault();
@@ -10868,7 +10704,7 @@ export default function TerminalCanvas({
               void navigator.clipboard.writeText(text).catch(() => null);
             }
             deleteEditorSelection();
-            editorStatusRef.current = language === "tr" ? "Kesildi" : "Cut";
+            editorStatusRef.current = messages.editor.cut;
           }
           dirtyRef.current = true;
           event.preventDefault();
@@ -12245,7 +12081,7 @@ export default function TerminalCanvas({
         autoCorrect="off"
         spellCheck={false}
         tabIndex={-1}
-        aria-label="Terminal input"
+        aria-label={messages.ui.inputLabel}
         onKeyDown={handleInputKeyDown}
         onKeyUp={syncSelection}
         onInput={handleInput}
