@@ -1821,11 +1821,7 @@ textarea {
 }
 
 .site-content > #projects.section {
-  background: none;
-}
-
-.site-content > #projects.section::before {
-  background: none;
+  background: var(--section-bg, var(--content-bg));
 }
 
 .section-inner {
@@ -3445,7 +3441,7 @@ textarea {
   }
 
   .site-content > #projects.section {
-    background: none;
+    background: var(--section-bg, var(--content-bg));
   }
 
   body::after {
