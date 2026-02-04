@@ -1066,6 +1066,8 @@ export default function TerminalCanvas({
   const doomBombsRef = useRef(2);
   const doomScoreRef = useRef(0);
   const doomCooldownRef = useRef(0);
+  const doomReloadRef = useRef(0);
+  const doomReloadMaxRef = useRef(0);
   const doomGameOverRef = useRef(false);
   const doomMiniMapRef = useRef(true);
   const doomBobRef = useRef(0);
@@ -1238,6 +1240,7 @@ export default function TerminalCanvas({
           hit: "İSABET",
           noBombs: "BOMBA YOK",
           boom: "PATLAMA",
+          reload: "ŞARJÖR",
           doorOpen: "KAPI AÇILDI",
           doorClose: "KAPI KAPANDI",
           noDoor: "KAPI YOK",
@@ -1282,7 +1285,7 @@ export default function TerminalCanvas({
           controls1:
             "W/S: hareket  A/D: kay  ←/→: dön  Shift: koş  Boşluk: saldırı",
           controls2:
-            "1: yumruk/testere  2: tabanca  3: pompalı  4: minigun  5: roketatar  B: bomba  E: etkileşim  M: harita  H: ipucu  R: reset  Q: çıkış",
+            "1: yumruk/testere  2: tabanca  3: pompalı  4: minigun  5: roketatar  B: bomba  E: etkileşim  R: şarjör  M: harita  H: ipucu  Shift+R: reset  Q: çıkış",
           gameOver: "ÖLDÜN - R: yeniden",
         },
         en: {
@@ -1298,6 +1301,7 @@ export default function TerminalCanvas({
           hit: "HIT",
           noBombs: "NO BOMBS",
           boom: "BOOM",
+          reload: "RELOAD",
           doorOpen: "DOOR OPEN",
           doorClose: "DOOR CLOSED",
           noDoor: "NO DOOR",
@@ -1342,7 +1346,7 @@ export default function TerminalCanvas({
           controls1:
             "W/S: move  A/D: strafe  ←/→: turn  Shift: run  Space: attack",
           controls2:
-            "1: fists/saw  2: pistol  3: shotgun  4: chaingun  5: launcher  B: bomb  E: interact  M: map  H: hint  R: reset  Q: quit",
+            "1: fists/saw  2: pistol  3: shotgun  4: chaingun  5: launcher  B: bomb  E: interact  R: reload  M: map  H: hint  Shift+R: reset  Q: quit",
           gameOver: "YOU DIED - R: restart",
         },
       } as const;
@@ -2312,6 +2316,8 @@ export default function TerminalCanvas({
       doomHintRef.current = null;
       doomHintWindowRef.current = true;
       doomCooldownRef.current = 0;
+      doomReloadRef.current = 0;
+      doomReloadMaxRef.current = 0;
       doomGameOverRef.current = false;
       doomBobRef.current = 0;
       if (resetStats) {
@@ -2726,6 +2732,9 @@ export default function TerminalCanvas({
     if (doomGameOverRef.current) {
       return;
     }
+    if (doomReloadRef.current > 0) {
+      return;
+    }
     if (doomCooldownRef.current > 0) {
       return;
     }
@@ -3034,6 +3043,38 @@ export default function TerminalCanvas({
     doomMessageRef.current = doomText("boom");
   }, [doomText]);
 
+  const reloadDoom = useCallback(() => {
+    if (getDoomBootProgress() < 1) {
+      return;
+    }
+    if (doomGameOverRef.current) {
+      beginDoomBoot();
+      resetDoom();
+      return;
+    }
+    if (doomReloadRef.current > 0) {
+      return;
+    }
+    const weapon = doomWeaponRef.current;
+    if (weapon === "fist" || weapon === "chainsaw") {
+      doomMessageRef.current = doomText("ready");
+      return;
+    }
+    const duration =
+      weapon === "pistol"
+        ? 18
+        : weapon === "shotgun"
+          ? 26
+          : weapon === "chaingun"
+            ? 22
+            : weapon === "launcher"
+              ? 28
+              : 20;
+    doomReloadRef.current = duration;
+    doomReloadMaxRef.current = duration;
+    doomMessageRef.current = doomText("reload");
+  }, [beginDoomBoot, doomText, getDoomBootProgress, resetDoom]);
+
   const openDoomDoor = useCallback(() => {
     const map = doomMapRef.current;
     if (!map.length) {
@@ -3158,6 +3199,13 @@ export default function TerminalCanvas({
     }
     if (doomCooldownRef.current > 0) {
       doomCooldownRef.current -= 1;
+    }
+    if (doomReloadRef.current > 0) {
+      doomReloadRef.current -= 1;
+      if (doomReloadRef.current <= 0) {
+        doomReloadRef.current = 0;
+        doomReloadMaxRef.current = 0;
+      }
     }
     impulse.move *= 0.82;
     impulse.strafe *= 0.82;
@@ -9279,7 +9327,16 @@ export default function TerminalCanvas({
         const weaponW = clamp(Math.floor(viewW * 0.46), 170, 320);
         const weaponH = clamp(Math.floor(viewH * 0.22), 78, weaponMaxH);
         const weaponX = Math.floor(viewX + (viewW - weaponW) / 2 + bobX);
-        const weaponY = Math.floor(hudY - weaponH - 6 + bobY - recoil * 10);
+        const reloadMax = doomReloadMaxRef.current;
+        const reloadRemaining = doomReloadRef.current;
+        const reload =
+          reloadMax > 0 ? clamp(reloadRemaining / reloadMax, 0, 1) : 0;
+        const reloadPhase = 1 - reload;
+        const reloadDrop = Math.sin(reloadPhase * Math.PI);
+        const reloadY = reloadDrop * weaponH * 0.22;
+        const weaponY = Math.floor(
+          hudY - weaponH - 6 + bobY - recoil * 10 + reloadY,
+        );
         const weapon = doomWeaponRef.current;
         const attack = clamp(doomMuzzleRef.current / 14, 0, 1);
         ctx.save();
@@ -9629,8 +9686,8 @@ export default function TerminalCanvas({
           );
         }
 
-        const labelFont = Math.max(9, Math.floor(hudHeight * 0.18));
-        const valueFont = Math.max(16, Math.floor(hudHeight * 0.38));
+        const labelFont = Math.max(9, Math.floor(hudHeight * 0.16));
+        const valueFont = Math.max(14, Math.floor(hudHeight * 0.33));
         const labelY = hudY + Math.floor(hudHeight * 0.14);
         const valueY = hudY + Math.floor(hudHeight * 0.4);
         const statPad = Math.floor(sectionPadding * 0.4);
@@ -9686,7 +9743,7 @@ export default function TerminalCanvas({
         ctx.fillStyle = "#f4d35e";
         ctx.fillText(String(bombs).padStart(2, "0"), bombsX + statPad, valueY);
 
-        ctx.font = `${Math.max(9, Math.floor(hudHeight * 0.18))}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.font = `${Math.max(9, Math.floor(hudHeight * 0.16))}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillStyle = "rgba(255,255,255,0.55)";
         const weaponKeyMap: Record<string, string> = {
           fist: "weaponFist",
@@ -9823,12 +9880,12 @@ export default function TerminalCanvas({
         const infoY = Math.min(hudY - 16, viewY + viewH - 16);
         const hintWindowVisible = doomHintWindowRef.current;
         if (hintWindowVisible) {
-          const hintFont = Math.max(8, Math.floor(headerSize * 0.54));
+          const hintFont = Math.max(8, Math.floor(headerSize * 0.46));
           const hintLineHeight = Math.max(12, Math.floor(hintFont * 1.35));
           const panelPaddingX = 12;
           const panelPaddingY = 10;
           const colGap = 14;
-          const desiredPanelW = Math.min(Math.floor(viewW * 0.72), 520);
+          const desiredPanelW = Math.min(Math.floor(viewW * 0.84), 640);
           const panelW = clamp(
             desiredPanelW,
             Math.min(240, Math.floor(viewW)),
@@ -10687,6 +10744,9 @@ export default function TerminalCanvas({
         return true;
       }
       if (lower === "r") {
+        if (mode === "doom" && !event.shiftKey) {
+          return false;
+        }
         if (mode === "snake") {
           resetSnake();
           placeSnakeFood();
@@ -11246,6 +11306,12 @@ export default function TerminalCanvas({
           event.preventDefault();
           return true;
         }
+        if (lower === "r") {
+          reloadDoom();
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
         if (lower === "e") {
           interactDoom();
           dirtyRef.current = true;
@@ -11654,6 +11720,7 @@ export default function TerminalCanvas({
       moveEditorCursor,
       interactDoom,
       shootDoom,
+      reloadDoom,
       throwDoomBomb,
       hasChessLegalMove,
       isChessInCheck,

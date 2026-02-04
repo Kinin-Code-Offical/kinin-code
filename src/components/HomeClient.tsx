@@ -1806,7 +1806,7 @@ export default function HomeClient({
     <main className="site-shell" ref={shellRef}>
       {debugEnabled ? (
         <div className="debug-hud">
-          {`scroll: ${debugHud.scroll.toFixed(3)}\nreveal: ${debugHud.reveal.toFixed(3)}\nfade: ${debugHud.fade.toFixed(3)}\nheroActive: ${debugHud.heroActive}`}
+          {`${t.ui.debugHud.scroll}: ${debugHud.scroll.toFixed(3)}\n${t.ui.debugHud.reveal}: ${debugHud.reveal.toFixed(3)}\n${t.ui.debugHud.fade}: ${debugHud.fade.toFixed(3)}\n${t.ui.debugHud.heroActive}: ${debugHud.heroActive}`}
         </div>
       ) : null}
       {!siteReady || isSwitching ? (
@@ -1915,7 +1915,7 @@ export default function HomeClient({
                 {languageMeta[language].label}
               </button>
             </div>
-            <div className="dock-socials" aria-label="Social links">
+            <div className="dock-socials" aria-label={t.ui.socialLinksLabel}>
               {profile.socials.map((social, index) => {
                 const isEmail = social.href.startsWith("mailto:");
                 if (isEmail) {
@@ -2085,7 +2085,9 @@ export default function HomeClient({
                     {languageMeta.en.label}
                   </button>
                 </div>
-                <div className="sidebar-socials" aria-label="Social links">
+                <div
+                  className="sidebar-socials"
+                  aria-label={t.ui.socialLinksLabel}>
                   {profile.socials.map((social) => (
                     <a
                       key={social.label}
@@ -2210,7 +2212,9 @@ export default function HomeClient({
                     {languageMeta.en.label}
                   </button>
                 </div>
-                <div className="sidebar-socials" aria-label="Social links">
+                <div
+                  className="sidebar-socials"
+                  aria-label={t.ui.socialLinksLabel}>
                   {profile.socials.map((social) => (
                     <a
                       key={social.label}
@@ -2292,7 +2296,7 @@ export default function HomeClient({
               <button
                 type="button"
                 className="hero-key-button hero-key-focus"
-                aria-label="Terminal input"
+                aria-label={t.hero.keys.terminalInputAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   handleTerminalInputFocus();
@@ -2302,17 +2306,17 @@ export default function HomeClient({
               <button
                 type="button"
                 className="hero-key-button hero-key-tab"
-                aria-label="Tab"
+                aria-label={t.hero.keys.tabAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   handleVirtualKey("Tab", { focus: true });
                 }}>
-                Tab
+                {t.hero.keys.tabLabel}
               </button>
               <button
                 type="button"
                 className="hero-key-button hero-key-up"
-                aria-label="Arrow up"
+                aria-label={t.hero.keys.arrowUpAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   handleVirtualKey("ArrowUp", { focus: false });
@@ -2322,7 +2326,7 @@ export default function HomeClient({
               <button
                 type="button"
                 className="hero-key-button hero-key-left"
-                aria-label="Arrow left"
+                aria-label={t.hero.keys.arrowLeftAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   handleVirtualKey("ArrowLeft", { focus: false });
@@ -2332,7 +2336,7 @@ export default function HomeClient({
               <button
                 type="button"
                 className="hero-key-button hero-key-right"
-                aria-label="Arrow right"
+                aria-label={t.hero.keys.arrowRightAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   handleVirtualKey("ArrowRight", { focus: false });
@@ -2342,7 +2346,7 @@ export default function HomeClient({
               <button
                 type="button"
                 className="hero-key-button hero-key-down"
-                aria-label="Arrow down"
+                aria-label={t.hero.keys.arrowDownAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   handleVirtualKey("ArrowDown", { focus: false });
@@ -2354,20 +2358,20 @@ export default function HomeClient({
                 className={`hero-key-button hero-key-mod hero-key-ctrl${
                   mobileModifiers.ctrl ? " is-active" : ""
                 }`}
-                aria-label="Ctrl modifier"
+                aria-label={t.hero.keys.ctrlAria}
                 aria-pressed={mobileModifiers.ctrl}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   toggleMobileModifier("ctrl");
                 }}>
-                Ctrl
+                {t.hero.keys.ctrlLabel}
               </button>
               <button
                 type="button"
                 className={`hero-key-button hero-key-mod hero-key-shift${
                   mobileModifiers.shift ? " is-active" : ""
                 }`}
-                aria-label="Shift modifier"
+                aria-label={t.hero.keys.shiftAria}
                 aria-pressed={mobileModifiers.shift}
                 onPointerDown={(event) => {
                   event.preventDefault();
@@ -2380,13 +2384,13 @@ export default function HomeClient({
                 className={`hero-key-button hero-key-mod hero-key-alt${
                   mobileModifiers.alt ? " is-active" : ""
                 }`}
-                aria-label="Alt modifier"
+                aria-label={t.hero.keys.altAria}
                 aria-pressed={mobileModifiers.alt}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   toggleMobileModifier("alt");
                 }}>
-                Alt
+                {t.hero.keys.altLabel}
               </button>
             </div>
           ) : null}
