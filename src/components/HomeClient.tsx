@@ -11,12 +11,10 @@ import {
   useState,
 } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { CanvasTexture } from "three";
 import ContactForm from "@/components/ContactForm";
 import Markdown from "@/components/Markdown";
-import TerminalCanvas, {
-  TerminalApi,
-} from "@/components/terminal/TerminalCanvas";
-import type { SceneDebugInfo } from "@/components/hero/HeroScene";
+import { Terminal, type TerminalRef } from "@/components/terminal/Terminal";
 import { usePreferences } from "@/components/PreferencesProvider";
 import type { ContentData } from "@/lib/content";
 import { getAlternateLanguage, languageMeta } from "@/lib/i18n";
@@ -27,10 +25,13 @@ function HeroLoading() {
   return <div className="hero-loading">{t.hero.loading}</div>;
 }
 
-const HeroScene = dynamic(() => import("@/components/hero/HeroScene"), {
-  ssr: false,
-  loading: () => <HeroLoading />,
-});
+const Scene = dynamic(
+  () => import("@/components/canvas/Scene").then((mod) => mod.Scene),
+  {
+    ssr: false,
+    loading: () => <HeroLoading />,
+  },
+);
 
 type HomeClientProps = {
   content: ContentData;
@@ -497,6 +498,17 @@ export default function HomeClient({
   const { profile, projects, theme, pages, capabilities } = content;
   const { t, language, setLanguage } = useI18n();
   const { theme: currentTheme, toggleTheme, isSwitching } = usePreferences();
+  const terminalTheme = useMemo(
+    () => ({
+      palette: {
+        terminalBg: theme.palette.terminalBg,
+        terminalText: theme.palette.terminalText,
+        terminalDim: theme.palette.terminalDim,
+      },
+      crt: theme.crt,
+    }),
+    [theme],
+  );
   const heroRef = useRef<HTMLElement>(null);
   const featuredRef = useRef<HTMLElement>(null);
   const featuredHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -641,7 +653,9 @@ export default function HomeClient({
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
   const [openCapabilityId, setOpenCapabilityId] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
+  const [terminalTexture, setTerminalTexture] = useState<CanvasTexture | null>(
+    null,
+  );
   const [terminalFocused, setTerminalFocused] = useState(false);
   const pendingTerminalFocusRef = useRef(false);
   const [screenAspect, setScreenAspect] = useState(1.33);
@@ -668,30 +682,33 @@ export default function HomeClient({
     alt: false,
   });
   const mobileModifiersRef = useRef(mobileModifiers);
+  const terminalRef = useRef<TerminalRef>(null);
+  const terminalUser = useMemo(
+    () =>
+      profile.terminal.prompt.split("@")[0] || t.terminal.system.userFallback,
+    [profile.terminal.prompt, t.terminal.system.userFallback],
+  );
+  const homeDir = useMemo(() => `/home/${terminalUser}`, [terminalUser]);
+
   const handleSceneReady = useCallback(() => {
     setSceneReady(true);
     setSceneReadyAt(Date.now());
-  }, []);
-
-  const handleSceneDebug = useCallback((info: SceneDebugInfo) => {
-    if (info.modelLoaded || info.fallbackPlane) {
-      setModelReady(true);
-      setModelReadyAt(Date.now());
-    }
+    setModelReady(true);
+    setModelReadyAt(Date.now());
   }, []);
 
   const handleTerminalFocus = useCallback(() => {
-    if (terminalApi) {
-      terminalApi.focus();
+    if (terminalRef.current) {
+      terminalRef.current.focusInput();
       pendingTerminalFocusRef.current = false;
       return;
     }
     pendingTerminalFocusRef.current = true;
-  }, [terminalApi]);
+  }, []);
 
   const handleTerminalInputFocus = useCallback(() => {
-    terminalApi?.focusInput?.();
-  }, [terminalApi]);
+    terminalRef.current?.focusInput();
+  }, []);
 
   const handleVirtualKey = useCallback(
     (
@@ -701,26 +718,17 @@ export default function HomeClient({
       if (options?.focus !== false) {
         handleTerminalFocus();
       }
-      const modifiers = mobileModifiersRef.current;
-      const down = new KeyboardEvent("keydown", {
-        key,
-        bubbles: true,
-        ctrlKey: modifiers.ctrl,
-        shiftKey: modifiers.shift,
-        altKey: modifiers.alt,
-      });
-      const up = new KeyboardEvent("keyup", {
-        key,
-        bubbles: true,
-        ctrlKey: modifiers.ctrl,
-        shiftKey: modifiers.shift,
-        altKey: modifiers.alt,
-      });
-      window.dispatchEvent(down);
-      window.dispatchEvent(up);
+      terminalRef.current?.handleInput(key);
     },
     [handleTerminalFocus],
   );
+
+  useEffect(() => {
+    if (terminalTexture && !terminalBootReady) {
+      setTerminalBootReady(true);
+      setTerminalBootReadyAt(Date.now());
+    }
+  }, [terminalTexture, terminalBootReady]);
 
   const toggleMobileModifier = useCallback((key: "ctrl" | "shift" | "alt") => {
     setMobileModifiers((prev) => {
@@ -1091,15 +1099,15 @@ export default function HomeClient({
   }, [bootDone]);
 
   useEffect(() => {
-    if (!terminalApi || !pendingTerminalFocusRef.current) {
+    if (!terminalRef.current || !pendingTerminalFocusRef.current) {
       return;
     }
-    terminalApi.focus();
+    terminalRef.current.focusInput();
     pendingTerminalFocusRef.current = false;
-  }, [terminalApi]);
+  }, []);
 
   useEffect(() => {
-    if (!bootDone || !terminalApi || isMobile || isCoarsePointer) {
+    if (!bootDone || !terminalRef.current || isMobile || isCoarsePointer) {
       return;
     }
     const active = document.activeElement;
@@ -1110,8 +1118,8 @@ export default function HomeClient({
     ) {
       return;
     }
-    terminalApi.focus();
-  }, [bootDone, isCoarsePointer, isMobile, terminalApi]);
+    terminalRef.current.focusInput();
+  }, [bootDone, isCoarsePointer, isMobile]);
 
   useEffect(() => {
     mobileModifiersRef.current = mobileModifiers;
@@ -1341,9 +1349,6 @@ export default function HomeClient({
   }, [latestProjects, t.projects.latestTitle]);
 
   const files = useMemo(() => {
-    const terminalUser =
-      profile.terminal.prompt.split("@")[0] || t.terminal.system.userFallback;
-    const homeDir = `/home/${terminalUser}`;
     const docsDir = `${homeDir}/docs`;
     const scriptsDir = `${homeDir}/scripts`;
     const mediaDir = `${homeDir}/media`;
@@ -1588,14 +1593,7 @@ export default function HomeClient({
         content: t.terminal.files.elfPlaceholder,
       },
     ];
-  }, [
-    localizedPages,
-    profile.fullName,
-    profile.terminal.prompt,
-    projectsMd,
-    t.terminal.files,
-    t.terminal.system.userFallback,
-  ]);
+  }, [localizedPages, profile.fullName, projectsMd, t.terminal.files, homeDir]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -1604,6 +1602,26 @@ export default function HomeClient({
     }
     setMenuOpen(false);
   };
+
+  const terminalConfig = useMemo(
+    () => ({
+      prompt: profile.terminal.prompt,
+      introLines: profile.introLines[language],
+      homePath: homeDir,
+      files,
+      messages: t.terminal,
+      onNavigateAction: scrollToSection,
+    }),
+    [
+      files,
+      homeDir,
+      language,
+      profile.introLines,
+      profile.terminal.prompt,
+      scrollToSection,
+      t.terminal,
+    ],
+  );
 
   const navLabels: Record<string, string> = {
     home: t.nav.home,
@@ -2222,45 +2240,10 @@ export default function HomeClient({
           id="home"
           className={`hero-shell ${terminalFocused ? "focused" : ""}`}>
           <div className="hero-sticky">
-            <HeroScene
-              terminalApi={terminalApi}
+            <Scene
+              texture={terminalTexture}
               scrollProgressRef={scrollProgressRef}
-              noteTexts={{ red: t.hero.noteRed, blue: t.hero.noteBlue }}
-              active={heroActive}
-              onDebugAction={handleSceneDebug}
-              onScreenAspectAction={(aspect) => {
-                if (!screenAspectReady) {
-                  setScreenAspect(aspect);
-                  setScreenAspectReady(true);
-                  setScreenAspectReadyAt(Date.now());
-                  screenAspectRef.current = aspect;
-                  pendingAspectRef.current = null;
-                  return;
-                }
-                const diff = Math.abs(aspect - screenAspectRef.current);
-                if (diff < 0.03) {
-                  return;
-                }
-                pendingAspectRef.current = aspect;
-                if (interactionActiveRef.current) {
-                  return;
-                }
-                if (screenAspectTimerRef.current) {
-                  window.clearTimeout(screenAspectTimerRef.current);
-                }
-                screenAspectTimerRef.current = window.setTimeout(() => {
-                  if (pendingAspectRef.current === null) {
-                    return;
-                  }
-                  const nextAspect = pendingAspectRef.current;
-                  pendingAspectRef.current = null;
-                  setScreenAspect(nextAspect);
-                  if (!screenAspectReady) {
-                    setScreenAspectReady(true);
-                    setScreenAspectReadyAt(Date.now());
-                  }
-                }, 140);
-              }}
+              className="hero-scene absolute-fill"
               onReadyAction={handleSceneReady}
             />
             <div className="hero-overlay">
@@ -2384,26 +2367,14 @@ export default function HomeClient({
             className={`hero-scroll-shield${heroActive ? " is-active" : ""}`}
             aria-hidden="true"
           />
-          <TerminalCanvas
-            files={files}
-            introLines={profile.introLines[language]}
-            prompt={profile.terminal.prompt}
-            language={language}
-            messages={t.terminal}
-            theme={theme}
-            isMobile={isMobile}
-            isActive={heroActive}
-            screenAspect={screenAspect}
-            scrollProgressRef={scrollProgressRef}
-            onNavigateAction={scrollToSection}
-            onReadyAction={(api) => {
-              setTerminalApi(api);
-            }}
-            onBootReadyAction={() => {
-              setTerminalBootReady(true);
-              setTerminalBootReadyAt(Date.now());
-            }}
-            onFocusChangeAction={(focused) => setTerminalFocused(focused)}
+          <Terminal
+            ref={terminalRef}
+            config={terminalConfig}
+            theme={terminalTheme}
+            active={heroActive}
+            focused={terminalFocused}
+            onFocusChange={setTerminalFocused}
+            onTextureReady={setTerminalTexture}
           />
         </section>
 

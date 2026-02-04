@@ -3486,3 +3486,24 @@ textarea {
   opacity: calc(1 - var(--content-reveal));
   transition: height 0.3s ease, opacity 0.3s ease;
 }
+
+/* Utility - Agent Added */
+.absolute-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-hidden-layer {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+
+.hidden {
+  display: none;
+}
+

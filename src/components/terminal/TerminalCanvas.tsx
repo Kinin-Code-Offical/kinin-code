@@ -5218,21 +5218,21 @@ export default function TerminalCanvas({
           }
           dirtyRef.current = true;
         }
-      } else {
-        if (freezeTimeoutRef.current) {
-          window.clearTimeout(freezeTimeoutRef.current);
-        }
-        freezeTimeoutRef.current = window.setTimeout(() => {
-          if (interactionActiveRef.current) {
-            return;
-          }
-          if (freezeTextureRef.current || pendingFreezeRef.current) {
-            freezeTextureRef.current = false;
-            pendingFreezeRef.current = false;
-            dirtyRef.current = true;
-          }
-        }, 220);
+        return;
       }
+      if (freezeTimeoutRef.current) {
+        window.clearTimeout(freezeTimeoutRef.current);
+      }
+      freezeTimeoutRef.current = window.setTimeout(() => {
+        if (interactionActiveRef.current) {
+          return;
+        }
+        if (freezeTextureRef.current || pendingFreezeRef.current) {
+          freezeTextureRef.current = false;
+          pendingFreezeRef.current = false;
+          dirtyRef.current = true;
+        }
+      }, 220);
     };
     window.addEventListener(
       "hero-interaction",

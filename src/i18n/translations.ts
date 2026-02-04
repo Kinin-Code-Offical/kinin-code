@@ -958,6 +958,7 @@ export const translations = {
         playerControlsMedia: "Space: play/pause  ←/→: seek  Q: quit",
         playerControlsImage:
           "←/→: previous/next  +/-: zoom  0: reset  Q: quit",
+        inputLabel: "Terminal input",
         sciCalc: "SCI-CALC",
         calcControls: "Arrow keys: move  Enter: select  Q: quit",
         retroFps: "HELLRUN",
