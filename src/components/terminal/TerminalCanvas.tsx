@@ -1025,6 +1025,11 @@ export default function TerminalCanvas({
       hp: number;
       cooldown: number;
       type: "raider" | "spitter" | "charger" | "brute";
+      anim: number;
+      hurt: number;
+      dead: boolean;
+      deadTimer: number;
+      seed: number;
     }>
   >([]);
   const doomPickupsRef = useRef<
@@ -1119,6 +1124,19 @@ export default function TerminalCanvas({
     spin: number;
     life: number;
   } | null>(null);
+  const doomBloodRef = useRef<
+    Array<{
+      x: number;
+      y: number;
+      z: number;
+      vx: number;
+      vy: number;
+      vz: number;
+      life: number;
+      maxLife: number;
+      size: number;
+    }>
+  >([]);
   const doomBootRef = useRef<{ start: number; duration: number } | null>(null);
   const chessBoardRef = useRef<string[][]>([]);
   const chessCursorRef = useRef<GridPoint>({ x: 0, y: 7 });
@@ -2123,6 +2141,11 @@ export default function TerminalCanvas({
         hp: number;
         cooldown: number;
         type: "raider" | "spitter" | "charger" | "brute";
+        anim: number;
+        hurt: number;
+        dead: boolean;
+        deadTimer: number;
+        seed: number;
       }> = [];
       const pickups: Array<{
         x: number;
@@ -2151,46 +2174,45 @@ export default function TerminalCanvas({
         { open: number; target: number; cooldown: number; locked?: boolean }
       > = {};
       let exit: { x: number; y: number } | null = null;
+      const makeEnemy = (
+        type: "raider" | "spitter" | "charger" | "brute",
+        hp: number,
+        x: number,
+        y: number,
+        glyph: string,
+      ) => {
+        const seed = hashString(
+          `hellrun-enemy-${clampedIndex}-${x}-${y}-${glyph}`,
+        );
+        enemies.push({
+          x: x + 0.5,
+          y: y + 0.5,
+          hp,
+          cooldown: 0,
+          type,
+          anim: ((seed % 1024) / 1024) * Math.PI * 2,
+          hurt: 0,
+          dead: false,
+          deadTimer: 0,
+          seed,
+        });
+      };
       const map = layout.map((row, y) =>
         row.split("").map((cell, x) => {
           if (cell === "E") {
-            enemies.push({
-              x: x + 0.5,
-              y: y + 0.5,
-              hp: 4,
-              cooldown: 0,
-              type: "raider",
-            });
+            makeEnemy("raider", 4, x, y, cell);
             return 0;
           }
           if (cell === "I") {
-            enemies.push({
-              x: x + 0.5,
-              y: y + 0.5,
-              hp: 3,
-              cooldown: 0,
-              type: "spitter",
-            });
+            makeEnemy("spitter", 3, x, y, cell);
             return 0;
           }
           if (cell === "Z") {
-            enemies.push({
-              x: x + 0.5,
-              y: y + 0.5,
-              hp: 5,
-              cooldown: 0,
-              type: "charger",
-            });
+            makeEnemy("charger", 5, x, y, cell);
             return 0;
           }
           if (cell === "O") {
-            enemies.push({
-              x: x + 0.5,
-              y: y + 0.5,
-              hp: 9,
-              cooldown: 0,
-              type: "brute",
-            });
+            makeEnemy("brute", 9, x, y, cell);
             return 0;
           }
           if (cell === "A") {
@@ -2286,6 +2308,7 @@ export default function TerminalCanvas({
       doomExplosionRef.current = null;
       doomBombRef.current = null;
       doomProjectilesRef.current = [];
+      doomBloodRef.current = [];
       doomHintRef.current = null;
       doomHintWindowRef.current = true;
       doomCooldownRef.current = 0;
@@ -2533,6 +2556,53 @@ export default function TerminalCanvas({
     [doomText],
   );
 
+  const spawnDoomBlood = useCallback(
+    (
+      x: number,
+      y: number,
+      opts: { count?: number; strength?: number; pool?: boolean } = {},
+    ) => {
+      const count = Math.max(0, Math.floor(opts.count ?? 6));
+      const strength = clamp(opts.strength ?? 1, 0.4, 2);
+      const blood = doomBloodRef.current;
+      for (let i = 0; i < count; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (0.015 + Math.random() * 0.05) * strength;
+        const life = Math.floor(18 + Math.random() * 18);
+        blood.push({
+          x,
+          y,
+          z: 0.05 + Math.random() * 0.35,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          vz: (0.06 + Math.random() * 0.14) * strength,
+          life,
+          maxLife: life,
+          size: clamp(0.6 + Math.random() * 0.8 * strength, 0.6, 2.2),
+        });
+      }
+      if (opts.pool) {
+        const poolLife = Math.floor(220 + Math.random() * 120);
+        blood.push({
+          x,
+          y,
+          z: 0,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          life: poolLife,
+          maxLife: poolLife,
+          size: clamp(1.4 * strength, 0.9, 2.4),
+        });
+      }
+      const cap = 140;
+      if (blood.length > cap) {
+        blood.splice(0, blood.length - cap);
+      }
+    },
+    [],
+  );
+
   const triggerDoomExplosion = useCallback(
     (
       x: number,
@@ -2574,6 +2644,9 @@ export default function TerminalCanvas({
         const enemies = doomEnemiesRef.current;
         for (let i = enemies.length - 1; i >= 0; i -= 1) {
           const enemy = enemies[i];
+          if (enemy.dead) {
+            continue;
+          }
           const dist = Math.hypot(enemy.x - next.x, enemy.y - next.y);
           if (dist > radius) {
             continue;
@@ -2581,9 +2654,21 @@ export default function TerminalCanvas({
           const scale = 1 - dist / Math.max(0.0001, radius);
           const dmg = Math.max(1, Math.round(damage * scale));
           enemy.hp -= dmg;
+          enemy.hurt = Math.max(enemy.hurt, 12);
+          const bloodStrength = clamp(dmg / 8, 0.6, 1.7);
+          spawnDoomBlood(enemy.x, enemy.y, {
+            count: Math.floor(3 + 4 * bloodStrength),
+            strength: bloodStrength,
+          });
           if (enemy.hp <= 0) {
-            enemies.splice(i, 1);
+            enemy.dead = true;
+            enemy.deadTimer = 260;
             doomScoreRef.current += opts.scorePerKill;
+            spawnDoomBlood(enemy.x, enemy.y, {
+              count: Math.floor(10 + 6 * bloodStrength),
+              strength: Math.max(1.2, bloodStrength),
+              pool: true,
+            });
           }
         }
 
@@ -2634,7 +2719,7 @@ export default function TerminalCanvas({
         }
       }
     },
-    [applyDoomPlayerDamage],
+    [applyDoomPlayerDamage, spawnDoomBlood],
   );
 
   const shootDoom = useCallback(() => {
@@ -2650,14 +2735,26 @@ export default function TerminalCanvas({
 
     const applyDamage = (index: number, damage: number) => {
       const enemy = enemies[index];
-      if (!enemy) {
+      if (!enemy || enemy.dead) {
         return false;
       }
       enemy.hp -= damage;
+      enemy.hurt = Math.max(enemy.hurt, 12);
+      const bloodStrength = clamp(damage / 3, 0.6, 1.6);
+      spawnDoomBlood(enemy.x, enemy.y, {
+        count: Math.floor(4 + 3 * bloodStrength),
+        strength: bloodStrength,
+      });
       if (enemy.hp <= 0) {
-        enemies.splice(index, 1);
+        enemy.dead = true;
+        enemy.deadTimer = 260;
         doomScoreRef.current += 1;
         doomMessageRef.current = doomText("targetDown");
+        spawnDoomBlood(enemy.x, enemy.y, {
+          count: Math.floor(12 + 6 * bloodStrength),
+          strength: Math.max(1.2, bloodStrength),
+          pool: true,
+        });
       } else {
         doomMessageRef.current = doomText("hit");
       }
@@ -2673,6 +2770,9 @@ export default function TerminalCanvas({
       let bestDist = 999;
       for (let i = 0; i < enemies.length; i += 1) {
         const enemy = enemies[i];
+        if (enemy.dead) {
+          continue;
+        }
         const dx = enemy.x - player.x;
         const dy = enemy.y - player.y;
         const dist = Math.hypot(dx, dy);
@@ -2906,7 +3006,7 @@ export default function TerminalCanvas({
     if (enemyTarget) {
       applyDamage(enemyTarget.index, 1);
     }
-  }, [castDoomDistance, doomText, triggerDoomExplosion]);
+  }, [castDoomDistance, doomText, spawnDoomBlood, triggerDoomExplosion]);
 
   const throwDoomBomb = useCallback(() => {
     if (doomGameOverRef.current) {
@@ -3112,6 +3212,39 @@ export default function TerminalCanvas({
       player.y = nextY;
     }
 
+    const blood = doomBloodRef.current;
+    for (let i = blood.length - 1; i >= 0; i -= 1) {
+      const drop = blood[i];
+      drop.life -= 1;
+      if (drop.life <= 0) {
+        blood.splice(i, 1);
+        continue;
+      }
+      if (drop.z > 0 || drop.vz !== 0) {
+        drop.vz -= 0.018;
+        drop.z += drop.vz;
+        if (drop.z <= 0) {
+          drop.z = 0;
+          drop.vz = 0;
+        }
+      }
+      const nextX = drop.x + drop.vx;
+      const nextY = drop.y + drop.vy;
+      if (!isWall(nextX, drop.y)) {
+        drop.x = nextX;
+      } else {
+        drop.vx *= -0.18;
+      }
+      if (!isWall(drop.x, nextY)) {
+        drop.y = nextY;
+      } else {
+        drop.vy *= -0.18;
+      }
+      const drag = drop.z > 0 ? 0.92 : 0.86;
+      drop.vx *= drag;
+      drop.vy *= drag;
+    }
+
     const doors = doomDoorStatesRef.current;
     Object.entries(doors).forEach(([key, door]) => {
       const [sx, sy] = key.split(",").map((value) => Number(value));
@@ -3262,6 +3395,9 @@ export default function TerminalCanvas({
           let hit = false;
           for (let e = 0; e < enemies.length; e += 1) {
             const enemy = enemies[e];
+            if (enemy.dead) {
+              continue;
+            }
             if (
               Math.hypot(enemy.x - projectile.x, enemy.y - projectile.y) < 0.25
             ) {
@@ -3307,7 +3443,19 @@ export default function TerminalCanvas({
       );
       return wallDist + 0.05 >= dist;
     };
-    enemies.forEach((enemy, index) => {
+    for (let index = 0; index < enemies.length; index += 1) {
+      const enemy = enemies[index];
+      if (enemy.hurt > 0) {
+        enemy.hurt -= 1;
+      }
+      if (enemy.dead) {
+        enemy.deadTimer -= 1;
+        if (enemy.deadTimer <= 0) {
+          enemies.splice(index, 1);
+          index -= 1;
+        }
+        continue;
+      }
       if (enemy.cooldown > 0) {
         enemy.cooldown -= 1;
       }
@@ -3315,7 +3463,7 @@ export default function TerminalCanvas({
       const dy = player.y - enemy.y;
       const dist = Math.hypot(dx, dy);
       if (dist < 0.0001) {
-        return;
+        continue;
       }
       const inv = 1 / Math.max(0.0001, dist);
       const dirX = dx * inv;
@@ -3382,7 +3530,8 @@ export default function TerminalCanvas({
           enemy.cooldown = meleeCooldown;
           applyDoomPlayerDamage(meleeDamage, 2);
         }
-        return;
+        enemy.anim = (enemy.anim + 0.06) % (Math.PI * 2);
+        continue;
       }
 
       if (
@@ -3409,6 +3558,8 @@ export default function TerminalCanvas({
         enemy.cooldown = shootCooldown;
       }
 
+      const prevX = enemy.x;
+      const prevY = enemy.y;
       const sideX = -dirY;
       const sideY = dirX;
       const moveX = dirX + sideX * strafe;
@@ -3422,8 +3573,10 @@ export default function TerminalCanvas({
       if (!isWall(enemy.x, ny)) {
         enemy.y = ny;
       }
-    });
-    if (!enemies.length) {
+      const moved = Math.hypot(enemy.x - prevX, enemy.y - prevY);
+      enemy.anim = (enemy.anim + moved * 22 + 0.02) % (Math.PI * 2);
+    }
+    if (!enemies.some((enemy) => !enemy.dead)) {
       doomMessageRef.current = doomText("clear");
     }
   }, [
@@ -7352,7 +7505,8 @@ export default function TerminalCanvas({
       if (mode === "editor") {
         const pad = Math.floor(Math.min(width, height) * 0.1);
         const boxW = width - pad * 2;
-        const boxH = height - pad * 2;
+        const commandsArea = Math.max(24, Math.floor(lineHeight * 1.4));
+        const boxH = height - pad * 2 - commandsArea;
         const headerHeight = Math.floor(lineHeight * 1.2) + 8;
         const footerHeight = Math.floor(lineHeight * 1.6) + 10;
         const textAreaY = pad + headerHeight;
@@ -7528,28 +7682,18 @@ export default function TerminalCanvas({
         ctx.fillStyle = dim;
         ctx.fillText(safeStatus, pad + 12, statusY + lineHeight);
 
-        const helpText =
-          language === "tr"
-            ? "^G Yardım  ^S Kaydet  ^Q Çıkış  ^W Komut  : komut"
-            : "^G Help  ^S Save  ^Q Quit  ^W Command  : cmd";
+        const helpText = messages.editor.help;
         const footerFont = Math.max(9, Math.floor(fontSize * 0.7));
         ctx.font = `${footerFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-        const helpY = pad + boxH - Math.max(8, Math.floor(footerFont * 0.6));
+        const helpY =
+          pad +
+          boxH +
+          Math.max(8, Math.floor((commandsArea - footerFont) * 0.6));
         const helpMaxW = boxW - 24;
-        if (helpMaxW > 240) {
+        if (helpMaxW > 160) {
           const safeHelp = trimToWidth(helpText, helpMaxW);
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(
-            pad + 6,
-            pad + boxH - footerHeight + 4,
-            boxW - 12,
-            footerHeight - 8,
-          );
-          ctx.clip();
           ctx.fillStyle = dim;
           ctx.fillText(safeHelp, pad + 12, helpY);
-          ctx.restore();
         }
 
         ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
@@ -7567,7 +7711,8 @@ export default function TerminalCanvas({
       } else if (mode === "player") {
         const pad = Math.floor(Math.min(width, height) * 0.12);
         const boxW = width - pad * 2;
-        const boxH = height - pad * 2;
+        const controlsArea = Math.max(28, Math.floor(headerSize * 1.6));
+        const boxH = height - pad * 2 - controlsArea;
         ctx.strokeStyle = dim;
         ctx.lineWidth = 2;
         ctx.strokeRect(pad, pad, boxW, boxH);
@@ -7643,12 +7788,8 @@ export default function TerminalCanvas({
             ? messages.ui.playerControlsImage
             : messages.ui.playerControlsMedia;
         const controlsGapStart = pad + boxH;
-        const controlsGapEnd = height - pad;
-        const controlsOffset = Math.max(18, Math.floor(headerSize * 1.4));
-        const controlsY = Math.min(
-          controlsGapEnd - 6,
-          Math.floor(controlsGapStart + controlsOffset),
-        );
+        const controlsOffset = Math.max(18, Math.floor(controlsArea * 0.7));
+        const controlsY = Math.floor(controlsGapStart + controlsOffset);
         ctx.fillText(controlsText, pad + 12, controlsY);
       } else if (mode === "calc") {
         const pad = Math.floor(Math.min(width, height) * 0.12);
@@ -8331,6 +8472,96 @@ export default function TerminalCanvas({
             }
           };
 
+          const bloodDrops = doomBloodRef.current.slice().sort((a, b) => {
+            const da = Math.hypot(a.x - player.x, a.y - player.y);
+            const db = Math.hypot(b.x - player.x, b.y - player.y);
+            return db - da;
+          });
+          const maxBlood =
+            perfTier === "low" ? 30 : perfTier === "mid" ? 50 : 70;
+          bloodDrops.slice(0, maxBlood).forEach((drop) => {
+            const dx = drop.x - player.x;
+            const dy = drop.y - player.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 0.2 || dist > 12) {
+              return;
+            }
+            const angle = Math.atan2(dy, dx);
+            const delta = Math.atan2(
+              Math.sin(angle - player.angle),
+              Math.cos(angle - player.angle),
+            );
+            if (Math.abs(delta) > fov * 0.65) {
+              return;
+            }
+            const screenX = viewX + (0.5 + delta / fov) * Math.max(1, viewW);
+            const column = Math.floor((screenX - viewX) / colWidth);
+            if (column < 0 || column >= wallDistances.length) {
+              return;
+            }
+            if (dist >= wallDistances[column]) {
+              return;
+            }
+            const baseH = Math.min(viewH, Math.floor(viewH / dist));
+            const floorY = Math.floor(viewY + (viewH + baseH) / 2 + cameraBob);
+            const zLift = clamp(drop.z, 0, 1.2) * baseH * 0.55;
+            const y = floorY - zLift - 2;
+            const size = clamp(Math.floor(baseH * 0.08 * drop.size), 2, 18);
+            const t = clamp(drop.life / Math.max(1, drop.maxLife), 0, 1);
+            const baseAlpha = drop.z > 0 ? 0.6 : 0.42;
+            const alpha = baseAlpha * (drop.z > 0 ? t : Math.pow(t, 0.65));
+            if (alpha <= 0.01) {
+              return;
+            }
+
+            const drawBlood = () => {
+              ctx.fillStyle = `rgba(214,115,91,${alpha})`;
+              ctx.beginPath();
+              ctx.ellipse(
+                screenX,
+                y,
+                size * 0.55,
+                size * (drop.z > 0 ? 0.55 : 0.28),
+                0,
+                0,
+                Math.PI * 2,
+              );
+              ctx.fill();
+              if (drop.z > 0) {
+                ctx.fillStyle = `rgba(246,194,122,${0.12 * alpha})`;
+                ctx.beginPath();
+                ctx.arc(
+                  screenX - size * 0.12,
+                  y - size * 0.1,
+                  size * 0.12,
+                  0,
+                  Math.PI * 2,
+                );
+                ctx.fill();
+              }
+            };
+
+            const doorDist = doorDistances[column] ?? 0;
+            const doorClipY = doorBandBottoms[column] ?? 0;
+            const behindDoor =
+              doorDist > 0 && dist > doorDist + 0.02 && doorClipY > 0;
+            if (behindDoor) {
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(
+                viewX,
+                doorClipY,
+                viewW,
+                Math.max(0, viewY + viewH - doorClipY),
+              );
+              ctx.clip();
+              drawBlood();
+              ctx.restore();
+              return;
+            }
+            drawBlood();
+          });
+
           const props = doomPropsRef.current.slice();
           const pickups = doomPickupsRef.current;
           const sprites = [
@@ -8535,6 +8766,11 @@ export default function TerminalCanvas({
               const bodyW = Math.floor(spriteW * 0.78);
               const headW = Math.floor(spriteW * 0.52);
               const left = Math.floor(screenX - spriteW / 2);
+              const dead = enemy.dead;
+              const hurt = clamp(enemy.hurt / 12, 0, 1);
+              const walk = enemy.anim;
+              const stride = Math.sin(walk * 2);
+              const bob = dead ? 0 : Math.sin(walk) * 2;
               let body = `rgb(${clampC(base + 40)}, ${clampC(base)}, ${clampC(
                 base - 20,
               )})`;
@@ -8580,75 +8816,136 @@ export default function TerminalCanvas({
                 eye = "#f4d35e";
               }
 
+              if (dead) {
+                const poolW = spriteW * (enemy.type === "brute" ? 0.55 : 0.46);
+                const poolH = Math.max(3, Math.floor(spriteH * 0.055));
+                ctx.fillStyle = "rgba(214,115,91,0.38)";
+                ctx.beginPath();
+                ctx.ellipse(
+                  screenX,
+                  floorY - 2,
+                  poolW,
+                  poolH,
+                  0,
+                  0,
+                  Math.PI * 2,
+                );
+                ctx.fill();
+
+                const corpseH = Math.max(10, Math.floor(spriteH * 0.22));
+                const corpseW = Math.max(14, Math.floor(spriteW * 0.86));
+                const corpseX = left + Math.floor((spriteW - corpseW) / 2);
+                const corpseY = floorY - corpseH - 4;
+                ctx.fillStyle = body;
+                ctx.fillRect(
+                  corpseX,
+                  corpseY,
+                  corpseW,
+                  Math.floor(corpseH * 0.62),
+                );
+                ctx.fillStyle = head;
+                ctx.fillRect(
+                  corpseX + Math.floor(corpseW * 0.62),
+                  corpseY + Math.floor(corpseH * 0.08),
+                  Math.floor(corpseW * 0.22),
+                  Math.floor(corpseH * 0.32),
+                );
+                ctx.fillStyle = "rgba(0,0,0,0.22)";
+                ctx.fillRect(
+                  corpseX + Math.floor(corpseW * 0.18),
+                  corpseY + Math.floor(corpseH * 0.42),
+                  Math.floor(corpseW * 0.55),
+                  Math.max(2, Math.floor(corpseH * 0.08)),
+                );
+                return;
+              }
+
               ctx.fillStyle = body;
               ctx.fillRect(
                 left + Math.floor((spriteW - bodyW) / 2),
-                top + Math.floor(spriteH * 0.26),
+                top + Math.floor(spriteH * 0.28 + bob),
                 bodyW,
                 Math.floor(spriteH * 0.6),
               );
               ctx.fillStyle = head;
               ctx.fillRect(
                 left + Math.floor((spriteW - headW) / 2),
-                top + Math.floor(spriteH * 0.1),
+                top + Math.floor(spriteH * 0.12 + bob),
                 headW,
                 Math.floor(spriteH * 0.18),
               );
               ctx.fillStyle = eye;
               ctx.fillRect(
                 left + Math.floor(spriteW * 0.38),
-                top + Math.floor(spriteH * 0.18),
+                top + Math.floor(spriteH * 0.2 + bob),
                 Math.max(2, Math.floor(spriteW * 0.08)),
                 Math.max(2, Math.floor(spriteH * 0.06)),
               );
               ctx.fillRect(
                 left + Math.floor(spriteW * 0.56),
-                top + Math.floor(spriteH * 0.18),
+                top + Math.floor(spriteH * 0.2 + bob),
                 Math.max(2, Math.floor(spriteW * 0.08)),
                 Math.max(2, Math.floor(spriteH * 0.06)),
               );
               ctx.fillStyle = limb;
               ctx.fillRect(
                 left + Math.floor(spriteW * 0.02),
-                top + Math.floor(spriteH * 0.4),
+                top + Math.floor(spriteH * (0.42 + stride * 0.02) + bob),
                 Math.floor(spriteW * 0.18),
                 Math.floor(spriteH * 0.28),
               );
               ctx.fillRect(
                 left + Math.floor(spriteW * 0.8),
-                top + Math.floor(spriteH * 0.4),
+                top + Math.floor(spriteH * (0.42 - stride * 0.02) + bob),
                 Math.floor(spriteW * 0.18),
                 Math.floor(spriteH * 0.28),
+              );
+              const legW = Math.floor(spriteW * 0.18);
+              const legH = Math.floor(spriteH * 0.22);
+              const legY = top + Math.floor(spriteH * 0.78 + bob);
+              const liftA = Math.max(0, -stride) * Math.floor(spriteH * 0.06);
+              const liftB = Math.max(0, stride) * Math.floor(spriteH * 0.06);
+              ctx.fillRect(
+                left + Math.floor(spriteW * 0.3),
+                Math.floor(legY + liftA),
+                legW,
+                Math.max(2, Math.floor(legH - liftA)),
+              );
+              ctx.fillRect(
+                left + Math.floor(spriteW * 0.54),
+                Math.floor(legY + liftB),
+                legW,
+                Math.max(2, Math.floor(legH - liftB)),
               );
               if (enemy.type === "charger") {
                 ctx.fillStyle = "#f4d35e";
                 ctx.beginPath();
                 ctx.moveTo(
                   left + Math.floor(spriteW * 0.22),
-                  top + Math.floor(spriteH * 0.1),
+                  top + Math.floor(spriteH * 0.12 + bob),
                 );
                 ctx.lineTo(
                   left + Math.floor(spriteW * 0.34),
-                  top + Math.floor(spriteH * 0.04),
+                  top + Math.floor(spriteH * 0.06 + bob),
                 );
                 ctx.lineTo(
                   left + Math.floor(spriteW * 0.4),
-                  top + Math.floor(spriteH * 0.12),
+                  top + Math.floor(spriteH * 0.14 + bob),
                 );
                 ctx.closePath();
                 ctx.fill();
                 ctx.beginPath();
                 ctx.moveTo(
                   left + Math.floor(spriteW * 0.78),
-                  top + Math.floor(spriteH * 0.1),
+                  top + Math.floor(spriteH * 0.12 + bob),
                 );
                 ctx.lineTo(
                   left + Math.floor(spriteW * 0.66),
-                  top + Math.floor(spriteH * 0.04),
+                  top + Math.floor(spriteH * 0.06 + bob),
                 );
                 ctx.lineTo(
                   left + Math.floor(spriteW * 0.6),
-                  top + Math.floor(spriteH * 0.12),
+                  top + Math.floor(spriteH * 0.14 + bob),
                 );
                 ctx.closePath();
                 ctx.fill();
@@ -8656,7 +8953,7 @@ export default function TerminalCanvas({
                 ctx.fillStyle = "rgba(0,0,0,0.18)";
                 ctx.fillRect(
                   left + Math.floor(spriteW * 0.42),
-                  top + Math.floor(spriteH * 0.26),
+                  top + Math.floor(spriteH * 0.28 + bob),
                   Math.floor(spriteW * 0.16),
                   Math.floor(spriteH * 0.12),
                 );
@@ -8664,10 +8961,14 @@ export default function TerminalCanvas({
                 ctx.fillStyle = "rgba(0,0,0,0.24)";
                 ctx.fillRect(
                   left + Math.floor(spriteW * 0.2),
-                  top + Math.floor(spriteH * 0.22),
+                  top + Math.floor(spriteH * 0.24 + bob),
                   Math.floor(spriteW * 0.6),
                   Math.floor(spriteH * 0.08),
                 );
+              }
+              if (hurt > 0.001) {
+                ctx.fillStyle = `rgba(214,115,91,${0.28 * hurt})`;
+                ctx.fillRect(left, top, spriteW, spriteH);
               }
             };
 

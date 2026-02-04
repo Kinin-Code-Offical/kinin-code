@@ -145,8 +145,7 @@ export const translations = {
         lineNumbersOn: "edit: satir numaralari acik",
         lineNumbersOff: "edit: satir numaralari kapali",
         usageSet: "edit: kullanim :set nu|nonu",
-        help:
-          "Komutlar: :w :wq :q :q! :w <file> :set nu|nonu :p :help | N: <text> | :d N | :i N <text>",
+        help: ":w :wq :q ...",
         invalidLineNumber: "edit: gecersiz satir numarasi",
         lineDeleted: "edit: satir {line} silindi",
         lineInserted: "edit: satir {line} eklendi",
@@ -446,8 +445,7 @@ export const translations = {
         lineNumbersOn: "edit: line numbers on",
         lineNumbersOff: "edit: line numbers off",
         usageSet: "edit: usage :set nu|nonu",
-        help:
-          "Commands: :w :wq :q :q! :w <file> :set nu|nonu :p :help | N: <text> | :d N | :i N <text>",
+        help: ":w :wq :q ...",
         invalidLineNumber: "edit: invalid line number",
         lineDeleted: "edit: line {line} deleted",
         lineInserted: "edit: line {line} inserted",
