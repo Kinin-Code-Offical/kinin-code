@@ -2110,15 +2110,15 @@ textarea {
   
   .featured-track {
     /* Track yüksekliğini artır ki kartlar sığsın */
-    min-height: 560px;
+    min-height: 480px;
     place-items: center;
     justify-content: center;
   }
 
   .featured-card {
     /* Çok dikey form, ince uzun */
-    min-height: 540px;
-    padding: 24px 20px;
+    min-height: 430px;
+    padding: 22px 18px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -2132,8 +2132,8 @@ textarea {
   
   .featured-summary {
     /* Mobilde açıklamayı biraz kısalt */
-    -webkit-line-clamp: 5;
-    line-clamp: 5;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
     font-size: 14px;
   }
 
@@ -2146,6 +2146,20 @@ textarea {
   /* Mobilde ortalamayı garantiye al */
   .featured-track {
     place-items: center;
+    justify-content: center;
+  }
+
+  .featured-controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: min(92vw, 360px);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .featured-controls .featured-dots {
     justify-content: center;
   }
 }
@@ -3207,14 +3221,14 @@ textarea {
 
   .featured-slider {
     width: 100vw;
-    --featured-card-width: min(340px, 72vw);
-    --featured-offset-1: 60vw;
-    --featured-offset-2: 120vw;
+    --featured-card-width: clamp(300px, 72vw, 420px);
+    --featured-offset-1: clamp(180px, 26vw, 220px);
+    --featured-offset-2: calc(var(--featured-offset-1) * 2);
     --featured-center-nudge: 0px;
   }
 
   .featured-track {
-    min-height: clamp(420px, 58vh, 620px);
+    min-height: 480px;
     padding: 12px 0 24px;
     place-items: center;
   }
@@ -3235,7 +3249,7 @@ textarea {
 
   .featured-card {
     padding: 22px 20px;
-    min-height: clamp(420px, 56vh, 560px);
+    min-height: 430px;
     box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
   }
 
@@ -3245,10 +3259,11 @@ textarea {
   }
 
   .featured-summary {
-    display: block;
-    -webkit-line-clamp: unset;
-    line-clamp: unset;
-    max-height: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .featured-stack {
@@ -3269,19 +3284,16 @@ textarea {
   }
 
   .featured-controls {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: min(420px, 86vw);
+    gap: 10px;
+    width: min(92vw, 360px);
     margin: 0 auto;
   }
 
   .featured-controls .featured-dots {
     margin: 0;
-    gap: 6px;
-    flex-basis: 100%;
     justify-content: center;
   }
 

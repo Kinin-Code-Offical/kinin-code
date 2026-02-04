@@ -9523,8 +9523,8 @@ export default function TerminalCanvas({
           );
         }
 
-        const labelFont = Math.max(9, Math.floor(hudHeight * 0.16));
-        const valueFont = Math.max(14, Math.floor(hudHeight * 0.33));
+        const labelFont = Math.max(8, Math.floor(hudHeight * 0.14));
+        const valueFont = Math.max(12, Math.floor(hudHeight * 0.15));
         const labelY = hudY + Math.floor(hudHeight * 0.14);
         const valueY = hudY + Math.floor(hudHeight * 0.4);
         const statPad = Math.floor(sectionPadding * 0.4);
@@ -9580,7 +9580,7 @@ export default function TerminalCanvas({
         ctx.fillStyle = "#f4d35e";
         ctx.fillText(String(bombs).padStart(2, "0"), bombsX + statPad, valueY);
 
-        ctx.font = `${Math.max(9, Math.floor(hudHeight * 0.16))}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.font = `${Math.max(8, Math.floor(hudHeight * 0.13))}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillStyle = "rgba(255,255,255,0.55)";
         const weaponKeyMap: Record<string, string> = {
           fist: "weaponFist",
