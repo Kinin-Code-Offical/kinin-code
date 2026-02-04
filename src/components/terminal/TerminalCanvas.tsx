@@ -1112,8 +1112,11 @@ export default function TerminalCanvas({
     active: boolean;
     x: number;
     y: number;
+    z: number;
     vx: number;
     vy: number;
+    vz: number;
+    spin: number;
     life: number;
   } | null>(null);
   const doomBootRef = useRef<{ start: number; duration: number } | null>(null);
@@ -2921,9 +2924,12 @@ export default function TerminalCanvas({
       active: true,
       x: player.x + dirX * 0.3,
       y: player.y + dirY * 0.3,
+      z: 0.25,
       vx: dirX * 0.18,
       vy: dirY * 0.18,
-      life: 42,
+      vz: 0.18,
+      spin: Math.random() * Math.PI * 2,
+      life: 52,
     };
     doomMessageRef.current = doomText("boom");
   }, [doomText]);
@@ -3175,11 +3181,50 @@ export default function TerminalCanvas({
 
     const bomb = doomBombRef.current;
     if (bomb?.active) {
-      bomb.x += bomb.vx;
-      bomb.y += bomb.vy;
       bomb.life -= 1;
-      const hitWall = isWall(bomb.x, bomb.y);
-      if (bomb.life <= 0 || hitWall) {
+      const gravity = 0.028;
+      bomb.vz -= gravity;
+
+      const airDrag = bomb.z > 0 ? 0.995 : 0.92;
+      bomb.vx *= airDrag;
+      bomb.vy *= airDrag;
+
+      const radius = 0.16;
+      let nextX = bomb.x + bomb.vx;
+      let nextY = bomb.y + bomb.vy;
+      const hitX =
+        isWall(nextX + radius, bomb.y) || isWall(nextX - radius, bomb.y);
+      if (hitX) {
+        bomb.vx = -bomb.vx * 0.55;
+        bomb.vy *= 0.75;
+        nextX = bomb.x;
+      }
+      const hitY =
+        isWall(bomb.x, nextY + radius) || isWall(bomb.x, nextY - radius);
+      if (hitY) {
+        bomb.vy = -bomb.vy * 0.55;
+        bomb.vx *= 0.75;
+        nextY = bomb.y;
+      }
+      bomb.x = nextX;
+      bomb.y = nextY;
+
+      bomb.z += bomb.vz;
+      if (bomb.z <= 0) {
+        bomb.z = 0;
+        if (bomb.vz < -0.08) {
+          bomb.vz = -bomb.vz * 0.48;
+          bomb.vx *= 0.82;
+          bomb.vy *= 0.82;
+        } else {
+          bomb.vz = 0;
+        }
+      }
+
+      const planarSpeed = Math.hypot(bomb.vx, bomb.vy);
+      bomb.spin += planarSpeed * 6 + (bomb.vz + 0.1) * 0.8;
+
+      if (bomb.life <= 0) {
         doomBombRef.current = null;
         triggerDoomExplosion(bomb.x, bomb.y, {
           radius: 2.6,
@@ -7597,7 +7642,14 @@ export default function TerminalCanvas({
           playerMode === "image"
             ? messages.ui.playerControlsImage
             : messages.ui.playerControlsMedia;
-        ctx.fillText(controlsText, pad + 12, pad + boxH + 6);
+        const controlsGapStart = pad + boxH;
+        const controlsGapEnd = height - pad;
+        const controlsOffset = Math.max(18, Math.floor(headerSize * 1.4));
+        const controlsY = Math.min(
+          controlsGapEnd - 6,
+          Math.floor(controlsGapStart + controlsOffset),
+        );
+        ctx.fillText(controlsText, pad + 12, controlsY);
       } else if (mode === "calc") {
         const pad = Math.floor(Math.min(width, height) * 0.12);
         const boxW = width - pad * 2;
@@ -7809,7 +7861,11 @@ export default function TerminalCanvas({
               const dist = Math.hypot(dx, dy);
               const radius = 2.2;
               if (dist < radius) {
-                const t = (1 - dist / radius) * 0.22;
+                const fuse = clamp(1 - bomb.life / 52, 0, 1);
+                const flicker =
+                  0.75 + 0.25 * Math.sin(now / 70 + bomb.spin * 0.6);
+                const intensity = (0.14 + 0.18 * fuse) * flicker;
+                const t = (1 - dist / radius) * intensity;
                 boost += t;
                 hot += t * 0.6;
                 warm += t * 0.3;
@@ -8773,23 +8829,85 @@ export default function TerminalCanvas({
               if (Math.abs(delta) <= fov * 0.7) {
                 const screenX =
                   viewX + (0.5 + delta / fov) * Math.max(1, viewW);
+                const column = Math.floor((screenX - viewX) / colWidth);
+                if (column < 0 || column >= wallDistances.length) {
+                  return;
+                }
+                if (dist >= wallDistances[column]) {
+                  return;
+                }
+
                 const spriteH = Math.min(viewH, Math.floor(viewH / dist));
-                const size = Math.min(
-                  Math.floor(viewH * 0.18),
-                  Math.max(6, Math.floor(spriteH * 0.15)),
+                const size = clamp(Math.floor(spriteH * 0.18), 10, 26);
+                const floorY = Math.floor(
+                  viewY + (viewH + spriteH) / 2 + cameraBob,
                 );
-                const top = Math.floor(viewY + (viewH - size) / 2);
-                ctx.fillStyle = "#f4d35e";
+                const zLift = clamp(bomb.z, 0, 1.2) * spriteH * 0.55;
+                const bottomY = floorY - zLift;
+                const top = Math.floor(bottomY - size);
+
+                const shadowScale = clamp(1 - bomb.z * 0.7, 0.25, 1);
+                ctx.fillStyle = `rgba(0,0,0,${0.32 * shadowScale})`;
                 ctx.beginPath();
-                ctx.arc(screenX, top + size * 0.6, size * 0.4, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = "rgba(214,115,91,0.65)";
-                ctx.fillRect(
-                  screenX - size * 0.5,
-                  top + size * 0.55,
-                  size,
-                  size * 0.25,
+                ctx.ellipse(
+                  screenX,
+                  floorY - 2,
+                  size * 0.42 * shadowScale,
+                  size * 0.16 * shadowScale,
+                  0,
+                  0,
+                  Math.PI * 2,
                 );
+                ctx.fill();
+
+                const cx = screenX;
+                const cy = top + size * 0.62;
+                const r = size * 0.38;
+                ctx.fillStyle = "rgba(111,214,141,0.9)";
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = "rgba(0,0,0,0.28)";
+                ctx.lineWidth = Math.max(1, Math.floor(size * 0.08));
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+
+                const stripeAngle = bomb.spin;
+                const sx = Math.cos(stripeAngle) * r * 0.85;
+                const sy = Math.sin(stripeAngle) * r * 0.35;
+                ctx.strokeStyle = "rgba(0,0,0,0.24)";
+                ctx.lineWidth = Math.max(1, Math.floor(size * 0.12));
+                ctx.beginPath();
+                ctx.moveTo(cx - sx, cy - sy);
+                ctx.lineTo(cx + sx, cy + sy);
+                ctx.stroke();
+
+                ctx.fillStyle = "rgba(244,211,94,0.9)";
+                ctx.fillRect(
+                  Math.floor(cx - size * 0.08),
+                  Math.floor(top + size * 0.12),
+                  Math.max(2, Math.floor(size * 0.16)),
+                  Math.max(2, Math.floor(size * 0.22)),
+                );
+                ctx.fillStyle = "rgba(255,255,255,0.28)";
+                ctx.beginPath();
+                ctx.arc(cx - r * 0.35, cy - r * 0.25, r * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+
+                const fuseT = clamp(bomb.life / 52, 0, 1);
+                const spark = 0.5 + 0.5 * Math.sin(now / 55 + bomb.spin * 0.6);
+                const sparkAlpha = clamp((1 - fuseT) * 0.9, 0.1, 0.9) * spark;
+                ctx.fillStyle = `rgba(246,194,122,${sparkAlpha})`;
+                ctx.beginPath();
+                ctx.arc(
+                  cx + Math.sin(bomb.spin) * r * 0.25,
+                  top + size * 0.06,
+                  Math.max(1, Math.floor(size * 0.12)),
+                  0,
+                  Math.PI * 2,
+                );
+                ctx.fill();
               }
             }
           }
