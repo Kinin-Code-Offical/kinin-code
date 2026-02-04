@@ -47,7 +47,7 @@
   --terminal-dim: #b87d3f;
   --content-bg: #f0e0c6;
   --content-bg-alt: #f7eed9;
-  --reveal-bg: var(--hero-bg-mid);
+  --reveal-bg: var(--hero-bg-deep);
   --content-ink: #2a1b0f;
   --content-muted: #8b6a46;
   --content-border: rgba(216, 131, 40, 0.35);
@@ -1769,7 +1769,17 @@ textarea {
 }
 
 .section {
+  position: relative;
+  isolation: isolate;
   padding: clamp(72px, 10vw, 120px) clamp(18px, 8vw, 140px);
+  background: var(--section-bg, var(--content-bg));
+}
+
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   background:
     radial-gradient(
       circle at 10% 10%,
@@ -1789,6 +1799,11 @@ textarea {
     var(--section-bg, var(--content-bg));
 }
 
+.section > * {
+  position: relative;
+  z-index: 1;
+}
+
 .site-content > section.section {
   --section-bg: var(--content-bg);
   --section-overlay-a: rgba(var(--hero-accent-rgb), 0.12);
@@ -1806,7 +1821,7 @@ textarea {
 }
 
 .site-content > #projects.section {
-  background: transparent;
+  background: var(--section-bg, var(--content-bg));
 }
 
 .section-inner {
@@ -2087,16 +2102,23 @@ textarea {
 
 @media (max-width: 768px) {
   .featured-slider {
-    /* Mobilde kartları daha da incelt (daha dikey form) */
-    --featured-card-width: 72vw;
-    /* Kartların birbirine açıklığını ayarla */
-    --featured-offset-1: 65vw;
+    /* Mobilde kartları çok daha incelt (Instagram Story oranı gibi) */
+    --featured-card-width: 65vw;
+    /* Yan kartları uzağa at */
+    --featured-offset-1: 70vw;
+  }
+  
+  .featured-track {
+    /* Track yüksekliğini artır ki kartlar sığsın */
+    min-height: 560px;
+    place-items: center;
+    justify-content: center;
   }
 
   .featured-card {
-    /* Dikey oranı artır, daha modern mobil kart görünümü */
-    min-height: 520px;
-    padding: 28px 24px;
+    /* Çok dikey form, ince uzun */
+    min-height: 540px;
+    padding: 24px 20px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -3051,14 +3073,29 @@ textarea {
 }
 
 .site-footer {
+  position: relative;
+  isolation: isolate;
   padding: 48px clamp(18px, 8vw, 140px) 72px;
+  background: var(--content-bg);
+  border-top: 1px solid var(--content-border);
+}
+
+.site-footer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   background: radial-gradient(
       circle at 10% 0%,
       rgba(var(--hero-accent-rgb), 0.08),
       transparent 55%
     ),
     var(--content-bg);
-  border-top: 1px solid var(--content-border);
+}
+
+.site-footer > * {
+  position: relative;
+  z-index: 1;
 }
 
 .footer-inner {
@@ -3170,15 +3207,16 @@ textarea {
 
   .featured-slider {
     width: 100vw;
-    --featured-card-width: min(380px, 86vw);
-    --featured-offset-1: 22vw;
-    --featured-offset-2: 44vw;
+    --featured-card-width: min(340px, 72vw);
+    --featured-offset-1: 60vw;
+    --featured-offset-2: 120vw;
     --featured-center-nudge: 0px;
   }
 
   .featured-track {
-    min-height: clamp(300px, 42vh, 520px);
-    padding: 6px 0 18px;
+    min-height: clamp(420px, 58vh, 620px);
+    padding: 12px 0 24px;
+    place-items: center;
   }
 
   .featured-item {
@@ -3196,8 +3234,8 @@ textarea {
   }
 
   .featured-card {
-    padding: 20px;
-    min-height: clamp(240px, 34vh, 320px);
+    padding: 22px 20px;
+    min-height: clamp(420px, 56vh, 560px);
     box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
   }
 
@@ -3231,18 +3269,20 @@ textarea {
   }
 
   .featured-controls {
-    display: grid;
-    grid-template-columns: 40px 1fr 40px;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-items: center;
-    gap: 12px;
-    width: min(520px, 92vw);
+    justify-content: center;
+    gap: 6px;
+    width: min(420px, 86vw);
     margin: 0 auto;
   }
 
   .featured-controls .featured-dots {
     margin: 0;
-    gap: 8px;
+    gap: 6px;
+    flex-basis: 100%;
+    justify-content: center;
   }
 
   .featured-dot {
@@ -3252,8 +3292,8 @@ textarea {
   }
 
   .featured-arrow {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
   }
 
   .featured-ghost {
@@ -3290,10 +3330,6 @@ textarea {
     width: 100%;
   }
 
-  .featured-arrow {
-    width: 34px;
-    height: 34px;
-  }
 
   .featured-steps {
     display: none;
@@ -3396,9 +3432,16 @@ textarea {
     animation: none;
   }
 
-  .hero-shell,
-  .section {
+  .hero-shell {
     background: var(--content-bg);
+  }
+
+  .section {
+    background: var(--section-bg, var(--content-bg));
+  }
+
+  .site-content > #projects.section {
+    background: none;
   }
 
   body::after {
@@ -3425,7 +3468,7 @@ textarea {
   right: 0;
   height: calc(100vh * (1 - var(--content-reveal)));
   z-index: 1;
-  background: transparent;
+  background: none;
   pointer-events: none;
   touch-action: pan-y;
   opacity: calc(1 - var(--content-reveal));

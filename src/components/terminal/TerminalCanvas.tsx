@@ -7277,6 +7277,28 @@ export default function TerminalCanvas({
         const lineNumberWidth = state.showLineNumbers
           ? (maxLineDigits + 2) * charWidth
           : 0;
+        const textAreaWidth = Math.max(1, boxW - 24 - lineNumberWidth);
+        const maxCharsPerLine = Math.max(
+          1,
+          Math.floor(textAreaWidth / charWidth),
+        );
+        const wrapEditorLine = (text: string) => {
+          if (!text) {
+            return [{ text: "", start: 0, end: 0 }];
+          }
+          const segments: { text: string; start: number; end: number }[] = [];
+          let cursor = 0;
+          while (cursor < text.length) {
+            const sliceEnd = Math.min(cursor + maxCharsPerLine, text.length);
+            segments.push({
+              text: text.slice(cursor, sliceEnd),
+              start: cursor,
+              end: sliceEnd,
+            });
+            cursor = sliceEnd;
+          }
+          return segments;
+        };
 
         updateEditorScroll(visibleLines);
         const top = clamp(
@@ -7296,50 +7318,66 @@ export default function TerminalCanvas({
         ctx.rect(pad + 6, textAreaY, boxW - 12, textAreaH);
         ctx.clip();
 
-        for (let i = 0; i < visibleLines; i += 1) {
-          const lineIndex = top + i;
-          if (lineIndex >= state.buffer.length) {
-            continue;
-          }
+        let displayRow = 0;
+        for (
+          let lineIndex = top;
+          lineIndex < state.buffer.length && displayRow < visibleLines;
+          lineIndex += 1
+        ) {
           const line = state.buffer[lineIndex] ?? "";
-          const y = textAreaY + i * lineHeight;
-          if (state.showLineNumbers) {
-            ctx.fillStyle = dim;
-            const numberText = String(lineIndex + 1).padStart(maxLineDigits);
-            ctx.fillText(numberText, pad + 12, y);
-          }
+          const segments = wrapEditorLine(line);
+          for (let segIndex = 0; segIndex < segments.length; segIndex += 1) {
+            if (displayRow >= visibleLines) {
+              break;
+            }
+            const segment = segments[segIndex];
+            const y = textAreaY + displayRow * lineHeight;
+            const textX = pad + 12 + lineNumberWidth;
 
-          const textX = pad + 12 + lineNumberWidth;
-          ctx.fillStyle = accent;
-          ctx.fillText(line, textX, y);
+            if (state.showLineNumbers && segIndex === 0) {
+              ctx.fillStyle = dim;
+              const numberText = String(lineIndex + 1).padStart(maxLineDigits);
+              ctx.fillText(numberText, pad + 12, y);
+            }
 
-          if (selection) {
-            const { start, end } = selection;
-            if (lineIndex >= start.row && lineIndex <= end.row) {
-              const startCol = lineIndex === start.row ? start.col : 0;
-              const endCol = lineIndex === end.row ? end.col : line.length;
-              if (endCol > startCol) {
-                ctx.fillStyle = "rgba(246,194,122,0.18)";
-                ctx.fillRect(
-                  textX + startCol * charWidth,
-                  y - 1,
-                  Math.max(1, (endCol - startCol) * charWidth),
-                  lineHeight,
-                );
-                ctx.fillStyle = accent;
-                ctx.fillText(line, textX, y);
+            ctx.fillStyle = accent;
+            ctx.fillText(segment.text, textX, y);
+
+            if (selection) {
+              const { start, end } = selection;
+              if (lineIndex >= start.row && lineIndex <= end.row) {
+                const startCol = lineIndex === start.row ? start.col : 0;
+                const endCol = lineIndex === end.row ? end.col : line.length;
+                const segStart = Math.max(startCol, segment.start);
+                const segEnd = Math.min(endCol, segment.end);
+                if (segEnd > segStart) {
+                  ctx.fillStyle = "rgba(246,194,122,0.18)";
+                  ctx.fillRect(
+                    textX + (segStart - segment.start) * charWidth,
+                    y - 1,
+                    Math.max(1, (segEnd - segStart) * charWidth),
+                    lineHeight,
+                  );
+                  ctx.fillStyle = accent;
+                  ctx.fillText(segment.text, textX, y);
+                }
               }
             }
-          }
 
-          if (
-            cursorVisible &&
-            lineIndex === cursor.row &&
-            !editorCommandRef.current.active
-          ) {
-            const cursorX = textX + cursor.col * charWidth;
-            ctx.fillStyle = accent;
-            ctx.fillRect(cursorX, y - 1, 2, lineHeight);
+            if (
+              cursorVisible &&
+              lineIndex === cursor.row &&
+              !editorCommandRef.current.active
+            ) {
+              if (cursor.col >= segment.start && cursor.col <= segment.end) {
+                const cursorX =
+                  textX + (cursor.col - segment.start) * charWidth;
+                ctx.fillStyle = accent;
+                ctx.fillRect(cursorX, y - 1, 2, lineHeight);
+              }
+            }
+
+            displayRow += 1;
           }
         }
 
@@ -7381,8 +7419,8 @@ export default function TerminalCanvas({
 
         const helpText =
           language === "tr"
-            ? "^S Kaydet  ^Q Çıkış  ^W Komut  : komut"
-            : "^S Save  ^Q Quit  ^W Command  : cmd";
+            ? "^G Yardım  ^S Kaydet  ^Q Çıkış  ^W Komut  : komut"
+            : "^G Help  ^S Save  ^Q Quit  ^W Command  : cmd";
         const footerFont = Math.max(9, Math.floor(fontSize * 0.7));
         ctx.font = `${footerFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         const helpY = pad + boxH - Math.max(8, Math.floor(footerFont * 0.6));
