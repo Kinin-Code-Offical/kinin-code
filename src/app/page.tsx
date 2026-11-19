@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { preload } from "react-dom";
 import HomeClient from "@/components/HomeClient";
 import { getContent } from "@/lib/content";
 import { profile } from "@/content/profile";
@@ -34,6 +35,9 @@ export default async function Home({
 }: {
   searchParams?: Promise<{ dev?: string; debug?: string }>;
 }) {
+  // Start downloading the 3D model together with the HTML instead of waiting
+  // for the three.js bundle to load and mount the scene first.
+  preload("/models/computer.glb", { as: "fetch", crossOrigin: "anonymous" });
   const content = await getContent();
   const params = searchParams ? await searchParams : undefined;
   const debugEnabled =

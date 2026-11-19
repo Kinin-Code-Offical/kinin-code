@@ -11,10 +11,12 @@ import {
   useState,
 } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { CanvasTexture } from "three";
 import ContactForm from "@/components/ContactForm";
 import Markdown from "@/components/Markdown";
-import { Terminal, type TerminalRef } from "@/components/terminal/Terminal";
+import TerminalCanvas, {
+  TerminalApi,
+} from "@/components/terminal/TerminalCanvas";
+import type { SceneDebugInfo } from "@/components/hero/HeroScene";
 import { usePreferences } from "@/components/PreferencesProvider";
 import type { ContentData } from "@/lib/content";
 import { getAlternateLanguage, languageMeta } from "@/lib/i18n";
@@ -25,13 +27,10 @@ function HeroLoading() {
   return <div className="hero-loading">{t.hero.loading}</div>;
 }
 
-const Scene = dynamic(
-  () => import("@/components/canvas/Scene").then((mod) => mod.Scene),
-  {
-    ssr: false,
-    loading: () => <HeroLoading />,
-  },
-);
+const HeroScene = dynamic(() => import("@/components/hero/HeroScene"), {
+  ssr: false,
+  loading: () => <HeroLoading />,
+});
 
 type HomeClientProps = {
   content: ContentData;
@@ -95,23 +94,28 @@ function useSmoothScrollProgress(
     };
 
     const epsilon = 0.0008;
-    const smoothing = 0.12;
+    // Time-based easing (same feel at 60/120 Hz and on slow phones).
+    const smoothingTauMs = 110;
+    let lastTickAt = 0;
 
-    const tick = () => {
+    const tick = (time: number) => {
       if (!active || document.hidden) {
         running = false;
         rafRef.current = null;
         return;
       }
+      const dt = lastTickAt ? Math.min(64, Math.max(1, time - lastTickAt)) : 16;
+      lastTickAt = time;
       const diff = targetRef.current - progressRef.current;
       if (Math.abs(diff) < epsilon) {
         progressRef.current = targetRef.current;
         onUpdateRef.current?.(progressRef.current);
         running = false;
         rafRef.current = null;
+        lastTickAt = 0;
         return;
       }
-      progressRef.current += diff * smoothing;
+      progressRef.current += diff * (1 - Math.exp(-dt / smoothingTauMs));
       onUpdateRef.current?.(progressRef.current);
       rafRef.current = window.requestAnimationFrame(tick);
     };
@@ -498,17 +502,6 @@ export default function HomeClient({
   const { profile, projects, theme, pages, capabilities } = content;
   const { t, language, setLanguage } = useI18n();
   const { theme: currentTheme, toggleTheme, isSwitching } = usePreferences();
-  const terminalTheme = useMemo(
-    () => ({
-      palette: {
-        terminalBg: theme.palette.terminalBg,
-        terminalText: theme.palette.terminalText,
-        terminalDim: theme.palette.terminalDim,
-      },
-      crt: theme.crt,
-    }),
-    [theme],
-  );
   const heroRef = useRef<HTMLElement>(null);
   const featuredRef = useRef<HTMLElement>(null);
   const featuredHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -549,6 +542,7 @@ export default function HomeClient({
     },
     [],
   );
+  const cssVarCacheRef = useRef({ fade: "", reveal: "" });
   const scrollProgressRef = useSmoothScrollProgress(heroRef, (value) => {
     if (!shellRef.current) {
       return;
@@ -597,10 +591,20 @@ export default function HomeClient({
     if (!Number.isFinite(fade)) {
       fade = fadeRef.current;
     }
+    // Only touch the CSS variables when they actually change: every write
+    // invalidates styles for the whole page (they are used by many rules).
+    const fadeText = fade.toFixed(3);
+    const revealText = reveal.toFixed(3);
+    if (fadeText !== cssVarCacheRef.current.fade) {
+      cssVarCacheRef.current.fade = fadeText;
+      shellRef.current.style.setProperty("--hero-fade", fadeText);
+    }
+    if (revealText !== cssVarCacheRef.current.reveal) {
+      cssVarCacheRef.current.reveal = revealText;
+      shellRef.current.style.setProperty("--content-reveal", revealText);
+    }
     revealRef.current = reveal;
     fadeRef.current = fade;
-    shellRef.current.style.setProperty("--hero-fade", String(fade));
-    shellRef.current.style.setProperty("--content-reveal", String(reveal));
     const nextHeroActive = reveal < 0.98;
     if (debugEnabled) {
       const now = typeof performance !== "undefined" ? performance.now() : 0;
@@ -638,6 +642,10 @@ export default function HomeClient({
 
   const isMobile = useMediaQuery("(max-width: 900px)");
   const isCoarsePointer = useMediaQuery("(pointer: coarse)");
+  const isLandscape = useMediaQuery("(orientation: landscape)");
+  // Must match HeroScene's phone rig: the screen is viewed rotated by 90deg,
+  // so the terminal draws on a portrait canvas (see applyScreenRotation).
+  const isPortraitPhoneRig = isMobile && !isLandscape;
   const reducedMotion = useReducedMotion() ?? false;
   const [menuOpen, setMenuOpen] = useState(false);
   const fallbackSection = profile.sections[0] ?? "home";
@@ -653,9 +661,7 @@ export default function HomeClient({
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
   const [openCapabilityId, setOpenCapabilityId] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [terminalTexture, setTerminalTexture] = useState<CanvasTexture | null>(
-    null,
-  );
+  const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
   const [terminalFocused, setTerminalFocused] = useState(false);
   const pendingTerminalFocusRef = useRef(false);
   const [screenAspect, setScreenAspect] = useState(1.33);
@@ -682,33 +688,85 @@ export default function HomeClient({
     alt: false,
   });
   const mobileModifiersRef = useRef(mobileModifiers);
-  const terminalRef = useRef<TerminalRef>(null);
-  const terminalUser = useMemo(
-    () =>
-      profile.terminal.prompt.split("@")[0] || t.terminal.system.userFallback,
-    [profile.terminal.prompt, t.terminal.system.userFallback],
-  );
-  const homeDir = useMemo(() => `/home/${terminalUser}`, [terminalUser]);
-
   const handleSceneReady = useCallback(() => {
     setSceneReady(true);
     setSceneReadyAt(Date.now());
-    setModelReady(true);
-    setModelReadyAt(Date.now());
+  }, []);
+
+  const modelReadyRef = useRef(false);
+  const handleSceneDebug = useCallback((info: SceneDebugInfo) => {
+    // Mark ready only once; re-stamping the time on every call kept pushing
+    // the boot "stable" timer forward (boot screen stuck until the timeout).
+    if ((info.modelLoaded || info.fallbackPlane) && !modelReadyRef.current) {
+      modelReadyRef.current = true;
+      setModelReady(true);
+      setModelReadyAt(Date.now());
+    }
+  }, []);
+
+  const noteTexts = useMemo(
+    () => ({ red: t.hero.noteRed, blue: t.hero.noteBlue }),
+    [t.hero.noteRed, t.hero.noteBlue],
+  );
+
+  const terminalBootReadyRef = useRef(false);
+  const handleTerminalBootReady = useCallback(() => {
+    if (terminalBootReadyRef.current) {
+      return;
+    }
+    terminalBootReadyRef.current = true;
+    setTerminalBootReady(true);
+    setTerminalBootReadyAt(Date.now());
+  }, []);
+
+  const screenAspectReadyRef = useRef(false);
+  const handleScreenAspect = useCallback((aspect: number) => {
+    if (!Number.isFinite(aspect) || aspect <= 0) {
+      return;
+    }
+    if (!screenAspectReadyRef.current) {
+      screenAspectReadyRef.current = true;
+      screenAspectRef.current = aspect;
+      pendingAspectRef.current = null;
+      setScreenAspect(aspect);
+      setScreenAspectReady(true);
+      setScreenAspectReadyAt(Date.now());
+      return;
+    }
+    const diff = Math.abs(aspect - screenAspectRef.current);
+    if (diff < 0.03) {
+      return;
+    }
+    pendingAspectRef.current = aspect;
+    if (interactionActiveRef.current) {
+      return;
+    }
+    if (screenAspectTimerRef.current) {
+      window.clearTimeout(screenAspectTimerRef.current);
+    }
+    screenAspectTimerRef.current = window.setTimeout(() => {
+      const nextAspect = pendingAspectRef.current;
+      if (nextAspect === null) {
+        return;
+      }
+      pendingAspectRef.current = null;
+      screenAspectRef.current = nextAspect;
+      setScreenAspect(nextAspect);
+    }, 140);
   }, []);
 
   const handleTerminalFocus = useCallback(() => {
-    if (terminalRef.current) {
-      terminalRef.current.focusInput();
+    if (terminalApi) {
+      terminalApi.focus();
       pendingTerminalFocusRef.current = false;
       return;
     }
     pendingTerminalFocusRef.current = true;
-  }, []);
+  }, [terminalApi]);
 
   const handleTerminalInputFocus = useCallback(() => {
-    terminalRef.current?.focusInput();
-  }, []);
+    terminalApi?.focusInput?.();
+  }, [terminalApi]);
 
   const handleVirtualKey = useCallback(
     (
@@ -718,17 +776,26 @@ export default function HomeClient({
       if (options?.focus !== false) {
         handleTerminalFocus();
       }
-      terminalRef.current?.handleInput(key);
+      const modifiers = mobileModifiersRef.current;
+      const down = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        ctrlKey: modifiers.ctrl,
+        shiftKey: modifiers.shift,
+        altKey: modifiers.alt,
+      });
+      const up = new KeyboardEvent("keyup", {
+        key,
+        bubbles: true,
+        ctrlKey: modifiers.ctrl,
+        shiftKey: modifiers.shift,
+        altKey: modifiers.alt,
+      });
+      window.dispatchEvent(down);
+      window.dispatchEvent(up);
     },
     [handleTerminalFocus],
   );
-
-  useEffect(() => {
-    if (terminalTexture && !terminalBootReady) {
-      setTerminalBootReady(true);
-      setTerminalBootReadyAt(Date.now());
-    }
-  }, [terminalTexture, terminalBootReady]);
 
   const toggleMobileModifier = useCallback((key: "ctrl" | "shift" | "alt") => {
     setMobileModifiers((prev) => {
@@ -1035,9 +1102,9 @@ export default function HomeClient({
     if (!sceneReady || !modelReady || !sceneReadyAt || !modelReadyAt) {
       return;
     }
-    const stableDelay = 500;
-    const minBootDuration = 1000;
-    const maxWait = 12000;
+    const stableDelay = 200;
+    const minBootDuration = 600;
+    const maxWait = 8000;
     const lastReadyAt = Math.max(
       sceneReadyAt,
       modelReadyAt,
@@ -1099,15 +1166,15 @@ export default function HomeClient({
   }, [bootDone]);
 
   useEffect(() => {
-    if (!terminalRef.current || !pendingTerminalFocusRef.current) {
+    if (!terminalApi || !pendingTerminalFocusRef.current) {
       return;
     }
-    terminalRef.current.focusInput();
+    terminalApi.focus();
     pendingTerminalFocusRef.current = false;
-  }, []);
+  }, [terminalApi]);
 
   useEffect(() => {
-    if (!bootDone || !terminalRef.current || isMobile || isCoarsePointer) {
+    if (!bootDone || !terminalApi || isMobile || isCoarsePointer) {
       return;
     }
     const active = document.activeElement;
@@ -1118,8 +1185,8 @@ export default function HomeClient({
     ) {
       return;
     }
-    terminalRef.current.focusInput();
-  }, [bootDone, isCoarsePointer, isMobile]);
+    terminalApi.focus();
+  }, [bootDone, isCoarsePointer, isMobile, terminalApi]);
 
   useEffect(() => {
     mobileModifiersRef.current = mobileModifiers;
@@ -1139,11 +1206,8 @@ export default function HomeClient({
       if (!detail.active && pendingAspectRef.current !== null) {
         const nextAspect = pendingAspectRef.current;
         pendingAspectRef.current = null;
+        screenAspectRef.current = nextAspect;
         setScreenAspect(nextAspect);
-        if (!screenAspectReady) {
-          setScreenAspectReady(true);
-          setScreenAspectReadyAt(Date.now());
-        }
       }
     };
     window.addEventListener(
@@ -1159,7 +1223,7 @@ export default function HomeClient({
         window.clearTimeout(screenAspectTimerRef.current);
       }
     };
-  }, [screenAspectReady]);
+  }, []);
 
   useEffect(() => {
     const shouldLock = isMobile && (isSwitching || !siteReady || menuOpen);
@@ -1349,6 +1413,9 @@ export default function HomeClient({
   }, [latestProjects, t.projects.latestTitle]);
 
   const files = useMemo(() => {
+    const terminalUser =
+      profile.terminal.prompt.split("@")[0] || t.terminal.system.userFallback;
+    const homeDir = `/home/${terminalUser}`;
     const docsDir = `${homeDir}/docs`;
     const scriptsDir = `${homeDir}/scripts`;
     const mediaDir = `${homeDir}/media`;
@@ -1593,35 +1660,22 @@ export default function HomeClient({
         content: t.terminal.files.elfPlaceholder,
       },
     ];
-  }, [localizedPages, profile.fullName, projectsMd, t.terminal.files, homeDir]);
+  }, [
+    localizedPages,
+    profile.fullName,
+    profile.terminal.prompt,
+    projectsMd,
+    t.terminal.files,
+    t.terminal.system.userFallback,
+  ]);
 
-  const scrollToSection = (id: string) => {
+  const scrollToSection = useCallback((id: string) => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     setMenuOpen(false);
-  };
-
-  const terminalConfig = useMemo(
-    () => ({
-      prompt: profile.terminal.prompt,
-      introLines: profile.introLines[language],
-      homePath: homeDir,
-      files,
-      messages: t.terminal,
-      onNavigateAction: scrollToSection,
-    }),
-    [
-      files,
-      homeDir,
-      language,
-      profile.introLines,
-      profile.terminal.prompt,
-      scrollToSection,
-      t.terminal,
-    ],
-  );
+  }, []);
 
   const navLabels: Record<string, string> = {
     home: t.nav.home,
@@ -2240,10 +2294,13 @@ export default function HomeClient({
           id="home"
           className={`hero-shell ${terminalFocused ? "focused" : ""}`}>
           <div className="hero-sticky">
-            <Scene
-              texture={terminalTexture}
+            <HeroScene
+              terminalApi={terminalApi}
               scrollProgressRef={scrollProgressRef}
-              className="hero-scene absolute-fill"
+              noteTexts={noteTexts}
+              active={heroActive}
+              onDebugAction={handleSceneDebug}
+              onScreenAspectAction={handleScreenAspect}
               onReadyAction={handleSceneReady}
             />
             <div className="hero-overlay">
@@ -2257,7 +2314,9 @@ export default function HomeClient({
                 </div>
               </div>
               <p className="hero-hint">{t.hero.hint}</p>
-              <p className="hero-hint">{t.hero.keysHint}</p>
+              {!isCoarsePointer ? (
+                <p className="hero-hint">{t.hero.keysHint}</p>
+              ) : null}
             </div>
           </div>
           {showVirtualKeys ? (
@@ -2366,15 +2425,33 @@ export default function HomeClient({
           <div
             className={`hero-scroll-shield${heroActive ? " is-active" : ""}`}
             aria-hidden="true"
+            onClick={() => {
+              // Tap/click on the monitor (near the top of the hero) focuses the
+              // terminal - on phones this is what opens the soft keyboard.
+              // Scroll drags never produce a click, so scrolling is unaffected.
+              if (scrollProgressRef.current < 0.2) {
+                handleTerminalFocus();
+              }
+            }}
           />
-          <Terminal
-            ref={terminalRef}
-            config={terminalConfig}
-            theme={terminalTheme}
-            active={heroActive}
-            focused={terminalFocused}
-            onFocusChange={setTerminalFocused}
-            onTextureReady={setTerminalTexture}
+          <TerminalCanvas
+            files={files}
+            introLines={profile.introLines[language]}
+            prompt={profile.terminal.prompt}
+            language={language}
+            messages={t.terminal}
+            theme={theme}
+            isMobile={isMobile}
+            isActive={heroActive}
+            screenAspect={
+              isPortraitPhoneRig ? 1 / Math.max(0.1, screenAspect) : screenAspect
+            }
+            screenRotated={isPortraitPhoneRig}
+            scrollProgressRef={scrollProgressRef}
+            onNavigateAction={scrollToSection}
+            onReadyAction={setTerminalApi}
+            onBootReadyAction={handleTerminalBootReady}
+            onFocusChangeAction={setTerminalFocused}
           />
         </section>
 

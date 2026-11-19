@@ -308,6 +308,8 @@ type TerminalCanvasProps = {
   isMobile: boolean;
   isActive?: boolean;
   screenAspect?: number;
+  /** Portrait-phone view: the screen is shown rotated (see HeroScene). */
+  screenRotated?: boolean;
   fontScale?: number;
   scrollProgressRef?: MutableRefObject<number>;
   onNavigateAction: (section: string) => void;
@@ -934,6 +936,7 @@ export default function TerminalCanvas({
   isMobile,
   isActive = true,
   screenAspect,
+  screenRotated = false,
   fontScale,
   scrollProgressRef,
   onNavigateAction,
@@ -1278,11 +1281,18 @@ export default function TerminalCanvas({
   const pyodideRef = useRef<PyodideInterface | null>(null);
   const pyodideLoadingRef = useRef<Promise<PyodideInterface> | null>(null);
   const pipPackagesRef = useRef<string[]>(["pip", "setuptools", "wheel"]);
-  const [cursorVisible, setCursorVisible] = useState(true);
+  // Ref (not state): blinking must not re-render this whole component.
+  const cursorVisibleRef = useRef(true);
+  // In the rotated portrait view a sticky note on the bezel overlaps the top
+  // corner of the screen, so shell text starts a little lower there.
+  const screenRotatedRef = useRef(screenRotated);
+  useEffect(() => {
+    screenRotatedRef.current = screenRotated;
+    dirtyRef.current = true;
+  }, [screenRotated]);
   const [ready, setReady] = useState(false);
   const noiseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const freezeTextureRef = useRef(false);
-  const frozenSnapshotRef = useRef<HTMLCanvasElement | null>(null);
   const pendingFreezeRef = useRef(false);
   const freezeTimeoutRef = useRef<number | null>(null);
   const gradientCacheRef = useRef<{
@@ -1529,10 +1539,10 @@ export default function TerminalCanvas({
       ? 640
       : isMobile
         ? perfTier === "high"
-          ? 860
+          ? 1024
           : perfTier === "low"
-            ? 620
-            : 740
+            ? 760
+            : 900
         : perfTier === "high"
           ? 1600
           : perfTier === "low"
@@ -1551,7 +1561,7 @@ export default function TerminalCanvas({
     if (isActive) {
       dirtyRef.current = true;
       if (focusedRef.current) {
-        setCursorVisible(true);
+        cursorVisibleRef.current = true;
       }
     }
   }, [isActive]);
@@ -1576,7 +1586,7 @@ export default function TerminalCanvas({
         return;
       }
       if (focusedRef.current) {
-        setCursorVisible(true);
+        cursorVisibleRef.current = true;
       }
       lastDrawRef.current = 0;
       dirtyRef.current = true;
@@ -5123,14 +5133,8 @@ export default function TerminalCanvas({
     canvas.height = canvasSize.height;
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      const snapshot = frozenSnapshotRef.current;
-      if (snapshot && snapshot.width > 0 && snapshot.height > 0) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(snapshot, 0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.fillStyle = theme.palette.terminalBg;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      ctx.fillStyle = theme.palette.terminalBg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
     const buildTexture = () => {
@@ -5162,8 +5166,11 @@ export default function TerminalCanvas({
       dirtyRef.current = true;
       return;
     }
+    // Keep the same texture object: the screen material references it. A new
+    // object here left the 3D screen showing a stale (frozen) texture, so
+    // typed text never appeared. dispose() frees the GPU storage so it is
+    // re-allocated with the new canvas dimensions on the next upload.
     textureRef.current.dispose();
-    textureRef.current = buildTexture();
     lastCanvasSizeRef.current = {
       width: canvasSize.width,
       height: canvasSize.height,
@@ -5209,30 +5216,24 @@ export default function TerminalCanvas({
           window.clearTimeout(freezeTimeoutRef.current);
           freezeTimeoutRef.current = null;
         }
-        if (!freezeTextureRef.current) {
-          const snapshot = frozenSnapshotRef.current;
-          if (snapshot && snapshot.width > 0 && snapshot.height > 0) {
-            freezeTextureRef.current = true;
-          } else {
-            pendingFreezeRef.current = true;
+        // While the page scrolls the terminal texture stays as-is: no 2D
+        // redraws and no GPU uploads competing with the scroll frames.
+        freezeTextureRef.current = true;
+      } else {
+        if (freezeTimeoutRef.current) {
+          window.clearTimeout(freezeTimeoutRef.current);
+        }
+        freezeTimeoutRef.current = window.setTimeout(() => {
+          if (interactionActiveRef.current) {
+            return;
           }
-          dirtyRef.current = true;
-        }
-        return;
+          if (freezeTextureRef.current || pendingFreezeRef.current) {
+            freezeTextureRef.current = false;
+            pendingFreezeRef.current = false;
+            dirtyRef.current = true;
+          }
+        }, 220);
       }
-      if (freezeTimeoutRef.current) {
-        window.clearTimeout(freezeTimeoutRef.current);
-      }
-      freezeTimeoutRef.current = window.setTimeout(() => {
-        if (interactionActiveRef.current) {
-          return;
-        }
-        if (freezeTextureRef.current || pendingFreezeRef.current) {
-          freezeTextureRef.current = false;
-          pendingFreezeRef.current = false;
-          dirtyRef.current = true;
-        }
-      }, 220);
     };
     window.addEventListener(
       "hero-interaction",
@@ -5258,7 +5259,7 @@ export default function TerminalCanvas({
       if (freezeTextureRef.current || !focusedRef.current) {
         return;
       }
-      setCursorVisible((prev) => !prev);
+      cursorVisibleRef.current = !cursorVisibleRef.current;
       dirtyRef.current = true;
     }, 520);
     return () => window.clearInterval(timer);
@@ -7215,42 +7216,12 @@ export default function TerminalCanvas({
     if (
       freezeTextureRef.current &&
       bootReadyRef.current &&
-      hasTerminalContentRef.current
+      hasTerminalContentRef.current &&
+      !focusedRef.current
     ) {
-      const snapshot = frozenSnapshotRef.current;
-      if (snapshot && snapshot.width > 0 && snapshot.height > 0) {
-        const { width, height } = canvas;
-        ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(snapshot, 0, 0, width, height);
-        const now = typeof performance !== "undefined" ? performance.now() : 0;
-        const glitchSlices = 6;
-        for (let i = 0; i < glitchSlices; i += 1) {
-          const t = now * 0.002 + i * 1.7;
-          const y = Math.floor((Math.sin(t) * 0.5 + 0.5) * (height - 8));
-          const sliceHeight = 3 + (i % 3);
-          const xShift = Math.round(Math.sin(t * 2.3) * 6);
-          ctx.drawImage(
-            snapshot,
-            0,
-            y,
-            width,
-            sliceHeight,
-            xShift,
-            y,
-            width,
-            sliceHeight,
-          );
-        }
-        ctx.globalAlpha = 0.12;
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, width, height);
-        ctx.globalAlpha = 1;
-        textureRef.current.needsUpdate = true;
-        textureUpdateRef.current = textureRef.current.needsUpdate;
-        dirtyRef.current = false;
-        emitTextureEvent(now);
-        return;
-      }
+      // Frozen while the page scrolls: keep dirtyRef set so the latest state
+      // is painted as soon as scrolling stops.
+      return;
     }
     const { width, height } = canvas;
     const scale = Math.min(width, height);
@@ -7261,7 +7232,10 @@ export default function TerminalCanvas({
     const maxFont = Math.floor(scale * 0.034);
     const fontSize = clamp(baseFont, minFont, maxFont);
     const lineHeight = Math.floor(fontSize * 1.45);
-    const availableHeight = Math.max(1, height - padding * 2);
+    const shellTopInset = screenRotatedRef.current
+      ? Math.floor(height * 0.09)
+      : 0;
+    const availableHeight = Math.max(1, height - padding * 2 - shellTopInset);
     const maxSlots = Math.max(2, Math.floor(availableHeight / lineHeight));
     const scrollOffset = scrollOffsetRef.current;
     const lines = linesRef.current;
@@ -7353,28 +7327,6 @@ export default function TerminalCanvas({
       texture.needsUpdate = true;
       textureUpdateRef.current = texture.needsUpdate;
       dirtyRef.current = false;
-
-      const snapshot =
-        frozenSnapshotRef.current ?? document.createElement("canvas");
-      if (snapshot.width !== width || snapshot.height !== height) {
-        snapshot.width = width;
-        snapshot.height = height;
-      }
-      const sctx = snapshot.getContext("2d");
-      if (sctx) {
-        sctx.clearRect(0, 0, width, height);
-        sctx.drawImage(canvas, 0, 0);
-      }
-      frozenSnapshotRef.current = snapshot;
-
-      if (
-        pendingFreezeRef.current &&
-        bootReadyRef.current &&
-        hasTerminalContentRef.current
-      ) {
-        freezeTextureRef.current = true;
-        pendingFreezeRef.current = false;
-      }
 
       const now = typeof performance !== "undefined" ? performance.now() : 0;
       emitTextureEvent(now);
@@ -7520,7 +7472,7 @@ export default function TerminalCanvas({
             }
 
             if (
-              cursorVisible &&
+              cursorVisibleRef.current &&
               lineIndex === cursor.row &&
               !editorCommandRef.current.active
             ) {
@@ -10394,7 +10346,11 @@ export default function TerminalCanvas({
       ctx.fillStyle = line.color ?? theme.palette.terminalText;
       ctx.shadowColor = "rgba(255, 200, 140, 0.22)";
       ctx.shadowBlur = glow;
-      ctx.fillText(line.text, padding, padding + index * lineHeight);
+      ctx.fillText(
+        line.text,
+        padding,
+        padding + shellTopInset + index * lineHeight,
+      );
       ctx.shadowBlur = 0;
     });
 
@@ -10409,7 +10365,8 @@ export default function TerminalCanvas({
 
     let caretDrawn = false;
     visiblePrompt.forEach((line, index) => {
-      const y = padding + (visibleOutput.length + index) * lineHeight;
+      const y =
+        padding + shellTopInset + (visibleOutput.length + index) * lineHeight;
       if (y > height - padding) {
         return;
       }
@@ -10432,7 +10389,7 @@ export default function TerminalCanvas({
       if (
         !caretDrawn &&
         focusedRef.current &&
-        cursorVisible &&
+        cursorVisibleRef.current &&
         !hasSelection &&
         caretAbs >= line.start &&
         caretAbs <= line.end
@@ -10449,7 +10406,6 @@ export default function TerminalCanvas({
 
     finalizeFrame();
   }, [
-    cursorVisible,
     ensureEditorBuffer,
     normalizeEditorSelection,
     updateEditorScroll,
@@ -10463,7 +10419,6 @@ export default function TerminalCanvas({
     isMobile,
     perfTier,
     prompt,
-    language,
     doomText,
     formatMessage,
     messages,
@@ -10499,7 +10454,7 @@ export default function TerminalCanvas({
           return;
         }
         appendLine(line, theme.palette.terminalDim);
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 140));
       }
       appendLine(messages.welcome, theme.palette.terminalText);
       appendLine(messages.hint, theme.palette.terminalDim);
@@ -11566,7 +11521,6 @@ export default function TerminalCanvas({
       stopApp,
       formatMessage,
       messages,
-      language,
     ],
   );
 

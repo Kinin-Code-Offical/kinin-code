@@ -50,22 +50,31 @@ function writeStorage(name: string, value: string) {
   }
 }
 
-function getInitialLanguage(initialLanguage: Language): Language {
-  if (typeof window === "undefined") {
-    return initialLanguage;
+function readStorage(name: string) {
+  try {
+    return localStorage.getItem(name);
+  } catch {
+    return null;
   }
+}
+
+/**
+ * Client-only language preference. The server already resolves `?lang`,
+ * the cookie and Accept-Language, so this only differs in rare cases
+ * (e.g. cookie cleared but localStorage kept). It is applied after hydration
+ * to keep SSR and the first client render identical.
+ */
+function getClientLanguage(): Language | null {
   const params = new URLSearchParams(window.location.search);
   const paramLang = params.get("lang");
   if (paramLang === "tr" || paramLang === "en") {
     return paramLang;
   }
-  const storedLang =
-    localStorage.getItem(LANG_COOKIE) || readCookie(LANG_COOKIE);
+  const storedLang = readCookie(LANG_COOKIE) || readStorage(LANG_COOKIE);
   if (storedLang === "tr" || storedLang === "en") {
     return storedLang;
   }
-  const browserLang = navigator.language.toLowerCase();
-  return browserLang.startsWith("tr") ? "tr" : "en";
+  return null;
 }
 
 export function PreferencesProvider({
@@ -78,11 +87,17 @@ export function PreferencesProvider({
   initialLanguage: Language;
 }) {
   const [theme, setTheme] = useState<Theme>(initialTheme);
-  const [language, setLanguageState] = useState<Language>(() =>
-    getInitialLanguage(initialLanguage),
-  );
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
   const [isSwitching, setIsSwitching] = useState(false);
   const switchTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const clientLanguage = getClientLanguage();
+    if (clientLanguage && clientLanguage !== initialLanguage) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time post-hydration sync
+      setLanguageState(clientLanguage);
+    }
+  }, [initialLanguage]);
 
   const startSwitch = useCallback(() => {
     setIsSwitching(true);

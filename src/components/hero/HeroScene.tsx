@@ -1,7 +1,8 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   Component,
   type ReactNode,
@@ -27,27 +28,137 @@ import {
   Object3D,
   PlaneGeometry,
   PerspectiveCamera,
+  PMREMGenerator,
   Quaternion,
   SRGBColorSpace,
+  type Scene,
+  type Texture,
+  type WebGLRenderer,
   Vector2,
   Vector3,
 } from "three";
 import type { TerminalApi } from "@/components/terminal/TerminalCanvas";
 
-useGLTF.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
+// Model is meshopt-compressed (decoder ships with three-stdlib); no Draco CDN fetch.
+const MODEL_URL = "/models/computer.glb";
 if (typeof window !== "undefined") {
-  const nav = navigator as Navigator & {
-    deviceMemory?: number;
-    connection?: { saveData?: boolean; effectiveType?: string };
-  };
-  const saveData = Boolean(nav.connection?.saveData);
-  const memory = typeof nav.deviceMemory === "number" ? nav.deviceMemory : 8;
-  const isMobile = window.matchMedia("(max-width: 900px)").matches;
-  const slowNetwork = /2g/.test(nav.connection?.effectiveType ?? "");
-  const shouldPreload = !saveData && !slowNetwork && !isMobile && memory > 4;
-  if (shouldPreload) {
-    useGLTF.preload("/models/computer.glb");
-  }
+  // The page already starts the GLB download via <link rel="preload">; this
+  // kicks off parsing/decoding as soon as the chunk is evaluated (all devices,
+  // the meshopt model is small enough for mobile too).
+  useGLTF.preload(MODEL_URL, false, true);
+}
+
+/** See usePhoneRigRef in ComputerModel. */
+function applyScreenRotation(
+  texture: { center: { set: (x: number, y: number) => void }; rotation: number },
+  rotated: boolean,
+) {
+  texture.center.set(0.5, 0.5);
+  texture.rotation = rotated ? Math.PI / 2 : 0;
+}
+
+const TEXTURE_SLOTS = [
+  "map",
+  "normalMap",
+  "roughnessMap",
+  "metalnessMap",
+  "aoMap",
+  "emissiveMap",
+  "alphaMap",
+  "bumpMap",
+  "clearcoatMap",
+  "clearcoatNormalMap",
+  "clearcoatRoughnessMap",
+  "specularIntensityMap",
+  "specularColorMap",
+] as const;
+
+/**
+ * Compile every shader and upload every texture up-front (while the boot
+ * screen is visible). Objects outside the first camera view (lamp, keyboard,
+ * mug...) otherwise compiled synchronously the first time they scrolled into
+ * view, freezing the page for ~2.5s in the middle of the zoom-out.
+ */
+async function warmUpScene(
+  renderer: WebGLRenderer,
+  scene: Scene,
+  camera: Camera,
+): Promise<void> {
+  scene.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+    const materials = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+    for (const material of materials) {
+      const record = material as unknown as Record<string, unknown>;
+      for (const slot of TEXTURE_SLOTS) {
+        const texture = record[slot] as Texture | null | undefined;
+        if (texture && (texture as Texture).isTexture) {
+          renderer.initTexture(texture);
+        }
+      }
+    }
+  });
+  await renderer.compileAsync(scene, camera);
+}
+
+/** Shadow maps are static (see onCreated); ask three.js to re-render it once. */
+function requestShadowMapUpdate(renderer: {
+  shadowMap: { needsUpdate: boolean };
+}) {
+  renderer.shadowMap.needsUpdate = true;
+}
+
+type EnvTarget = {
+  environment: unknown;
+  environmentIntensity: number;
+};
+
+function setSceneEnvironment(
+  scene: EnvTarget,
+  texture: unknown,
+  intensity: number,
+) {
+  scene.environment = texture;
+  scene.environmentIntensity = intensity;
+}
+
+/**
+ * Reflection environment generated locally (three.js RoomEnvironment) instead
+ * of downloading an HDR from a third-party CDN: no network request, generated
+ * once before the first frame, so materials compile only once.
+ */
+/** Production: skip synchronous shader log checks (they stall on compile and
+ *  only print harmless driver warnings such as D3D "X4122"). */
+function configureRendererDebug(renderer: {
+  debug: { checkShaderErrors: boolean };
+}) {
+  renderer.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
+}
+
+function LocalEnvironment({ intensity = 0.85 }: { intensity?: number }) {
+  const { gl, scene, invalidate } = useThree();
+  // Layout effect: the environment must exist before shaders are warmed up.
+  useLayoutEffect(() => {
+    configureRendererDebug(gl);
+    const pmrem = new PMREMGenerator(gl);
+    const room = new RoomEnvironment();
+    const target = pmrem.fromScene(room, 0.04);
+    room.dispose();
+    pmrem.dispose();
+    const previous = scene.environment;
+    const previousIntensity = scene.environmentIntensity;
+    setSceneEnvironment(scene, target.texture, intensity);
+    invalidate();
+    return () => {
+      setSceneEnvironment(scene, previous, previousIntensity);
+      target.dispose();
+    };
+  }, [gl, scene, invalidate, intensity]);
+  return null;
 }
 
 export type SceneDebugInfo = {
@@ -337,7 +448,7 @@ function ComputerModel({
   showNotes: boolean;
   setPlaneColor: string;
 }) {
-  const { scene, cameras } = useGLTF("/models/computer.glb");
+  const { scene, cameras } = useGLTF(MODEL_URL, false, true);
   const screenMeshRef = useRef<Mesh | null>(null);
   const fallbackPlaneRef = useRef<Mesh | null>(null);
   const setPlaneRef = useRef<Mesh | null>(null);
@@ -354,6 +465,14 @@ function ComputerModel({
   const lastGoodTextureRef = useRef<CanvasTexture | null>(null);
   const sceneCenteredRef = useRef(false);
   const shadowEligibleRef = useRef<WeakSet<Mesh>>(new WeakSet());
+  // The portrait-phone camera (ScrollStartPhone) is rolled 90deg so the
+  // landscape screen fills a portrait viewport. The terminal then renders on a
+  // portrait canvas and the texture is rotated back so text reads upright.
+  const usePhoneRigRef = useRef(usePhoneRig);
+  const { invalidate } = useThree();
+  useLayoutEffect(() => {
+    usePhoneRigRef.current = usePhoneRig;
+  }, [usePhoneRig]);
   const applyScreenMaterial = useCallback((texture: CanvasTexture | null) => {
     let material = screenMaterialRef.current;
     if (!material) {
@@ -374,6 +493,7 @@ function ComputerModel({
       texture.colorSpace = SRGBColorSpace;
       texture.minFilter = LinearFilter;
       texture.magFilter = LinearFilter;
+      applyScreenRotation(texture, usePhoneRigRef.current);
     }
     material.map = texture ?? null;
     material.color.set(texture ? "#ffffff" : "#2a1b0f");
@@ -387,6 +507,13 @@ function ComputerModel({
       fallbackPlaneRef.current.receiveShadow = false;
     }
   }, []);
+  useEffect(() => {
+    const texture = lastTextureRef.current;
+    if (texture) {
+      applyScreenRotation(texture, usePhoneRig);
+      invalidate();
+    }
+  }, [usePhoneRig, invalidate]);
   const readyRef = useRef(false);
   const screenAspectRef = useRef<number | null>(null);
   const updateScreenMaterial = useCallback(
@@ -412,6 +539,19 @@ function ComputerModel({
       ? (terminalApi?.texture ?? null)
       : null;
     updateScreenMaterial(baseTexture);
+    // Re-check the binding whenever the terminal repaints (identity check
+    // only), so the screen can never keep showing a stale texture.
+    const handleTextureUpdated = () => {
+      updateScreenMaterial(
+        allowTerminalTexture ? (terminalApi?.texture ?? null) : null,
+      );
+    };
+    window.addEventListener("terminal-texture-updated", handleTextureUpdated);
+    return () =>
+      window.removeEventListener(
+        "terminal-texture-updated",
+        handleTextureUpdated,
+      );
   }, [active, allowTerminalTexture, terminalApi, updateScreenMaterial]);
 
   const pickScreenMesh = (meshList: Mesh[], bounds: Box3, size: Vector3) => {
@@ -493,6 +633,29 @@ function ComputerModel({
     }
     return { width, height };
   };
+
+  // Parent callbacks are read through a ref so their identity never re-runs
+  // the (expensive) scene setup below. Inline callbacks from the parent used
+  // to re-run it on every render, which re-rendered the parent again: an
+  // endless ~50Hz loop that caused the constant stutter.
+  const callbacksRef = useRef({
+    onCameraRig,
+    onContentReady,
+    onDebugAction,
+    onScreenAspectAction,
+    onScreenFocus,
+    onScreenMeshAction,
+  });
+  useLayoutEffect(() => {
+    callbacksRef.current = {
+      onCameraRig,
+      onContentReady,
+      onDebugAction,
+      onScreenAspectAction,
+      onScreenFocus,
+      onScreenMeshAction,
+    };
+  });
 
   useLayoutEffect(() => {
     const meshNames: string[] = [];
@@ -658,7 +821,7 @@ function ComputerModel({
       screenMesh.frustumCulled = false;
       scene.updateWorldMatrix(true, false);
       screenMesh.updateWorldMatrix(true, false);
-      onScreenMeshAction?.(screenMesh);
+      callbacksRef.current.onScreenMeshAction?.(screenMesh);
 
       const screenBounds = new Box3().setFromObject(screenMesh);
       const localBounds = getMeshLocalBounds(screenMesh);
@@ -693,7 +856,7 @@ function ComputerModel({
             Math.abs(screenAspectRef.current - aspect) > 0.02)
         ) {
           screenAspectRef.current = aspect;
-          onScreenAspectAction?.(aspect);
+          callbacksRef.current.onScreenAspectAction?.(aspect);
         }
       }
       const overlayCandidates: Mesh[] = [];
@@ -893,7 +1056,7 @@ function ComputerModel({
     const endCam = usePhoneRig
       ? (findCamera("ScrollEndPhone") ?? findCamera("ScrollEnd"))
       : findCamera("ScrollEnd");
-    onCameraRig?.({ start: startCam, end: endCam });
+    callbacksRef.current.onCameraRig?.({ start: startCam, end: endCam });
     if (!screenMesh) {
       const center = bounds.getCenter(new Vector3());
       const planeWidth = size.x * 0.45;
@@ -909,8 +1072,8 @@ function ComputerModel({
       plane.frustumCulled = false;
       scene.add(plane);
       fallbackPlaneRef.current = plane;
-      onScreenFocus?.(plane.position.clone());
-      onScreenMeshAction?.(plane);
+      callbacksRef.current.onScreenFocus?.(plane.position.clone());
+      callbacksRef.current.onScreenMeshAction?.(plane);
       const fallbackAspect = planeWidth > 0 ? planeWidth / planeHeight : 0;
       if (
         fallbackAspect > 0 &&
@@ -918,9 +1081,9 @@ function ComputerModel({
           Math.abs(screenAspectRef.current - fallbackAspect) > 0.02)
       ) {
         screenAspectRef.current = fallbackAspect;
-        onScreenAspectAction?.(fallbackAspect);
+        callbacksRef.current.onScreenAspectAction?.(fallbackAspect);
       }
-      onDebugAction({
+      callbacksRef.current.onDebugAction({
         modelLoaded: true,
         meshNames,
         meshCount: meshNames.length,
@@ -928,7 +1091,7 @@ function ComputerModel({
         fallbackPlane: true,
       });
     } else {
-      onDebugAction({
+      callbacksRef.current.onDebugAction({
         modelLoaded: true,
         meshNames,
         meshCount: meshNames.length,
@@ -939,16 +1102,10 @@ function ComputerModel({
 
     if (!readyRef.current) {
       readyRef.current = true;
-      onContentReady?.();
+      callbacksRef.current.onContentReady?.();
     }
   }, [
     cameras,
-    onCameraRig,
-    onContentReady,
-    onDebugAction,
-    onScreenAspectAction,
-    onScreenFocus,
-    onScreenMeshAction,
     scene,
     setPlaneColor,
     lowPower,
@@ -1360,8 +1517,8 @@ function SceneContent({
     end: [number, number, number];
   }>({ start: [11, 15, 14], end: [11, 15, 14] });
   const lastBgRef = useRef("");
-  const [envReady, setEnvReady] = useState(false);
-  const { gl, invalidate } = useThree();
+  const { gl, invalidate, scene: rootScene, camera: rootCamera } = useThree();
+  const warmupDoneRef = useRef(false);
   const parallax = useParallax(allowPointerParallax);
   const groupRef = useRef<Mesh>(null);
   const contentReadyRef = useRef(false);
@@ -1483,16 +1640,34 @@ function SceneContent({
   );
 
   const handleContentReady = useCallback(() => {
+    if (!warmupDoneRef.current) {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        warmupDoneRef.current = true;
+        invalidate();
+      };
+      // Never let a slow driver block the boot screen for long.
+      window.setTimeout(finish, 4000);
+      // Next frame: all effects (environment, shadows, materials) are applied
+      // by then, so each program is compiled exactly once, in its final form.
+      window.requestAnimationFrame(() => {
+        warmUpScene(gl, rootScene, rootCamera).then(finish, finish);
+      });
+    }
     contentReadyRef.current = true;
     modelFailedRef.current = false;
     retryCountRef.current = 0;
-    setEnvReady(true);
+    requestShadowMapUpdate(gl);
     if (retryTimerRef.current) {
       window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     }
     invalidate();
-  }, [invalidate]);
+  }, [gl, invalidate, rootCamera, rootScene]);
 
   const scheduleModelRetry = useCallback(
     (reason: "error" | "reset" | "visible") => {
@@ -1621,15 +1796,9 @@ function SceneContent({
     const lastScrollRef = { value: initialScroll };
     lastScrollValueRef.current = initialScroll;
     lastScrollTimeRef.current = performance.now();
-    const lowPowerInterval = 120;
-    const diffThreshold = performanceMode ? 0.0025 : lowPower ? 0.0018 : 0.0005;
-    const minInterval = performanceMode
-      ? 140
-      : lowPower
-        ? lowPowerInterval
-        : isMobile
-          ? 70
-          : 45;
+    const diffThreshold = lowPower ? 0.001 : 0.0004;
+    // ~30 fps cap on low-power devices, display refresh rate otherwise.
+    const minInterval = lowPower ? 32 : 0;
     const tick = () => {
       const now = performance.now();
       const { current } = scrollProgressRef;
@@ -1737,32 +1906,13 @@ function SceneContent({
       setActive(true);
       scheduleEnd();
     };
-    const handleKey = (event: KeyboardEvent) => {
-      if (
-        event.key.startsWith("Arrow") ||
-        event.key === "PageUp" ||
-        event.key === "PageDown"
-      ) {
-        markInteraction();
-      }
-    };
     window.addEventListener("scroll", markInteraction, { passive: true });
     window.addEventListener("wheel", markInteraction, { passive: true });
-    if (!lowPower) {
-      window.addEventListener("pointermove", markInteraction, {
-        passive: true,
-      });
-      window.addEventListener("touchmove", markInteraction, { passive: true });
-    }
-    window.addEventListener("keydown", handleKey);
+    window.addEventListener("touchmove", markInteraction, { passive: true });
     return () => {
       window.removeEventListener("scroll", markInteraction);
       window.removeEventListener("wheel", markInteraction);
-      if (!lowPower) {
-        window.removeEventListener("pointermove", markInteraction);
-        window.removeEventListener("touchmove", markInteraction);
-      }
-      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("touchmove", markInteraction);
       if (timerId) {
         window.clearTimeout(timerId);
       }
@@ -1837,23 +1987,17 @@ function SceneContent({
     const lastFrame = lastFrameTimeRef.current || now;
     const dt = Math.min(32, Math.max(8, now - lastFrame));
     lastFrameTimeRef.current = now;
-    const rawScroll = scrollProgressRef.current;
+    // scrollProgressRef is already eased by useSmoothScrollProgress; a second
+    // smoothing layer here added latency and, with frameloop="demand", could
+    // stall before converging (camera stuck half-way, never zooming out).
+    const rawScroll = Math.min(1, Math.max(0, scrollProgressRef.current));
     const rawDelta = rawScroll - lastRawScrollRef.current;
     lastRawScrollRef.current = rawScroll;
     const speed = Math.abs(rawDelta) / dt;
     scrollVelocityRef.current = speed;
     const speedNorm = Math.min(1, speed * 160);
-    const tau = 90 + speedNorm * 200;
-    const alpha = 1 - Math.exp(-dt / tau);
-    const delta = rawScroll - smoothScrollRef.current;
-    const maxStep = 0.08 - speedNorm * 0.04;
-    const step = Math.max(-maxStep, Math.min(maxStep, delta));
-    if (speedNorm > 0.6 || Math.abs(delta) > 0.12) {
-      smoothScrollRef.current = rawScroll;
-    } else {
-      smoothScrollRef.current += step * alpha;
-    }
-    const scroll = smoothScrollRef.current;
+    smoothScrollRef.current = rawScroll;
+    const scroll = rawScroll;
     const base = {
       x: isMobile ? 0 : 0.2,
       y: isMobile ? 0.6 : 0.9,
@@ -1995,7 +2139,11 @@ function SceneContent({
       setBgColor(nextColor);
     }
 
-    if (contentReadyRef.current && !frameReadyRef.current) {
+    if (
+      contentReadyRef.current &&
+      warmupDoneRef.current &&
+      !frameReadyRef.current
+    ) {
       frameReadyRef.current = true;
       onReadyAction?.();
     }
@@ -2004,6 +2152,10 @@ function SceneContent({
   const lights = DEFAULT_LIGHTS;
   const lightingActive = active && enhancedLighting && !performanceMode;
   const shadowsEnabled = lightingActive && !isFirefox;
+  useEffect(() => {
+    requestShadowMapUpdate(gl);
+    invalidate();
+  }, [gl, invalidate, shadowsEnabled, modelAttempt]);
   const shadowMapSize = performanceMode
     ? 256
     : lowPower
@@ -2070,6 +2222,9 @@ function SceneContent({
           angle={0.35}
         />
       ) : null}
+      {lightingActive && !minimalLighting && !isMobile ? (
+        <LocalEnvironment />
+      ) : null}
       <group
         ref={groupRef}
         castShadow={shadowsEnabled}
@@ -2114,9 +2269,6 @@ function SceneContent({
           </Suspense>
         </SceneErrorBoundary>
       </group>
-      {envReady && lightingActive && !minimalLighting && !isMobile ? (
-        <Environment preset="warehouse" />
-      ) : null}
     </>
   );
 }
@@ -2172,25 +2324,29 @@ export default function HeroScene(props: HeroSceneProps) {
     return isMobile || memory <= 4 || cores <= 4 || saveData || slowNetwork;
   }, [isMobile, lowPowerDisabled]);
   const lowPower = lowPowerOverride ? true : baseLowPower;
-  const performanceMode = lowPower || interactionActive;
+  // Interaction (scroll/touch) must NOT change lights, shadows, environment or
+  // dpr: every such change forces three.js to recompile all shader programs,
+  // which caused visible hitches on every scroll start/stop.
+  const performanceMode = lowPower;
   const enhancedLighting = useMemo(
     () => !lowPower && !isFirefox,
     [lowPower, isFirefox],
   );
+  // Device-pixel-ratio range. The scene is now light enough (meshopt model,
+  // static shadows, no per-scroll recompiles) to render sharply: the old
+  // 0.55-0.75 range made everything blurry on 3x phone screens.
   const dpr = useMemo(() => {
     if (!isActive) {
-      return [0.6, 0.8] as [number, number];
+      return [0.5, 0.75] as [number, number];
     }
-    if (performanceMode || lowPower) {
-      return isMobile
-        ? ([0.55, 0.75] as [number, number])
-        : ([0.6, 0.8] as [number, number]);
+    if (isMobile) {
+      return [1, 1.75] as [number, number];
     }
-    if (isMobile || isFirefox) {
-      return [0.7, 0.9] as [number, number];
+    if (lowPower || isFirefox) {
+      return [0.85, 1.25] as [number, number];
     }
-    return [0.9, 1] as [number, number];
-  }, [isActive, isFirefox, isMobile, lowPower, performanceMode]);
+    return [1, 1.5] as [number, number];
+  }, [isActive, isFirefox, isMobile, lowPower]);
   useEffect(() => {
     const handleInteraction = (event: Event) => {
       const { detail } = event as CustomEvent<{ active?: boolean }>;
@@ -2222,7 +2378,10 @@ export default function HeroScene(props: HeroSceneProps) {
           !isActive || performanceMode || isFirefox
             ? "low-power"
             : "high-performance",
-        logarithmicDepthBuffer: !performanceMode && !lowPower,
+        // logarithmicDepthBuffer writes gl_FragDepth in every shader, which
+        // disables early depth testing (expensive fill-rate) - not needed here.
+        logarithmicDepthBuffer: false,
+        stencil: false,
         alpha: true,
       }}
       shadows={enhancedLighting && !isMobile && !performanceMode && !isFirefox}
@@ -2255,6 +2414,11 @@ export default function HeroScene(props: HeroSceneProps) {
           false,
         );
         gl.setClearColor(0x000000, 0);
+        configureRendererDebug(gl);
+        // Lights and objects are static (only the camera moves), so the shadow
+        // map is rendered on demand instead of on every frame.
+        gl.shadowMap.autoUpdate = false;
+        gl.shadowMap.needsUpdate = true;
         return () => {
           gl.domElement.removeEventListener(
             "webglcontextlost",
