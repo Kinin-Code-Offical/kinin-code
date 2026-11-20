@@ -18,5 +18,10 @@ kinin-code.dev {
 		-Server
 	}
 
-	reverse_proxy 127.0.0.1:3000
+	reverse_proxy 127.0.0.1:3000 {
+		# Next.js compares proxy (middleware) rewrites against its own
+		# http:// origin; forwarding "https" made the /tr and /en rewrites
+		# be treated as external and fail with EPROTO (HTTP 500).
+		header_up X-Forwarded-Proto http
+	}
 }

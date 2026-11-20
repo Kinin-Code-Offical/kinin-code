@@ -13,7 +13,7 @@
 param(
   [string]$Instance = "kinin-code",
   [string]$Zone = "us-east1-b",
-  [string]$Project = "",
+  [string]$Project = "kinin-code-dev",
   [switch]$Setup,
   [switch]$SkipBuild
 )
@@ -22,7 +22,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
-$gcloudArgs = @("--zone", $Zone)
+$gcloudArgs = @("--zone", $Zone, "--quiet", "--strict-host-key-checking=no")
 if ($Project) { $gcloudArgs += @("--project", $Project) }
 
 if (-not $SkipBuild) {
