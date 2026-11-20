@@ -47,6 +47,12 @@ export const profile = {
       icon: "@",
     },
   ],
+  // Extra public profiles of the same person (structured data "sameAs").
+  // Add LinkedIn, ORCID, Google Scholar, etc. here when available.
+  sameAs: [
+    "https://github.com/Kinin-Code-Offical",
+    "https://patreon.com/YamacGursel",
+  ] as string[],
   terminal: {
     prompt: "yamac@comp:~$",
   },

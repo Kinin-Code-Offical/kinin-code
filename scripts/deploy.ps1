@@ -68,4 +68,8 @@ if ($LASTEXITCODE -ne 0) { throw "remote install failed" }
 
 Remove-Item -Recurse -Force $stage
 Remove-Item -Force $bundle
+
+# Tell Bing/Yandex (IndexNow) that the pages changed. Never fails the deploy.
+try { & node scripts/indexnow.mjs } catch { Write-Host "IndexNow ping skipped: $_" }
+
 Write-Host "==> Done: https://kinin.dev"
