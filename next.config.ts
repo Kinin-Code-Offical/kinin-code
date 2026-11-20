@@ -21,6 +21,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // HELLRUN sprites/textures and the paper PDFs rarely change:
+        // let browsers and Cloudflare cache them for a week.
+        source: "/:dir(hellrun|papers)/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=604800, stale-while-revalidate=86400",
+          },
+        ],
+      },
     ];
   },
 };

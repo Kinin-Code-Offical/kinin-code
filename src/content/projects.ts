@@ -7,13 +7,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Windows icin deterministik robotik simulasyon platformu. Unity 3D, .NET orchestration ve C++ fizik/firmware motorlariyla HIL odakli.",
+        "Windows için deterministik robotik simülasyon platformu. Unity 3D, .NET orkestrasyonu ve C++ fizik/firmware motorlarıyla HIL odaklı.",
       en:
         "Deterministic robotics simulation platform for Windows, combining Unity visuals, .NET orchestration, and C++ physics/firmware engines.",
     },
     detailsMd: {
       tr:
-        "### Ozellikler\n- Deterministik sabit zaman adimi scheduler\n- C++ fizik ve rigidbody motoru (AVX2 optimizasyon)\n- ATmega328P firmware emulasyonu\n- Unity 3D gorunum ve debug araclari\n- IPC ile HIL baglantisi",
+        "### Özellikler\n- Deterministik sabit zaman adımlı scheduler\n- C++ fizik ve rigidbody motoru (AVX2 optimizasyonu)\n- ATmega328P firmware emülasyonu\n- Unity 3D görünüm ve debug araçları\n- IPC ile HIL bağlantısı",
       en:
         "### Highlights\n- Deterministic fixed-step scheduler\n- C++ physics + rigid body engine (AVX2 optimized)\n- ATmega328P firmware emulation\n- Unity 3D visualization with debug tools\n- IPC-based HIL integration",
     },
@@ -30,13 +30,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Windows icin Cloud SQL Auth Proxy yonetimi yapan CLI. gcloud entegrasyonu, kurulum sihirbazi, servis yonetimi ve diagnostik akisi.",
+        "Windows için Cloud SQL Auth Proxy yönetimi yapan CLI. gcloud entegrasyonu, kurulum sihirbazı, servis yönetimi ve diagnostik akışı.",
       en:
         "Windows-native CLI for managing Cloud SQL Auth Proxy with gcloud integration, setup wizard, service control, and diagnostics.",
     },
     detailsMd: {
       tr:
-        "### Ozellikler\n- Kurulum sihirbazi ve otomatik proxy indirimi\n- gcloud/ADC kimlik dogrulama yardimcilari\n- Instance secimi ve arka plan servis yonetimi\n- JSON loglar ve hassas veri maskeleme\n- Doctor komutu ve self-update",
+        "### Özellikler\n- Kurulum sihirbazı ve otomatik proxy indirme\n- gcloud/ADC kimlik doğrulama yardımcıları\n- Instance seçimi ve arka plan servis yönetimi\n- JSON loglar ve hassas veri maskeleme\n- Doctor komutu ve self-update",
       en:
         "### Highlights\n- Setup wizard with automated proxy install\n- gcloud/ADC auth helpers\n- Instance selection + background service control\n- Structured JSON logs with masking\n- Doctor checks + self-update",
     },
@@ -54,13 +54,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Ogretmen ve ogrenciler icin kapsamli egitim yonetimi ve ozel ders takip platformu. Next.js 16 + Prisma + PostgreSQL.",
+        "Öğretmen ve öğrenciler için kapsamlı eğitim yönetimi ve özel ders takip platformu. Next.js 16 + Prisma + PostgreSQL.",
       en:
         "Comprehensive education management and tutoring platform built with Next.js 16, Prisma, and PostgreSQL.",
     },
     detailsMd: {
       tr:
-        "### Kapsam\n- Web + API ayri katmanlar\n- Prisma migration ve veri modeli\n- Dosya depolama (GCS) entegrasyonu\n- Kurumsal kullanima uygun yapilandirma",
+        "### Kapsam\n- Web + API ayrı katmanlar\n- Prisma migration ve veri modeli\n- Dosya depolama (GCS) entegrasyonu\n- Kurumsal kullanıma uygun yapılandırma",
       en:
         "### Scope\n- Separate web + API layers\n- Prisma migrations + data model\n- File storage integration (GCS)\n- Enterprise-ready configuration",
     },
@@ -78,13 +78,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Sigorta acenteleri icin poliçe/musteri/varlik yonetimi. Flutter on yuz, PHP REST API ve MySQL altyapisi.",
+        "Sigorta acenteleri için poliçe/müşteri/varlık yönetimi. Flutter ön yüz, PHP REST API ve MySQL altyapısı.",
       en:
         "Insurance agency management system with a Flutter client, PHP REST API, and MySQL backend.",
     },
     detailsMd: {
       tr:
-        "### Durum\n- Aktif gelistirme (on-going)\n- CI/CD akisi ve test altyapisi\n- Phinx migration yapisi",
+        "### Durum\n- Aktif geliştirme (devam ediyor)\n- CI/CD akışı ve test altyapısı\n- Phinx migration yapısı",
       en:
         "### Status\n- Actively in development\n- CI/testing pipeline\n- Phinx-based migrations",
     },
@@ -101,13 +101,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "ESP8266/ESP32 icin RFID erisim kontrol sistemi. Web arayuz, MQTT entegrasyonu ve WebSocket API.",
+        "ESP8266/ESP32 için RFID erişim kontrol sistemi. Web arayüzü, MQTT entegrasyonu ve WebSocket API.",
       en:
         "RFID access control system for ESP8266/ESP32 with web UI, MQTT integration, and WebSocket API.",
     },
     detailsMd: {
       tr:
-        "### Ozellikler\n- Wiegand, PN532 ve RDM6300 destegi\n- Gercek zamanli status + log akisi\n- NTP zaman senkronu\n- PlatformIO/Arduino kurulum akisi",
+        "### Özellikler\n- Wiegand, PN532 ve RDM6300 desteği\n- Gerçek zamanlı durum + log akışı\n- NTP zaman senkronu\n- PlatformIO/Arduino kurulum akışı",
       en:
         "### Highlights\n- Wiegand, PN532, and RDM6300 reader support\n- Real-time status + access logs\n- NTP time sync\n- PlatformIO/Arduino setup",
     },
@@ -124,13 +124,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "C++/C# tabanli oyun motoru ve editor (WPF). Grafik, matematik, ses ve networking katmanlari.",
+        "C++/C# tabanlı oyun motoru ve editör (WPF). Grafik, matematik, ses ve ağ katmanları.",
       en:
         "C++/C# game engine and editor (WPF) with rendering, math, audio, and networking layers.",
     },
     detailsMd: {
       tr:
-        "### Detaylar\n- C++ cekirdek motor + C# editor\n- DirectX 12 tabanli render hedefi\n- Oyun editoru ve sahne arayuzu",
+        "### Detaylar\n- C++ çekirdek motor + C# editör\n- DirectX 12 tabanlı render hedefi\n- Oyun editörü ve sahne arayüzü",
       en:
         "### Details\n- C++ core engine + C# editor\n- DirectX 12 rendering target\n- Editor tooling and scene UI",
     },
@@ -147,13 +147,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Model goruntuleme, sahne kompozisyonu ve optimizasyon icin moduler 3D arac seti. WebGL/R3F uyumlu akislar.",
+        "Model görüntüleme, sahne kompozisyonu ve optimizasyon için modüler 3D araç seti. WebGL/R3F uyumlu akışlar.",
       en:
         "Modular 3D tooling for model viewing, scene composition, and optimization with WebGL/R3F-friendly workflows.",
     },
     detailsMd: {
       tr:
-        "### Hedefler\n- Model import/export pipeline\n- Hafif material preset'leri\n- LOD ve performans profili\n- Editor odakli sahne katmanlari\n\n> Durum: aktif gelistirme",
+        "### Hedefler\n- Model import/export pipeline\n- Hafif materyal preset'leri\n- LOD ve performans profili\n- Editör odaklı sahne katmanları\n\n> Durum: aktif geliştirme",
       en:
         "### Goals\n- Model import/export pipeline\n- Lightweight material presets\n- LOD + performance profiling\n- Editor-focused scene layers\n\n> Status: in active development",
     },
@@ -168,13 +168,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Webtoon, cizgi roman, PDF ve akademik kaynaklari tek kutuphanede toplayan tarayici eklentisi.",
+        "Webtoon, çizgi roman, PDF ve akademik kaynakları tek kütüphanede toplayan tarayıcı eklentisi.",
       en:
         "Browser extension that collects webtoons, comics, PDFs, and academic sources into a unified library.",
     },
     detailsMd: {
       tr:
-        "### Kapsam\n- Otomatik kaydetme ve klasorleme\n- Etiketleme + arama\n- Okuma listesi ve ilerleme takibi\n- Hafif senkronizasyon modu\n\n> Durum: prototip",
+        "### Kapsam\n- Otomatik kaydetme ve klasörleme\n- Etiketleme + arama\n- Okuma listesi ve ilerleme takibi\n- Hafif senkronizasyon modu\n\n> Durum: prototip",
       en:
         "### Scope\n- One-click save and folders\n- Tagging + search\n- Reading list and progress tracking\n- Lightweight sync mode\n\n> Status: prototype",
     },
@@ -189,13 +189,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "Gercek zamanli rigidbody, carpisma ve zaman adimi icin optimize edilmis ozel fizik motoru.",
+        "Gerçek zamanlı rigidbody, çarpışma ve zaman adımı için optimize edilmiş özel fizik motoru.",
       en:
         "Custom real-time physics engine optimized for rigid bodies, collisions, and stable time-stepping.",
     },
     detailsMd: {
       tr:
-        "### Odak\n- Deterministik solver\n- Genisletilebilir carpisma katmani\n- Sabit zaman adimi pipeline\n\n> Durum: Ar-Ge asamasi",
+        "### Odak\n- Deterministik solver\n- Genişletilebilir çarpışma katmanı\n- Sabit zaman adımlı pipeline\n\n> Durum: Ar-Ge aşaması",
       en:
         "### Focus\n- Deterministic solver\n- Extensible collision layer\n- Fixed-step pipeline\n\n> Status: R&D phase",
     },
@@ -210,13 +210,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "ESP32/Arduino sinyallerini fizik motoru ile senkron calistiran, ikincil kernel destekli simulasyon ortami.",
+        "ESP32/Arduino sinyallerini fizik motoru ile senkron çalıştıran, ikincil kernel destekli simülasyon ortamı.",
       en:
         "Simulation kernel that syncs ESP32/Arduino signals with a physics engine, supporting a secondary runtime kernel.",
     },
     detailsMd: {
       tr:
-        "### Vizyon\n- Gercek donanim sinyaliyle hizalanmis simulasyon\n- Cift katmanli kernel modeli\n- Sensorden aktuatore tam dongu test\n\n> Durum: tasarim & mimari",
+        "### Vizyon\n- Gerçek donanım sinyaliyle hizalanmış simülasyon\n- Çift katmanlı kernel modeli\n- Sensörden aktüatöre tam döngü test\n\n> Durum: tasarım & mimari",
       en:
         "### Vision\n- Hardware-synchronized simulation signals\n- Dual-kernel runtime model\n- End-to-end sensor-to-actuator testing\n\n> Status: design & architecture",
     },
@@ -231,13 +231,13 @@ export const projects = [
     featured: true,
     summary: {
       tr:
-        "3D retro bilgisayar ve CRT terminal odakli portfoy sitesi. R3F, CanvasTexture ve i18n altyapisi.",
+        "3D retro bilgisayar ve CRT terminal odaklı portfolyo sitesi. R3F, CanvasTexture ve i18n altyapısı.",
       en:
         "3D retro-computer portfolio with CRT terminal, built on R3F, CanvasTexture, and i18n.",
     },
     detailsMd: {
       tr:
-        "### Ozellikler\n- GLB model + terminal texture mapping\n- i18n (TR/EN) ve SEO altyapisi\n- Performans odakli mobil degrade",
+        "### Özellikler\n- GLB model + terminal texture mapping\n- i18n (TR/EN) ve SEO altyapısı\n- Performans odaklı mobil sadeleştirme",
       en:
         "### Highlights\n- GLB model + terminal texture mapping\n- TR/EN i18n and SEO foundations\n- Performance-minded mobile degrade",
     },

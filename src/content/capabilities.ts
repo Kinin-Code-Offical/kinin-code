@@ -1,114 +1,161 @@
+// Capability cards, grouped into the electrical/electronics side and the
+// software/product side. Technologies listed are the ones used in the
+// projects on this site (RobotWin Studio, ESP-FIND, the Gong Global platform).
 export const capabilities = [
   {
-    id: "rapid-prototyping",
-    icon: "zap",
+    id: "pcb",
+    icon: "pcb",
+    group: { tr: "Elektrik–Elektronik", en: "Electrical & Electronics" },
     title: {
-      tr: "Hizli prototipleme",
-      en: "Rapid prototyping",
+      tr: "PCB tasarımı & donanım",
+      en: "PCB design & hardware",
     },
     body: {
-      tr: "Fikirleri hizlica MVP'ye cevirir, dogru iterasyonlarla gelistiririm.",
-      en: "Turn ideas into MVPs fast and iterate with clear, focused steps.",
+      tr: "Şematikten karta: sensör/MCU kartları, güç katları ve arayüz devreleri için şematik çizimi, PCB yerleşimi, üretim dosyaları ve prototipin devreye alınması.",
+      en: "From schematic to board: schematics, PCB layout, manufacturing files and bring-up for sensor/MCU boards, power stages and interface circuits.",
     },
     bullets: {
-      tr: ["Wireframe -> prototype akisi", "Hizli test ve geri bildirim"],
-      en: ["Wireframe to prototype flow", "Fast testing and feedback loops"],
+      tr: [
+        "Şematik çizimi ve PCB yerleşimi",
+        "Güç katı, koruma ve gürültüye dikkat eden tasarım",
+        "Gerber/BOM çıktısı, montaj ve ölçümle doğrulama",
+      ],
+      en: [
+        "Schematic capture and PCB layout",
+        "Power stages, protection and noise-aware design",
+        "Gerber/BOM output, assembly and bench verification",
+      ],
     },
+    tags: ["PCB", "Schematic", "Gerber/BOM", "Bring-up"],
   },
   {
-    id: "3d-modeling",
-    icon: "cube",
+    id: "signalling",
+    icon: "signal",
+    group: { tr: "Elektrik–Elektronik", en: "Electrical & Electronics" },
     title: {
-      tr: "3D cizim & modelleme",
-      en: "3D drafting & modeling",
+      tr: "Sinyalizasyon sistemleri",
+      en: "Signalling systems",
     },
     body: {
-      tr: "Blender ve oyun motoru uyumlu sahnelerle etkileyici 3D arayuzler.",
-      en: "Blender-first scenes and game-engine ready assets for 3D UIs.",
+      tr: "Raylı sistem, trafik ve endüstriyel sinyalizasyon için kontrol mantığı: durum makineleri, kilitleme (interlocking) kuralları, güvenli-hata (fail-safe) davranışı ve saha haberleşmesi.",
+      en: "Control logic for railway, traffic and industrial signalling: state machines, interlocking rules, fail-safe behaviour and field communication.",
     },
     bullets: {
-      tr: ["GLB/GLTF pipeline", "Sahne optimizasyonu"],
-      en: ["GLB/GLTF pipeline", "Scene optimization"],
+      tr: [
+        "Durum makinesi tabanlı kontrol ve kilitleme mantığı",
+        "Fail-safe tasarım, arıza tespiti ve izleme",
+        "Saha haberleşmesi: RS-485, CAN, MQTT",
+      ],
+      en: [
+        "State-machine control and interlocking logic",
+        "Fail-safe design, fault detection and monitoring",
+        "Field communication: RS-485, CAN, MQTT",
+      ],
     },
+    tags: ["Signalling", "Interlocking", "Fail-safe", "RS-485/CAN"],
   },
   {
-    id: "electronics",
+    id: "embedded",
     icon: "cpu",
+    group: { tr: "Elektrik–Elektronik", en: "Electrical & Electronics" },
     title: {
-      tr: "Elektronik devre tasarimi",
-      en: "Electronics & circuit design",
+      tr: "Gömülü sistemler & IoT",
+      en: "Embedded systems & IoT",
     },
     body: {
-      tr: "Sensor/MCU entegrasyonu ve devre prototipleme ile donanimi canliya tasirim.",
-      en: "Bring hardware to life with sensor/MCU integration and prototyping.",
+      tr: "ESP32/Arduino tabanlı cihazlar, firmware ve bulut bağlantısı; RFID erişim kontrolünden firmware emülasyonuna ve donanım-döngüde (HIL) teste kadar.",
+      en: "ESP32/Arduino devices, firmware and cloud connectivity — from RFID access control to firmware emulation and hardware-in-the-loop testing.",
     },
     bullets: {
-      tr: ["ESP32/Arduino projeleri", "Test ve kalibrasyon"],
-      en: ["ESP32/Arduino builds", "Testing and calibration"],
+      tr: [
+        "ESP32 / ESP8266 / ATmega328P firmware",
+        "MQTT, WebSocket ve REST ile bulut entegrasyonu",
+        "HIL test ve firmware emülasyonu",
+      ],
+      en: [
+        "ESP32 / ESP8266 / ATmega328P firmware",
+        "Cloud integration over MQTT, WebSocket and REST",
+        "HIL testing and firmware emulation",
+      ],
     },
-  },
-  {
-    id: "ai-training",
-    icon: "brain",
-    title: {
-      tr: "Yapay zeka egitimi",
-      en: "AI training",
-    },
-    body: {
-      tr: "Veri hazirlama, model egitimi ve deploy ile uctan uca yapay zeka.",
-      en: "Data prep, model training, and deployment from end to end.",
-    },
-    bullets: {
-      tr: ["Model iterasyonu", "Uygulama entegrasyonu"],
-      en: ["Model iteration", "App integration"],
-    },
+    tags: ["ESP32", "Arduino", "MQTT", "HIL"],
   },
   {
     id: "full-stack",
     icon: "layers",
+    group: { tr: "Yazılım & Ürün", en: "Software & Product" },
     title: {
-      tr: "Full-Stack gelistirme",
-      en: "Full-stack development",
+      tr: "Full-stack builder",
+      en: "Full-stack builder",
     },
     body: {
-      tr: "Frontend (Next.js/React), backend (Node/.NET), veritabani, API ve auth.",
-      en: "Frontend (Next.js/React), backend (Node/.NET), DB, API design, auth.",
+      tr: "Fikirden canlıya ürün: web, mobil ve masaüstü istemciler, API'ler, veritabanı ve bulut altyapısı tek elden. Gong Global'in yazılım ekosistemini bu şekilde kurdum.",
+      en: "Products from idea to production: web, mobile and desktop clients, APIs, databases and cloud infrastructure end to end — how I built Gong Global's software ecosystem.",
     },
     bullets: {
-      tr: ["API tasarimi", "Guvenli kimlik dogrulama"],
-      en: ["API design", "Secure authentication"],
+      tr: [
+        "Next.js/React, Astro · ASP.NET Core/.NET, Node.js",
+        "PostgreSQL (RLS), MariaDB · Kotlin/Compose, WPF",
+        "Google Cloud, Cloudflare, Docker, CI/CD",
+      ],
+      en: [
+        "Next.js/React, Astro · ASP.NET Core/.NET, Node.js",
+        "PostgreSQL (RLS), MariaDB · Kotlin/Compose, WPF",
+        "Google Cloud, Cloudflare, Docker, CI/CD",
+      ],
     },
+    tags: ["Next.js", ".NET", "PostgreSQL", "Kotlin", "GCP"],
   },
   {
-    id: "collaboration",
-    icon: "users",
+    id: "simulation-3d",
+    icon: "cube",
+    group: { tr: "Yazılım & Ürün", en: "Software & Product" },
     title: {
-      tr: "Multi-developer isbirligi",
-      en: "Multi-developer collaboration",
+      tr: "Simülasyon & 3D",
+      en: "Simulation & 3D",
     },
     body: {
-      tr: "Git akisi, code review ve CI/CD ile ekip gelistirme kulturunu kurarim.",
-      en: "Git flow, code reviews, and CI/CD for healthy team delivery.",
+      tr: "Deterministik robotik simülasyon, C++ fizik motorları, Unity sahneleri ve web için optimize 3D; mekanik parçalar için CAD ve 3D baskı.",
+      en: "Deterministic robotics simulation, C++ physics engines, Unity scenes and web-optimised 3D; CAD and 3D printing for mechanical parts.",
     },
     bullets: {
-      tr: ["Issue tabanli calisma", "Dokumantasyon disiplini"],
-      en: ["Issue-driven delivery", "Documentation discipline"],
+      tr: [
+        "C++ rigidbody fizik ve sabit adımlı scheduler",
+        "Unity, Three.js/R3F, GLB optimizasyonu",
+        "SolidWorks/STEP ile parça tasarımı ve 3D baskı",
+      ],
+      en: [
+        "C++ rigid-body physics and fixed-step scheduling",
+        "Unity, Three.js/R3F, GLB optimisation",
+        "SolidWorks/STEP part design and 3D printing",
+      ],
     },
+    tags: ["Unity", "C++", "WebGL", "SolidWorks"],
   },
   {
-    id: "custom-tools",
-    icon: "wrench",
+    id: "ai-automation",
+    icon: "brain",
+    group: { tr: "Yazılım & Ürün", en: "Software & Product" },
     title: {
-      tr: "Custom tool gelistirme",
-      en: "Custom tool building",
+      tr: "Yapay zeka & otomasyon",
+      en: "AI & automation",
     },
     body: {
-      tr: "Dahili CLI araclari, otomasyon scriptleri ve dashboard'lar uretirim.",
-      en: "Build internal CLI tools, automation scripts, and dashboards.",
+      tr: "Veri hazırlama, model eğitimi ve ürüne entegrasyon; OCR ve sınıflandırma gibi işleri otomatik iş akışlarına, tekrar eden işleri CLI araçlarına dönüştürürüm.",
+      en: "Data preparation, model training and product integration; I turn OCR and classification into automated workflows and repetitive work into CLI tools.",
     },
     bullets: {
-      tr: ["Gelisimci deneyimi", "Operasyonel hiz"],
-      en: ["Developer experience", "Operational speed"],
+      tr: [
+        "OCR ve otomatik belge sınıflandırma",
+        "Model eğitimi, değerlendirme ve deploy",
+        "CLI ve otomasyon araçları",
+      ],
+      en: [
+        "OCR and automatic document classification",
+        "Model training, evaluation and deployment",
+        "CLI and automation tooling",
+      ],
     },
+    tags: ["Python", "OCR", "ML", "CLI"],
   },
 ] as const;

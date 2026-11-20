@@ -3,14 +3,14 @@ export const profile = {
   fullName: "Yamaç Gürsel",
   asciiName: "Yamac Gursel",
   jobTitle: {
-    tr: "Full-Stack Geliştirici",
-    en: "Full-Stack Builder",
+    tr: "Elektrik-Elektronik & Full-Stack Builder",
+    en: "Electronics & Full-Stack Builder",
   },
   description: {
     tr:
-      "Elektrik elektronik öğrencisi ve full-stack geliştirici. 3D, web ve donanımı birleştirerek ürünler tasarlar, hızlı prototipler ve güçlü altyapı kurar.",
+      "Elektrik-elektronik mühendisliği öğrencisi ve full-stack builder. PCB tasarımı, sinyalizasyon ve gömülü sistemlerden web, mobil ve bulut ürünlerine; Gong Global'in yazılım ekosistemini kurdu, ZMUT teorik fizik makalesinin yazarı.",
     en:
-      "Electric & Electronics Engineering student and full-stack builder. I combine 3D, web, and hardware to ship products, rapid prototypes, and reliable systems.",
+      "Electrical & Electronics Engineering student and full-stack builder. From PCB design, signalling and embedded systems to web, mobile and cloud products; built Gong Global's software ecosystem and authored the ZMUT theoretical-physics paper.",
   },
   ogImage: "/og.png",
   roles: {
@@ -23,10 +23,10 @@ export const profile = {
   },
   introLines: {
     tr: [
-      "KININ-TERM 2.0 baslatiliyor...",
-      "Profil okunuyor: Yamac",
-      "Sistem hazir. /home/yamac baglandi.",
-      "\"help\" ile komutlari gorebilirsin.",
+      "KININ-TERM 2.0 başlatılıyor...",
+      "Profil okunuyor: Yamaç",
+      "Sistem hazır. /home/yamac bağlandı.",
+      "\"help\" ile komutları görebilirsin.",
     ],
     en: [
       "Starting KININ-TERM 2.0...",
@@ -51,5 +51,15 @@ export const profile = {
     prompt: "yamac@comp:~$",
   },
   latestProjectsCount: 8,
-  sections: ["home", "intro", "featured", "capabilities", "about", "projects", "contact"],
+  sections: [
+    "home",
+    "intro",
+    "featured",
+    "capabilities",
+    "experience",
+    "research",
+    "about",
+    "projects",
+    "contact",
+  ],
 } as const;

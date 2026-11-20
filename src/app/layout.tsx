@@ -8,6 +8,7 @@ import { getAlternateLanguage } from "@/lib/i18n";
 import { profile } from "@/content/profile";
 import {
   buildAlternates,
+  getGoogleVerification,
   getLocale,
   getSiteUrl,
   isNoIndex,
@@ -117,10 +118,22 @@ export async function generateMetadata(): Promise<Metadata> {
       fullName,
       profile.asciiName,
       jobTitle[language],
+      "Kinin Code",
+      language === "tr" ? "Elektrik Elektronik Mühendisliği" : "Electrical and Electronics Engineering",
+      language === "tr" ? "PCB tasarımı" : "PCB design",
+      language === "tr" ? "Sinyalizasyon" : "Signalling systems",
+      language === "tr" ? "Gömülü sistemler" : "Embedded systems",
+      "Full-stack",
       "Next.js",
+      ".NET",
       "Three.js",
+      "ZMUT",
+      "Gong Global",
       "Portfolio",
     ],
+    verification: getGoogleVerification()
+      ? { google: getGoogleVerification() }
+      : undefined,
     openGraph: {
       title,
       description,

@@ -93,30 +93,52 @@ function useSmoothScrollProgress(
       targetRef.current = raw;
     };
 
-    const epsilon = 0.0008;
-    // Time-based easing (same feel at 60/120 Hz and on slow phones).
-    const smoothingTauMs = 110;
+    // Critically damped spring (Unity-style SmoothDamp). Unlike plain
+    // exponential easing it keeps the velocity continuous, so every mouse-wheel
+    // notch blends into the motion instead of restarting it at full speed -
+    // that restart was the visible "lurch" of the camera zoom-out.
+    const smoothTime = 0.2; // seconds to (almost) reach the target
+    const epsilon = 0.00015;
+    let velocity = 0;
     let lastTickAt = 0;
 
     const tick = (time: number) => {
       if (!active || document.hidden) {
         running = false;
         rafRef.current = null;
-        return;
-      }
-      const dt = lastTickAt ? Math.min(64, Math.max(1, time - lastTickAt)) : 16;
-      lastTickAt = time;
-      const diff = targetRef.current - progressRef.current;
-      if (Math.abs(diff) < epsilon) {
-        progressRef.current = targetRef.current;
-        onUpdateRef.current?.(progressRef.current);
-        running = false;
-        rafRef.current = null;
+        velocity = 0;
         lastTickAt = 0;
         return;
       }
-      progressRef.current += diff * (1 - Math.exp(-dt / smoothingTauMs));
-      onUpdateRef.current?.(progressRef.current);
+      const dt =
+        (lastTickAt ? Math.min(64, Math.max(1, time - lastTickAt)) : 16) /
+        1000;
+      lastTickAt = time;
+      const target = targetRef.current;
+      const current = progressRef.current;
+      const omega = 2 / smoothTime;
+      const x = omega * dt;
+      const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+      const change = current - target;
+      const temp = (velocity + omega * change) * dt;
+      velocity = (velocity - omega * temp) * exp;
+      let next = target + (change + temp) * exp;
+      // Never overshoot the target.
+      if (target - current > 0 === next > target) {
+        next = target;
+        velocity = 0;
+      }
+      if (Math.abs(target - next) < epsilon && Math.abs(velocity) < 0.002) {
+        progressRef.current = target;
+        onUpdateRef.current?.(target);
+        running = false;
+        rafRef.current = null;
+        velocity = 0;
+        lastTickAt = 0;
+        return;
+      }
+      progressRef.current = next;
+      onUpdateRef.current?.(next);
       rafRef.current = window.requestAnimationFrame(tick);
     };
 
@@ -491,6 +513,38 @@ const capabilityIcons: Record<string, ReactElement> = {
       />
     </svg>
   ),
+  // Circuit board: outline, chip and traces.
+  pcb: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <rect x="9" y="9" width="6" height="6" rx="1" />
+        <path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l3 3M18 18l-3-3" />
+      </g>
+    </svg>
+  ),
+  // Signal head with three lamps.
+  signal: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round">
+        <rect x="8" y="2" width="8" height="15" rx="3" />
+        <circle cx="12" cy="6" r="1.4" />
+        <circle cx="12" cy="9.5" r="1.4" />
+        <circle cx="12" cy="13" r="1.4" />
+        <path d="M12 17v5M8 22h8" />
+      </g>
+    </svg>
+  ),
 };
 
 type SectionId = ContentData["profile"]["sections"][number];
@@ -499,7 +553,15 @@ export default function HomeClient({
   content,
   debugEnabled = false,
 }: HomeClientProps) {
-  const { profile, projects, theme, pages, capabilities } = content;
+  const {
+    profile,
+    projects,
+    theme,
+    pages,
+    capabilities,
+    experience,
+    research,
+  } = content;
   const { t, language, setLanguage } = useI18n();
   const { theme: currentTheme, toggleTheme, isSwitching } = usePreferences();
   const heroRef = useRef<HTMLElement>(null);
@@ -659,7 +721,6 @@ export default function HomeClient({
   const [sceneReadyAt, setSceneReadyAt] = useState<number | null>(null);
   const [siteReady, setSiteReady] = useState(false);
   const [openProjectId, setOpenProjectId] = useState<string | null>(null);
-  const [openCapabilityId, setOpenCapabilityId] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
   const [terminalFocused, setTerminalFocused] = useState(false);
@@ -1349,9 +1410,11 @@ export default function HomeClient({
     () =>
       capabilities.map((capability) => ({
         ...capability,
+        group: capability.group[language],
         title: capability.title[language],
         body: capability.body[language],
         bullets: capability.bullets ? capability.bullets[language] : undefined,
+        tags: capability.tags,
       })),
     [capabilities, language],
   );
@@ -1412,6 +1475,48 @@ export default function HomeClient({
     ].join("\n");
   }, [latestProjects, t.projects.latestTitle]);
 
+  const researchMd = useMemo(
+    () =>
+      research
+        .map((paper) =>
+          [
+            `# ${paper.title[language]}`,
+            "",
+            paper.subtitle[language],
+            `${paper.dateLabel[language]} · ${paper.role[language]}`,
+            "",
+            paper.summary[language],
+            "",
+            ...paper.highlights[language].map((item) => `- ${item}`),
+            "",
+            ...paper.links.map((link) => `- ${link.label[language]}: ${link.href}`),
+          ].join("\n"),
+        )
+        .join("\n\n"),
+    [language, research],
+  );
+
+  const experienceMd = useMemo(
+    () =>
+      experience
+        .map((job) =>
+          [
+            `# ${job.company} — ${job.role[language]}`,
+            "",
+            `${job.period[language]} · ${job.location[language]} · ${job.url}`,
+            "",
+            job.summary[language],
+            "",
+            ...job.projects.map(
+              (item) =>
+                `- ${item.title[language]}: ${item.summary[language]} [${item.tags.join(", ")}]`,
+            ),
+          ].join("\n"),
+        )
+        .join("\n\n"),
+    [experience, language],
+  );
+
   const files = useMemo(() => {
     const terminalUser =
       profile.terminal.prompt.split("@")[0] || t.terminal.system.userFallback;
@@ -1441,6 +1546,16 @@ export default function HomeClient({
         path: `${docsDir}/projects.md`,
         content: projectsMd,
         section: "projects",
+      },
+      {
+        path: `${docsDir}/experience.md`,
+        content: experienceMd,
+        section: "experience",
+      },
+      {
+        path: `${docsDir}/research.md`,
+        content: researchMd,
+        section: "research",
       },
       {
         path: `${docsDir}/contact.md`,
@@ -1665,6 +1780,8 @@ export default function HomeClient({
     profile.fullName,
     profile.terminal.prompt,
     projectsMd,
+    experienceMd,
+    researchMd,
     t.terminal.files,
     t.terminal.system.userFallback,
   ]);
@@ -1682,6 +1799,8 @@ export default function HomeClient({
     intro: t.nav.intro,
     featured: t.nav.featured,
     capabilities: t.nav.capabilities,
+    experience: t.nav.experience,
+    research: t.nav.research,
     about: t.nav.about,
     projects: t.nav.projects,
     contact: t.nav.contact,
@@ -2690,66 +2809,214 @@ export default function HomeClient({
                   transition: { staggerChildren: 0.06 },
                 },
               }}>
-              {localizedCapabilities.map((item) => {
-                const isOpen = openCapabilityId === item.id;
-                const hasDetails = Boolean(item.bullets?.length);
-                return (
-                  <motion.article
-                    key={item.id}
-                    className="capability-card"
-                    variants={{
-                      hidden: { opacity: 0, y: 16 },
-                      show: { opacity: 1, y: 0 },
-                    }}
-                    whileHover={
-                      reducedMotion ? undefined : { y: -2, scale: 1.01 }
-                    }
-                    transition={{ duration: 0.35, ease: "easeOut" }}>
+              {localizedCapabilities.map((item) => (
+                <motion.article
+                  key={item.id}
+                  className="capability-card"
+                  variants={{
+                    hidden: { opacity: 0, y: 16 },
+                    show: { opacity: 1, y: 0 },
+                  }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}>
+                  <header className="capability-head">
                     <span className="capability-icon">
                       {capabilityIcons[item.icon] ?? capabilityIcons.layers}
                     </span>
-                    <div className="capability-body">
-                      <h3>{item.title}</h3>
-                      <p>{item.body}</p>
-                    </div>
-                    {hasDetails ? (
-                      <button
-                        type="button"
-                        className="capability-toggle"
-                        aria-expanded={isOpen}
-                        onClick={() =>
-                          setOpenCapabilityId(isOpen ? null : item.id)
-                        }>
-                        {isOpen
-                          ? t.sections.capabilities.close
-                          : t.sections.capabilities.details}
-                      </button>
-                    ) : null}
-                    {hasDetails ? (
-                      <motion.div
-                        className="capability-details"
-                        initial={false}
-                        animate={
-                          isOpen
-                            ? { height: "auto", opacity: 1 }
-                            : { height: 0, opacity: 0 }
-                        }
-                        transition={
-                          reducedMotion
-                            ? { duration: 0 }
-                            : { duration: 0.25, ease: "easeOut" }
-                        }>
-                        <ul>
-                          {item.bullets?.map((bullet) => (
-                            <li key={bullet}>{bullet}</li>
-                          ))}
-                        </ul>
-                      </motion.div>
-                    ) : null}
-                  </motion.article>
-                );
-              })}
+                    <span className="capability-group">{item.group}</span>
+                  </header>
+                  <div className="capability-body">
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
+                  </div>
+                  {item.bullets?.length ? (
+                    <ul className="capability-points">
+                      {item.bullets.map((bullet) => (
+                        <li key={bullet}>{bullet}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {item.tags?.length ? (
+                    <ul className="capability-tags">
+                      {item.tags.map((tag) => (
+                        <li key={tag}>{tag}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </motion.article>
+              ))}
             </motion.div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="experience"
+          className="section section-experience"
+          aria-labelledby="experience-title"
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.12 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner">
+            <div className="section-header">
+              <span className="section-eyebrow">
+                {t.sections.experience.eyebrow}
+              </span>
+              <h2 className="section-title" id="experience-title">
+                {t.sections.experience.title}
+              </h2>
+              <p className="section-subtitle">
+                {t.sections.experience.subtitle}
+              </p>
+            </div>
+            {experience.map((job) => (
+              <article key={job.id} className="experience-card">
+                <header className="experience-card__head">
+                  <div>
+                    <h3 className="experience-card__company">{job.company}</h3>
+                    <p className="experience-card__role">{job.role[language]}</p>
+                  </div>
+                  <div className="experience-card__meta">
+                    <span>{job.period[language]}</span>
+                    <span>{job.location[language]}</span>
+                    <a
+                      href={job.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="experience-card__visit">
+                      {t.sections.experience.visit}
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  </div>
+                </header>
+                <p className="experience-card__summary">
+                  {job.summary[language]}
+                </p>
+                <dl className="research-stats experience-stats">
+                  {job.stats.map((stat) => (
+                    <div key={stat.label.en}>
+                      <dt>{stat.value}</dt>
+                      <dd>{stat.label[language]}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <h4 className="experience-card__built">
+                  {t.sections.experience.built}
+                </h4>
+                <ul className="experience-projects">
+                  {job.projects.map((item) => (
+                    <li key={item.id} className="experience-project">
+                      <h5>
+                        {"link" in item && item.link ? (
+                          <a
+                            href={item.link}
+                            target="_blank"
+                            rel="noopener noreferrer">
+                            {item.title[language]}
+                            <span aria-hidden="true"> ↗</span>
+                          </a>
+                        ) : (
+                          item.title[language]
+                        )}
+                      </h5>
+                      <p>{item.summary[language]}</p>
+                      <ul className="capability-tags">
+                        {item.tags.map((tag) => (
+                          <li key={tag}>{tag}</li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="research"
+          className="section section-research"
+          aria-labelledby="research-title"
+          initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.15 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}>
+          <div className="section-inner">
+            <div className="section-header">
+              <span className="section-eyebrow">
+                {t.sections.research.eyebrow}
+              </span>
+              <h2 className="section-title" id="research-title">
+                {t.sections.research.title}
+              </h2>
+              <p className="section-subtitle">
+                {t.sections.research.subtitle}
+              </p>
+            </div>
+            {research.map((paper) => (
+              <article key={paper.id} className="research-card">
+                <header className="research-card__head">
+                  <div className="research-card__meta">
+                    <span className="research-card__badge">
+                      {paper.shortTitle}
+                    </span>
+                    <span>{paper.field[language]}</span>
+                    <span aria-hidden="true">·</span>
+                    <time dateTime={paper.date}>
+                      {paper.dateLabel[language]}
+                    </time>
+                    <span aria-hidden="true">·</span>
+                    <span>{paper.role[language]}</span>
+                  </div>
+                  <h3 className="research-card__title">
+                    {paper.title[language]}
+                  </h3>
+                  <p className="research-card__subtitle">
+                    {paper.subtitle[language]}
+                  </p>
+                </header>
+                <div className="research-card__body">
+                  <p className="research-card__summary">
+                    {paper.summary[language]}
+                  </p>
+                  <dl className="research-stats">
+                    {paper.stats.map((stat) => (
+                      <div key={stat.value + stat.label.en}>
+                        <dt>{stat.value}</dt>
+                        <dd>{stat.label[language]}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div className="research-card__results">
+                  <h4>{t.sections.research.highlights}</h4>
+                  <ul>
+                    {paper.highlights[language].map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <footer className="research-card__foot">
+                  <ul className="research-tags" aria-label="tags">
+                    {paper.tags.map((tag) => (
+                      <li key={tag}>{tag}</li>
+                    ))}
+                  </ul>
+                  <div className="research-links">
+                    {paper.links.map((link) => (
+                      <a
+                        key={link.href}
+                        className="research-link"
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer">
+                        {link.label[language]}
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    ))}
+                  </div>
+                </footer>
+              </article>
+            ))}
           </div>
         </motion.section>
 

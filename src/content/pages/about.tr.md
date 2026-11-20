@@ -55,4 +55,4 @@ Her projeye **kullanıcı odaklı** bir bakış açısıyla yaklaşıyorum. Temi
 
 ## İletişim
 
-Yeni projeler, işbirlikleri veya teknik konularda fikir alışverişi için her zaman açığım. Benimle iletişime geçmek için aşağıdaki kanalları kullanabilirsiniz.
+Yeni projeler, iş birlikleri veya teknik konularda fikir alışverişi için her zaman açığım. Benimle iletişime geçmek için aşağıdaki kanalları kullanabilirsiniz.

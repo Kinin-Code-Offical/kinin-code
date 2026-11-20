@@ -13,6 +13,20 @@ import {
 } from "react";
 import { CanvasTexture, LinearFilter, SRGBColorSpace } from "three";
 import { languageMeta, type Language } from "@/lib/i18n";
+import { createChessBot, type ChessBot } from "./chess/bot";
+import {
+  createMusicPlayer,
+  describeTrack,
+  type MusicPlayer,
+} from "./media/music";
+import { DEMOS, demoForFile, renderDemo, type DemoId } from "./media/asciiDemos";
+import { HellrunGame } from "./hellrun";
+import {
+  getGameStatus,
+  positionKey,
+  type ChessState,
+  type EngineMove,
+} from "./chess/engine";
 
 export type TerminalFile = {
   path: string;
@@ -248,6 +262,7 @@ type TerminalCanvasProps = {
       illegalMove: string;
       checkmate: string;
       stalemate: string;
+      draw: string;
       check: string;
       botThinking: string;
       difficulty: string;
@@ -383,25 +398,6 @@ declare global {
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
-
-const hashString = (value: string) => {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-};
-
-const mulberry32 = (seed: number) => {
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
-};
 
 const resolvePath = (cwd: string, input: string, home: string) => {
   const value = input.trim();
@@ -872,7 +868,7 @@ const findNode = (root: FsNode, path: string) => {
   return node;
 };
 
-const markdownToLines = (text: string): Line[] => {
+const markdownToLines = (text: string, locale?: string): Line[] => {
   const rawLines = text.split("\n");
   const lines: Line[] = [];
   rawLines.forEach((raw) => {
@@ -885,7 +881,8 @@ const markdownToLines = (text: string): Line[] => {
       const clean = trimmed
         .replace(/^#+\s*/, "")
         .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
-      lines.push({ text: clean.toUpperCase() });
+      // Locale-aware so Turkish headings become "İLETİŞİM", not "İLETIŞIM".
+      lines.push({ text: clean.toLocaleUpperCase(locale) });
       return;
     }
     if (trimmed.startsWith("-")) {
@@ -1093,140 +1090,22 @@ export default function TerminalCanvas({
   const pongScoreRef = useRef({ player: 0, ai: 0 });
   const pongLivesRef = useRef(3);
   const pongOverRef = useRef(false);
-  const doomMapRef = useRef<number[][]>([]);
-  const doomPlayerRef = useRef({ x: 2.5, y: 2.5, angle: 0 });
-  const doomImpulseRef = useRef({ move: 0, strafe: 0, turn: 0 });
-  const doomFlashRef = useRef(0);
-  const doomMessageRef = useRef<string | null>(null);
-  const doomEnemiesRef = useRef<
-    Array<{
-      x: number;
-      y: number;
-      hp: number;
-      cooldown: number;
-      type: "raider" | "spitter" | "charger" | "brute";
-      anim: number;
-      hurt: number;
-      dead: boolean;
-      deadTimer: number;
-      seed: number;
-    }>
-  >([]);
-  const doomPickupsRef = useRef<
-    Array<{
-      x: number;
-      y: number;
-      type:
-        | "ammo"
-        | "shells"
-        | "rockets"
-        | "med"
-        | "shield"
-        | "bomb"
-        | "chest"
-        | "shotgun"
-        | "chainsaw"
-        | "chaingun"
-        | "launcher";
-    }>
-  >([]);
-  const doomPropsRef = useRef<
-    Array<{
-      x: number;
-      y: number;
-      type: "pillar" | "crate" | "torch" | "barrel";
-      hp?: number;
-    }>
-  >([]);
-  const doomAmmoRef = useRef(24);
-  const doomShellsRef = useRef(10);
-  const doomRocketsRef = useRef(2);
-  const doomHealthRef = useRef(100);
-  const doomShieldRef = useRef(60);
-  const doomBombsRef = useRef(2);
-  const doomScoreRef = useRef(0);
-  const doomCooldownRef = useRef(0);
-  const doomReloadRef = useRef(0);
-  const doomReloadMaxRef = useRef(0);
-  const doomGameOverRef = useRef(false);
-  const doomMiniMapRef = useRef(true);
-  const doomBobRef = useRef(0);
-  const doomLevelRef = useRef(0);
-  const doomExitRef = useRef<{ x: number; y: number } | null>(null);
-  const doomDoorStatesRef = useRef<
-    Record<
-      string,
-      { open: number; target: number; cooldown: number; locked?: boolean }
-    >
-  >({});
-  const doomHintRef = useRef<string | null>(null);
-  const doomHintWindowRef = useRef(true);
-  const doomMuzzleRef = useRef(0);
-  const doomHurtRef = useRef(0);
-  const doomTexturesRef = useRef<{
-    size: number;
-    brick: HTMLCanvasElement;
-    tech: HTMLCanvasElement;
-    stone: HTMLCanvasElement;
-    door: HTMLCanvasElement;
-  } | null>(null);
-  const doomWeaponRef = useRef<
-    "fist" | "chainsaw" | "pistol" | "shotgun" | "chaingun" | "launcher"
-  >("pistol");
-  const doomShotgunUnlockedRef = useRef(false);
-  const doomChainsawUnlockedRef = useRef(false);
-  const doomChaingunUnlockedRef = useRef(false);
-  const doomLauncherUnlockedRef = useRef(false);
-  const doomProjectilesRef = useRef<
-    Array<{
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      life: number;
-      kind: "fireball" | "rocket";
-      friendly: boolean;
-      damage: number;
-      radius: number;
-    }>
-  >([]);
-  const doomExplosionRef = useRef<{
-    life: number;
-    x: number;
-    y: number;
-  } | null>(null);
-  const doomBombRef = useRef<{
-    active: boolean;
-    x: number;
-    y: number;
-    z: number;
-    vx: number;
-    vy: number;
-    vz: number;
-    spin: number;
-    life: number;
-  } | null>(null);
-  const doomBloodRef = useRef<
-    Array<{
-      x: number;
-      y: number;
-      z: number;
-      vx: number;
-      vy: number;
-      vz: number;
-      life: number;
-      maxLife: number;
-      size: number;
-    }>
-  >([]);
-  const doomBootRef = useRef<{ start: number; duration: number } | null>(null);
   const chessBoardRef = useRef<string[][]>([]);
   const chessCursorRef = useRef<GridPoint>({ x: 0, y: 7 });
   const chessSelectedRef = useRef<GridPoint | null>(null);
   const chessTurnRef = useRef<"w" | "b">("w");
   const chessMovesRef = useRef(0);
   const chessStatusRef = useRef<string | null>(null);
-  const chessModeRef = useRef<"pvp" | "bot">("pvp");
+  // Default to playing against the engine: an empty PvP board on a single
+  // keyboard is not what visitors expect when they type "chess".
+  const chessModeRef = useRef<"pvp" | "bot">("bot");
+  const chessLastMoveRef = useRef<{ from: GridPoint; to: GridPoint } | null>(
+    null,
+  );
+  const chessHistoryRef = useRef<string[]>([]);
+  const chessBotRef = useRef<ChessBot | null>(null);
+  const hellrunRef = useRef<HellrunGame | null>(null);
+  const hellrunLastFrameRef = useRef(0);
   const chessBotColorRef = useRef<"w" | "b">("b");
   const chessDifficultyRef = useRef<"easy" | "medium" | "hard">("medium");
   const chessBotThinkingRef = useRef(false);
@@ -1258,21 +1137,19 @@ export default function TerminalCanvas({
   const playerTitleRef = useRef("");
   const playerProgressRef = useRef(0);
   const playerDurationRef = useRef(180);
+  const playerLastTickRef = useRef(0);
+  const musicPlayerRef = useRef<MusicPlayer | null>(null);
+  const musicTrackRef = useRef<string | null>(null);
+  const musicEndedRef = useRef(false);
+  const playerSpectrumRef = useRef<Uint8Array>(new Uint8Array(40));
+  const demoIdRef = useRef<DemoId>("plasma");
+  const demoStateRef = useRef<unknown>(undefined);
   const playerIsPlayingRef = useRef(false);
-  const playerBarsRef = useRef<number[][]>([]);
   const playerStatusRef = useRef<string | null>(null);
   const playerImageListRef = useRef<string[]>([]);
   const playerImageIndexRef = useRef(0);
   const playerImageZoomRef = useRef(1);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const audioMasterRef = useRef<GainNode | null>(null);
-  const audioFilterRef = useRef<BiquadFilterNode | null>(null);
-  const audioDriveRef = useRef<WaveShaperNode | null>(null);
-  const audioPulseRef = useRef<OscillatorNode | null>(null);
-  const audioPulseGainRef = useRef<GainNode | null>(null);
-  const audioOscillatorsRef = useRef<OscillatorNode[]>([]);
-  const audioLfoRef = useRef<OscillatorNode | null>(null);
-  const audioLfoGainRef = useRef<GainNode | null>(null);
   const audioVolumeRef = useRef(0);
   const audioTargetRef = useRef(0);
   const audioTimerRef = useRef<number | null>(null);
@@ -1310,161 +1187,6 @@ export default function TerminalCanvas({
   const interactionActiveRef = useRef(false);
   const hasTerminalContentRef = useRef(false);
   const isActiveRef = useRef(isActive);
-
-  const doomText = useCallback(
-    (key: keyof TerminalCanvasProps["messages"]["doom"] | string) =>
-      messages.doom[key as keyof TerminalCanvasProps["messages"]["doom"]] ??
-      key,
-    [messages.doom],
-  );
-
-  const ensureDoomTextures = useCallback(() => {
-    if (doomTexturesRef.current) {
-      return doomTexturesRef.current;
-    }
-    if (typeof document === "undefined") {
-      return null;
-    }
-    const size = 64;
-    const makeTexture = (
-      seed: number,
-      draw: (ctx: CanvasRenderingContext2D, rand: () => number) => void,
-    ) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        return canvas;
-      }
-      ctx.imageSmoothingEnabled = false;
-      const rand = mulberry32(seed);
-      draw(ctx, rand);
-      return canvas;
-    };
-
-    const brick = makeTexture(hashString("hellrun-brick"), (ctx, rand) => {
-      ctx.fillStyle = "#2a1412";
-      ctx.fillRect(0, 0, size, size);
-      const brickW = 16;
-      const brickH = 8;
-      for (let y = 0; y < size; y += brickH) {
-        const row = Math.floor(y / brickH);
-        const offset = row % 2 === 0 ? 0 : Math.floor(brickW / 2);
-        for (let x = -offset; x < size; x += brickW) {
-          const shade = 0.75 + rand() * 0.35;
-          const r = Math.floor(120 * shade);
-          const g = Math.floor(46 * shade);
-          const b = Math.floor(38 * shade);
-          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-          ctx.fillRect(x + 1, y + 1, brickW - 2, brickH - 2);
-        }
-      }
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      for (let y = 0; y < size; y += brickH) {
-        ctx.fillRect(0, y, size, 1);
-      }
-      for (let y = 0; y < size; y += brickH) {
-        const row = Math.floor(y / brickH);
-        const offset = row % 2 === 0 ? 0 : Math.floor(brickW / 2);
-        for (let x = -offset; x < size; x += brickW) {
-          ctx.fillRect(x, y, 1, brickH);
-        }
-      }
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      for (let i = 0; i < 18; i += 1) {
-        const x = Math.floor(rand() * size);
-        const y = Math.floor(rand() * size);
-        ctx.fillRect(x, y, 1, 1);
-      }
-    });
-
-    const tech = makeTexture(hashString("hellrun-tech"), (ctx, rand) => {
-      ctx.fillStyle = "#1e2326";
-      ctx.fillRect(0, 0, size, size);
-      for (let i = 0; i < 12; i += 1) {
-        const x = Math.floor(rand() * (size - 10));
-        const y = Math.floor(rand() * (size - 10));
-        const w = 10 + Math.floor(rand() * 24);
-        const h = 8 + Math.floor(rand() * 18);
-        ctx.fillStyle = `rgba(120, 150, 155, ${0.06 + rand() * 0.08})`;
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = "rgba(255,255,255,0.12)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-      }
-      ctx.fillStyle = "rgba(246,194,122,0.12)";
-      for (let y = 0; y < size; y += 4) {
-        ctx.fillRect(0, y, size, 1);
-      }
-      ctx.fillStyle = "rgba(0,0,0,0.28)";
-      for (let x = 0; x < size; x += 8) {
-        ctx.fillRect(x, 0, 1, size);
-      }
-      ctx.fillStyle = "rgba(246,194,122,0.2)";
-      ctx.fillRect(Math.floor(size * 0.75), 0, 2, size);
-    });
-
-    const stone = makeTexture(hashString("hellrun-stone"), (ctx, rand) => {
-      ctx.fillStyle = "#2a241d";
-      ctx.fillRect(0, 0, size, size);
-      for (let i = 0; i < 260; i += 1) {
-        const x = Math.floor(rand() * size);
-        const y = Math.floor(rand() * size);
-        const v = 60 + Math.floor(rand() * 80);
-        ctx.fillStyle = `rgba(${v}, ${Math.floor(v * 0.9)}, ${Math.floor(
-          v * 0.75,
-        )}, 0.22)`;
-        ctx.fillRect(x, y, 1, 1);
-      }
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      for (let y = 0; y < size; y += 8) {
-        for (let x = 0; x < size; x += 8) {
-          if (rand() > 0.75) {
-            ctx.fillRect(x, y, 8, 1);
-          }
-        }
-      }
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
-      for (let i = 0; i < 32; i += 1) {
-        ctx.fillRect(
-          Math.floor(rand() * size),
-          Math.floor(rand() * size),
-          2,
-          1,
-        );
-      }
-    });
-
-    const door = makeTexture(hashString("hellrun-door"), (ctx, rand) => {
-      ctx.fillStyle = "#3b2a1c";
-      ctx.fillRect(0, 0, size, size);
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      for (let x = 0; x < size; x += 10) {
-        ctx.fillRect(x, 0, 2, size);
-      }
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      for (let x = 6; x < size; x += 12) {
-        ctx.fillRect(x, 0, 1, size);
-      }
-      ctx.fillStyle = "rgba(246,194,122,0.22)";
-      ctx.fillRect(Math.floor(size * 0.62), 0, 3, size);
-      ctx.fillStyle = "#f4d35e";
-      ctx.fillRect(Math.floor(size * 0.7), Math.floor(size * 0.6), 6, 4);
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      for (let i = 0; i < 22; i += 1) {
-        ctx.fillRect(
-          Math.floor(rand() * size),
-          Math.floor(rand() * size),
-          1,
-          1,
-        );
-      }
-    });
-
-    doomTexturesRef.current = { size, brick, tech, stone, door };
-    return doomTexturesRef.current;
-  }, []);
 
   const perfInfo = useMemo(() => {
     if (typeof navigator === "undefined") {
@@ -2013,1594 +1735,6 @@ export default function TerminalCanvas({
     dirtyRef.current = true;
   }, [computeAppGrid]);
 
-  const beginDoomBoot = useCallback((duration = 1400) => {
-    const now =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
-    doomBootRef.current = { start: now, duration };
-  }, []);
-
-  const doomLevels = useMemo(
-    () => [
-      [
-        "#################",
-        "#..D..V.#...D..X#",
-        "#..##...#..I..A.#",
-        "#..#....#.......#",
-        "#..#..SF#..##...#",
-        "#..####.#..#..K.#",
-        "#......D#..#..#.#",
-        "#..P..Q..#..B.#.#",
-        "#..##..T.#..V...#",
-        "#..#.....#..###.#",
-        "#..#..Z..#......#",
-        "#..D..G.Y#..C..H#",
-        "#################",
-      ],
-      [
-        "####################",
-        "#S..#....D..I..A..X#",
-        "#..###..#####..##..#",
-        "#..#..Q.#..P....#..#",
-        "#..#..T.#..###..#..#",
-        "#..#....#..V.#..#..#",
-        "#..####..D##.#..#..#",
-        "#..#..Z.....#..B..##",
-        "#..#..###.#.#..#####",
-        "#..#..K..U#.#..Y...#",
-        "#..#..#######..C.RH#",
-        "####################",
-      ],
-      [
-        "####################",
-        "#S....#..D..I..A..X#",
-        "#.#######..#######.#",
-        "#..#....#..#....#..#",
-        "#..#..T.#..#..P.#..#",
-        "#..#..Q.#..#..V.#..#",
-        "#..####.#..####.#..#",
-        "#..#..O.#..#..B.#R.#",
-        "#..#....#..#....#..#",
-        "#..#..K.#..####.#..#",
-        "#..#....#..L..C..YH#",
-        "####################",
-      ],
-      [
-        "####################",
-        "#S..A......#....D.X#",
-        "#..####...#..###...#",
-        "#..#..I...#..#O#...#",
-        "#..#..V...#..###...#",
-        "#..#..Q...#........#",
-        "#..#..#####....#...#",
-        "#..#..#...Z....#...#",
-        "#....V#....####....#",
-        "#..U..#..R.....Q...#",
-        "#..#######..#####..#",
-        "#..B..K..L..Y..H...#",
-        "####################",
-      ],
-    ],
-    [],
-  );
-
-  const getDoomBootProgress = useCallback(() => {
-    const boot = doomBootRef.current;
-    if (!boot) {
-      return 1;
-    }
-    const now =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
-    const progress = clamp((now - boot.start) / boot.duration, 0, 1);
-    if (progress >= 1) {
-      doomBootRef.current = null;
-    }
-    return progress;
-  }, []);
-
-  const loadDoomLevel = useCallback(
-    (index: number, resetStats: boolean) => {
-      const clampedIndex = clamp(index, 0, doomLevels.length - 1);
-      const layout = doomLevels[clampedIndex] ?? doomLevels[0];
-      const enemies: Array<{
-        x: number;
-        y: number;
-        hp: number;
-        cooldown: number;
-        type: "raider" | "spitter" | "charger" | "brute";
-        anim: number;
-        hurt: number;
-        dead: boolean;
-        deadTimer: number;
-        seed: number;
-      }> = [];
-      const pickups: Array<{
-        x: number;
-        y: number;
-        type:
-          | "ammo"
-          | "shells"
-          | "rockets"
-          | "med"
-          | "shield"
-          | "bomb"
-          | "chest"
-          | "shotgun"
-          | "chainsaw"
-          | "chaingun"
-          | "launcher";
-      }> = [];
-      const props: Array<{
-        x: number;
-        y: number;
-        type: "pillar" | "crate" | "torch" | "barrel";
-        hp?: number;
-      }> = [];
-      const doors: Record<
-        string,
-        { open: number; target: number; cooldown: number; locked?: boolean }
-      > = {};
-      let exit: { x: number; y: number } | null = null;
-      const makeEnemy = (
-        type: "raider" | "spitter" | "charger" | "brute",
-        hp: number,
-        x: number,
-        y: number,
-        glyph: string,
-      ) => {
-        const seed = hashString(
-          `hellrun-enemy-${clampedIndex}-${x}-${y}-${glyph}`,
-        );
-        enemies.push({
-          x: x + 0.5,
-          y: y + 0.5,
-          hp,
-          cooldown: 0,
-          type,
-          anim: ((seed % 1024) / 1024) * Math.PI * 2,
-          hurt: 0,
-          dead: false,
-          deadTimer: 0,
-          seed,
-        });
-      };
-      const map = layout.map((row, y) =>
-        row.split("").map((cell, x) => {
-          if (cell === "E") {
-            makeEnemy("raider", 4, x, y, cell);
-            return 0;
-          }
-          if (cell === "I") {
-            makeEnemy("spitter", 3, x, y, cell);
-            return 0;
-          }
-          if (cell === "Z") {
-            makeEnemy("charger", 5, x, y, cell);
-            return 0;
-          }
-          if (cell === "O") {
-            makeEnemy("brute", 9, x, y, cell);
-            return 0;
-          }
-          if (cell === "A") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "ammo" });
-            return 0;
-          }
-          if (cell === "H") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "med" });
-            return 0;
-          }
-          if (cell === "K") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "shield" });
-            return 0;
-          }
-          if (cell === "B") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "bomb" });
-            return 0;
-          }
-          if (cell === "C") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "chest" });
-            return 0;
-          }
-          if (cell === "G") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "shotgun" });
-            return 0;
-          }
-          if (cell === "Y") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "shells" });
-            return 0;
-          }
-          if (cell === "R") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "rockets" });
-            return 0;
-          }
-          if (cell === "F") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "chainsaw" });
-            return 0;
-          }
-          if (cell === "U") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "chaingun" });
-            return 0;
-          }
-          if (cell === "L") {
-            pickups.push({ x: x + 0.5, y: y + 0.5, type: "launcher" });
-            return 0;
-          }
-          if (cell === "P") {
-            props.push({ x: x + 0.5, y: y + 0.5, type: "pillar" });
-            return 0;
-          }
-          if (cell === "T") {
-            props.push({ x: x + 0.5, y: y + 0.5, type: "torch" });
-            return 0;
-          }
-          if (cell === "Q") {
-            props.push({ x: x + 0.5, y: y + 0.5, type: "crate", hp: 6 });
-            return 0;
-          }
-          if (cell === "V") {
-            props.push({ x: x + 0.5, y: y + 0.5, type: "barrel", hp: 3 });
-            return 0;
-          }
-          if (cell === "D") {
-            doors[`${x},${y}`] = { open: 0, target: 0, cooldown: 0 };
-            return 2;
-          }
-          if (cell === "X") {
-            exit = { x: x + 0.5, y: y + 0.5 };
-            return 0;
-          }
-          return cell === "#" ? 1 : 0;
-        }),
-      );
-      let spawn = { x: 2.5, y: 2.5 };
-      layout.forEach((row, y) => {
-        const x = row.indexOf("S");
-        if (x >= 0) {
-          spawn = { x: x + 0.5, y: y + 0.5 };
-        }
-      });
-      doomMapRef.current = map;
-      doomEnemiesRef.current = enemies;
-      doomPickupsRef.current = pickups;
-      doomPropsRef.current = props;
-      doomDoorStatesRef.current = doors;
-      doomExitRef.current = exit;
-      doomLevelRef.current = clampedIndex;
-      doomPlayerRef.current = { x: spawn.x, y: spawn.y, angle: 0 };
-      doomImpulseRef.current = { move: 0, strafe: 0, turn: 0 };
-      doomFlashRef.current = 0;
-      doomMuzzleRef.current = 0;
-      doomHurtRef.current = 0;
-      doomExplosionRef.current = null;
-      doomBombRef.current = null;
-      doomProjectilesRef.current = [];
-      doomBloodRef.current = [];
-      doomHintRef.current = null;
-      doomHintWindowRef.current = true;
-      doomCooldownRef.current = 0;
-      doomReloadRef.current = 0;
-      doomReloadMaxRef.current = 0;
-      doomGameOverRef.current = false;
-      doomBobRef.current = 0;
-      if (resetStats) {
-        doomAmmoRef.current = 40;
-        doomShellsRef.current = 8;
-        doomRocketsRef.current = 2;
-        doomHealthRef.current = 100;
-        doomShieldRef.current = 60;
-        doomBombsRef.current = 2;
-        doomScoreRef.current = 0;
-        doomWeaponRef.current = "pistol";
-        doomShotgunUnlockedRef.current = false;
-        doomChainsawUnlockedRef.current = false;
-        doomChaingunUnlockedRef.current = false;
-        doomLauncherUnlockedRef.current = false;
-      }
-      doomMessageRef.current = resetStats
-        ? doomText("ready")
-        : `${doomText("nextLevel")} ${clampedIndex + 1}`;
-      dirtyRef.current = true;
-    },
-    [doomLevels, doomText],
-  );
-
-  const resetDoom = useCallback(() => {
-    loadDoomLevel(0, true);
-  }, [loadDoomLevel]);
-
-  const castDoomDistance = useCallback(
-    (origin: { x: number; y: number }, angle: number, maxDist: number) => {
-      const map = doomMapRef.current;
-      if (!map.length) {
-        return maxDist;
-      }
-      const dirX = Math.cos(angle) || 0.0001;
-      const dirY = Math.sin(angle) || 0.0001;
-      let mapX = Math.floor(origin.x);
-      let mapY = Math.floor(origin.y);
-      const deltaDistX = Math.abs(1 / dirX);
-      const deltaDistY = Math.abs(1 / dirY);
-      const stepX = dirX < 0 ? -1 : 1;
-      const stepY = dirY < 0 ? -1 : 1;
-      let sideDistX =
-        (dirX < 0 ? origin.x - mapX : mapX + 1 - origin.x) * deltaDistX;
-      let sideDistY =
-        (dirY < 0 ? origin.y - mapY : mapY + 1 - origin.y) * deltaDistY;
-      let side = 0;
-      let distance = maxDist;
-      for (let step = 0; step < 96; step += 1) {
-        if (sideDistX < sideDistY) {
-          sideDistX += deltaDistX;
-          mapX += stepX;
-          side = 0;
-        } else {
-          sideDistY += deltaDistY;
-          mapY += stepY;
-          side = 1;
-        }
-        const cell = map[mapY]?.[mapX];
-        if (cell === 2) {
-          const doorOpen =
-            doomDoorStatesRef.current[`${mapX},${mapY}`]?.open ?? 0;
-          if (doorOpen >= 0.7) {
-            continue;
-          }
-        }
-        if (!cell || cell < 1) {
-          const props = doomPropsRef.current;
-          for (let i = 0; i < props.length; i += 1) {
-            const prop = props[i];
-            if (!prop || prop.type === "torch") {
-              continue;
-            }
-            if (Math.floor(prop.x) === mapX && Math.floor(prop.y) === mapY) {
-              const raw =
-                side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-              distance = Math.min(maxDist, raw);
-              return distance;
-            }
-          }
-        }
-        if (cell && cell >= 1) {
-          const raw =
-            side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-          distance = Math.min(maxDist, raw);
-          break;
-        }
-        const raw =
-          side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-        if (raw >= maxDist) {
-          distance = maxDist;
-          break;
-        }
-      }
-      return distance;
-    },
-    [],
-  );
-
-  const applyDoomPickup = useCallback(
-    (pickup: {
-      type:
-        | "ammo"
-        | "shells"
-        | "rockets"
-        | "med"
-        | "shield"
-        | "bomb"
-        | "chest"
-        | "shotgun"
-        | "chainsaw"
-        | "chaingun"
-        | "launcher";
-    }) => {
-      if (pickup.type === "ammo") {
-        doomAmmoRef.current = Math.min(99, doomAmmoRef.current + 12);
-        doomMessageRef.current = doomText("ammoPlus");
-        return;
-      }
-      if (pickup.type === "shells") {
-        doomShellsRef.current = Math.min(99, doomShellsRef.current + 5);
-        doomMessageRef.current = doomText("shellsPlus");
-        return;
-      }
-      if (pickup.type === "rockets") {
-        doomRocketsRef.current = Math.min(50, doomRocketsRef.current + 2);
-        doomMessageRef.current = doomText("rocketsPlus");
-        return;
-      }
-      if (pickup.type === "med") {
-        doomHealthRef.current = Math.min(100, doomHealthRef.current + 20);
-        doomMessageRef.current = doomText("healthPlus");
-        return;
-      }
-      if (pickup.type === "shield") {
-        doomShieldRef.current = Math.min(100, doomShieldRef.current + 35);
-        doomMessageRef.current = doomText("shieldPlus");
-        return;
-      }
-      if (pickup.type === "bomb") {
-        doomBombsRef.current = Math.min(9, doomBombsRef.current + 1);
-        doomMessageRef.current = doomText("bombPlus");
-        return;
-      }
-      if (pickup.type === "shotgun") {
-        doomShotgunUnlockedRef.current = true;
-        doomWeaponRef.current = "shotgun";
-        doomShellsRef.current = Math.min(99, doomShellsRef.current + 6);
-        doomMessageRef.current = doomText("shotgun");
-        return;
-      }
-      if (pickup.type === "chainsaw") {
-        doomChainsawUnlockedRef.current = true;
-        doomWeaponRef.current = "chainsaw";
-        doomMessageRef.current = doomText("chainsaw");
-        return;
-      }
-      if (pickup.type === "chaingun") {
-        doomChaingunUnlockedRef.current = true;
-        doomWeaponRef.current = "chaingun";
-        doomAmmoRef.current = Math.min(99, doomAmmoRef.current + 18);
-        doomMessageRef.current = doomText("chaingun");
-        return;
-      }
-      if (pickup.type === "launcher") {
-        doomLauncherUnlockedRef.current = true;
-        doomWeaponRef.current = "launcher";
-        doomRocketsRef.current = Math.min(50, doomRocketsRef.current + 2);
-        doomMessageRef.current = doomText("launcher");
-        return;
-      }
-      doomScoreRef.current += 5;
-      doomAmmoRef.current = Math.min(99, doomAmmoRef.current + 6);
-      doomShellsRef.current = Math.min(99, doomShellsRef.current + 2);
-      doomMessageRef.current = doomText("chest");
-    },
-    [doomText],
-  );
-
-  const findNearestDoomPickup = useCallback((radius: number) => {
-    const player = doomPlayerRef.current;
-    let bestIndex = -1;
-    let bestDist = radius;
-    doomPickupsRef.current.forEach((pickup, index) => {
-      const dist = Math.hypot(pickup.x - player.x, pickup.y - player.y);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIndex = index;
-      }
-    });
-    return bestIndex >= 0 ? { index: bestIndex, dist: bestDist } : null;
-  }, []);
-
-  const findNearestDoomPickupInFront = useCallback(
-    (radius: number, halfFov: number) => {
-      const player = doomPlayerRef.current;
-      let bestIndex = -1;
-      let bestDist = radius;
-      doomPickupsRef.current.forEach((pickup, index) => {
-        const dx = pickup.x - player.x;
-        const dy = pickup.y - player.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist >= bestDist) {
-          return;
-        }
-        const angle = Math.atan2(dy, dx);
-        const delta = Math.atan2(
-          Math.sin(angle - player.angle),
-          Math.cos(angle - player.angle),
-        );
-        if (Math.abs(delta) > halfFov) {
-          return;
-        }
-        bestDist = dist;
-        bestIndex = index;
-      });
-      return bestIndex >= 0 ? { index: bestIndex, dist: bestDist } : null;
-    },
-    [],
-  );
-
-  const applyDoomPlayerDamage = useCallback(
-    (damage: number, flash = 2) => {
-      if (doomShieldRef.current > 0) {
-        const absorbed = Math.min(doomShieldRef.current, damage);
-        doomShieldRef.current -= absorbed;
-        const left = damage - absorbed;
-        if (left > 0) {
-          doomHealthRef.current = Math.max(0, doomHealthRef.current - left);
-        }
-      } else {
-        doomHealthRef.current = Math.max(0, doomHealthRef.current - damage);
-      }
-      doomFlashRef.current = Math.max(doomFlashRef.current, flash);
-      doomHurtRef.current = 14;
-      doomMessageRef.current = doomText("damage");
-      if (doomHealthRef.current <= 0) {
-        doomGameOverRef.current = true;
-        doomMessageRef.current = doomText("died");
-      }
-    },
-    [doomText],
-  );
-
-  const spawnDoomBlood = useCallback(
-    (
-      x: number,
-      y: number,
-      opts: { count?: number; strength?: number; pool?: boolean } = {},
-    ) => {
-      const count = Math.max(0, Math.floor(opts.count ?? 6));
-      const strength = clamp(opts.strength ?? 1, 0.4, 2);
-      const blood = doomBloodRef.current;
-      for (let i = 0; i < count; i += 1) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = (0.015 + Math.random() * 0.05) * strength;
-        const life = Math.floor(18 + Math.random() * 18);
-        blood.push({
-          x,
-          y,
-          z: 0.05 + Math.random() * 0.35,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          vz: (0.06 + Math.random() * 0.14) * strength,
-          life,
-          maxLife: life,
-          size: clamp(0.6 + Math.random() * 0.8 * strength, 0.6, 2.2),
-        });
-      }
-      if (opts.pool) {
-        const poolLife = Math.floor(220 + Math.random() * 120);
-        blood.push({
-          x,
-          y,
-          z: 0,
-          vx: 0,
-          vy: 0,
-          vz: 0,
-          life: poolLife,
-          maxLife: poolLife,
-          size: clamp(1.4 * strength, 0.9, 2.4),
-        });
-      }
-      const cap = 140;
-      if (blood.length > cap) {
-        blood.splice(0, blood.length - cap);
-      }
-    },
-    [],
-  );
-
-  const triggerDoomExplosion = useCallback(
-    (
-      x: number,
-      y: number,
-      opts: {
-        radius: number;
-        damage: number;
-        flash: number;
-        life: number;
-        scorePerKill: number;
-      },
-    ) => {
-      const pending: Array<{ x: number; y: number; strength: number }> = [
-        { x, y, strength: 1 },
-      ];
-      const seen = new Set<string>();
-      let loops = 0;
-      while (pending.length && loops < 12) {
-        loops += 1;
-        const next = pending.shift();
-        if (!next) {
-          break;
-        }
-        const key = `${Math.floor(next.x * 10)},${Math.floor(next.y * 10)}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-
-        const strength = clamp(next.strength, 0.4, 1);
-        const radius = opts.radius * strength;
-        const damage = opts.damage * strength;
-        const flash = opts.flash * strength;
-        const life = Math.max(8, Math.round(opts.life * strength));
-
-        doomExplosionRef.current = { life, x: next.x, y: next.y };
-        doomFlashRef.current = Math.max(doomFlashRef.current, flash);
-
-        const enemies = doomEnemiesRef.current;
-        for (let i = enemies.length - 1; i >= 0; i -= 1) {
-          const enemy = enemies[i];
-          if (enemy.dead) {
-            continue;
-          }
-          const dist = Math.hypot(enemy.x - next.x, enemy.y - next.y);
-          if (dist > radius) {
-            continue;
-          }
-          const scale = 1 - dist / Math.max(0.0001, radius);
-          const dmg = Math.max(1, Math.round(damage * scale));
-          enemy.hp -= dmg;
-          enemy.hurt = Math.max(enemy.hurt, 12);
-          const bloodStrength = clamp(dmg / 8, 0.6, 1.7);
-          spawnDoomBlood(enemy.x, enemy.y, {
-            count: Math.floor(3 + 4 * bloodStrength),
-            strength: bloodStrength,
-          });
-          if (enemy.hp <= 0) {
-            enemy.dead = true;
-            enemy.deadTimer = 260;
-            doomScoreRef.current += opts.scorePerKill;
-            spawnDoomBlood(enemy.x, enemy.y, {
-              count: Math.floor(10 + 6 * bloodStrength),
-              strength: Math.max(1.2, bloodStrength),
-              pool: true,
-            });
-          }
-        }
-
-        const props = doomPropsRef.current;
-        for (let i = props.length - 1; i >= 0; i -= 1) {
-          const prop = props[i];
-          if (!prop || prop.type === "torch" || prop.type === "pillar") {
-            continue;
-          }
-          const dist = Math.hypot(prop.x - next.x, prop.y - next.y);
-          if (dist > radius) {
-            continue;
-          }
-          const scale = 1 - dist / Math.max(0.0001, radius);
-          const dmg = Math.max(1, Math.round(damage * 0.9 * scale));
-          prop.hp = Math.max(0, (prop.hp ?? 1) - dmg);
-          if (prop.hp <= 0) {
-            props.splice(i, 1);
-            if (prop.type === "barrel") {
-              pending.push({ x: prop.x, y: prop.y, strength: strength * 0.7 });
-            } else if (prop.type === "crate") {
-              const roll = Math.random();
-              const pickupType =
-                roll < 0.5
-                  ? "ammo"
-                  : roll < 0.78
-                    ? "shells"
-                    : roll < 0.9
-                      ? "bomb"
-                      : "med";
-              doomPickupsRef.current.push({
-                x: prop.x,
-                y: prop.y,
-                type: pickupType,
-              });
-            }
-          }
-        }
-
-        const player = doomPlayerRef.current;
-        const playerDist = Math.hypot(player.x - next.x, player.y - next.y);
-        if (playerDist < radius * 0.92) {
-          const scale = 1 - playerDist / Math.max(0.0001, radius);
-          applyDoomPlayerDamage(
-            Math.max(3, Math.round(damage * 0.45 * scale)),
-            flash + 1,
-          );
-        }
-      }
-    },
-    [applyDoomPlayerDamage, spawnDoomBlood],
-  );
-
-  const shootDoom = useCallback(() => {
-    if (doomGameOverRef.current) {
-      return;
-    }
-    if (doomReloadRef.current > 0) {
-      return;
-    }
-    if (doomCooldownRef.current > 0) {
-      return;
-    }
-    const weapon = doomWeaponRef.current;
-    const player = doomPlayerRef.current;
-    const enemies = doomEnemiesRef.current;
-
-    const applyDamage = (index: number, damage: number) => {
-      const enemy = enemies[index];
-      if (!enemy || enemy.dead) {
-        return false;
-      }
-      enemy.hp -= damage;
-      enemy.hurt = Math.max(enemy.hurt, 12);
-      const bloodStrength = clamp(damage / 3, 0.6, 1.6);
-      spawnDoomBlood(enemy.x, enemy.y, {
-        count: Math.floor(4 + 3 * bloodStrength),
-        strength: bloodStrength,
-      });
-      if (enemy.hp <= 0) {
-        enemy.dead = true;
-        enemy.deadTimer = 260;
-        doomScoreRef.current += 1;
-        doomMessageRef.current = doomText("targetDown");
-        spawnDoomBlood(enemy.x, enemy.y, {
-          count: Math.floor(12 + 6 * bloodStrength),
-          strength: Math.max(1.2, bloodStrength),
-          pool: true,
-        });
-      } else {
-        doomMessageRef.current = doomText("hit");
-      }
-      return true;
-    };
-
-    const pickEnemyTarget = (
-      aimAngle: number,
-      maxRange: number,
-      halfFov: number,
-    ) => {
-      let bestIndex = -1;
-      let bestDist = 999;
-      for (let i = 0; i < enemies.length; i += 1) {
-        const enemy = enemies[i];
-        if (enemy.dead) {
-          continue;
-        }
-        const dx = enemy.x - player.x;
-        const dy = enemy.y - player.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 0.25 || dist > maxRange) {
-          continue;
-        }
-        const angle = Math.atan2(dy, dx);
-        const delta = Math.atan2(
-          Math.sin(angle - aimAngle),
-          Math.cos(angle - aimAngle),
-        );
-        if (Math.abs(delta) > halfFov) {
-          continue;
-        }
-        const wallDist = castDoomDistance(player, angle, dist + 0.05);
-        if (wallDist + 0.05 < dist) {
-          continue;
-        }
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIndex = i;
-        }
-      }
-      return bestIndex >= 0 ? { index: bestIndex, dist: bestDist } : null;
-    };
-
-    const pickPropTarget = (
-      aimAngle: number,
-      maxRange: number,
-      halfFov: number,
-    ) => {
-      const props = doomPropsRef.current;
-      let bestIndex = -1;
-      let bestDist = 999;
-      for (let i = 0; i < props.length; i += 1) {
-        const prop = props[i];
-        if (!prop || prop.type === "torch" || prop.type === "pillar") {
-          continue;
-        }
-        const dx = prop.x - player.x;
-        const dy = prop.y - player.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 0.25 || dist > maxRange) {
-          continue;
-        }
-        const angle = Math.atan2(dy, dx);
-        const delta = Math.atan2(
-          Math.sin(angle - aimAngle),
-          Math.cos(angle - aimAngle),
-        );
-        if (Math.abs(delta) > halfFov) {
-          continue;
-        }
-        const wallDist = castDoomDistance(player, angle, dist + 0.05);
-        if (wallDist + 0.25 < dist) {
-          continue;
-        }
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIndex = i;
-        }
-      }
-      return bestIndex >= 0 ? { index: bestIndex, dist: bestDist } : null;
-    };
-
-    const damageProp = (index: number, damage: number) => {
-      const props = doomPropsRef.current;
-      const prop = props[index];
-      if (!prop || prop.type === "torch" || prop.type === "pillar") {
-        return false;
-      }
-      prop.hp = Math.max(0, (prop.hp ?? 1) - damage);
-      if (prop.hp > 0) {
-        doomMessageRef.current = doomText("hit");
-        return true;
-      }
-      props.splice(index, 1);
-      if (prop.type === "barrel") {
-        triggerDoomExplosion(prop.x, prop.y, {
-          radius: 2.4,
-          damage: 12,
-          flash: 7,
-          life: 12,
-          scorePerKill: 1,
-        });
-        doomMessageRef.current = doomText("boom");
-        return true;
-      }
-      if (prop.type === "crate") {
-        doomScoreRef.current += 1;
-        const roll = Math.random();
-        const pickupType =
-          roll < 0.5
-            ? "ammo"
-            : roll < 0.78
-              ? "shells"
-              : roll < 0.9
-                ? "bomb"
-                : "med";
-        doomPickupsRef.current.push({ x: prop.x, y: prop.y, type: pickupType });
-        doomMessageRef.current = doomText("hit");
-        return true;
-      }
-      doomMessageRef.current = doomText("hit");
-      return true;
-    };
-
-    if (weapon === "fist" || weapon === "chainsaw") {
-      doomCooldownRef.current = weapon === "chainsaw" ? 4 : 14;
-      doomMuzzleRef.current = weapon === "chainsaw" ? 10 : 8;
-      doomMessageRef.current = doomText(
-        weapon === "chainsaw" ? "saw" : "punch",
-      );
-      const enemyTarget = pickEnemyTarget(
-        player.angle,
-        weapon === "chainsaw" ? 1.35 : 1.05,
-        weapon === "chainsaw" ? 0.85 : 0.65,
-      );
-      const propTarget = pickPropTarget(
-        player.angle,
-        weapon === "chainsaw" ? 1.35 : 1.05,
-        weapon === "chainsaw" ? 0.75 : 0.6,
-      );
-      if (propTarget && (!enemyTarget || propTarget.dist <= enemyTarget.dist)) {
-        damageProp(propTarget.index, weapon === "chainsaw" ? 2 : 3);
-        return;
-      }
-      if (enemyTarget) {
-        applyDamage(enemyTarget.index, weapon === "chainsaw" ? 2 : 3);
-      }
-      return;
-    }
-
-    if (weapon === "launcher") {
-      if (!doomLauncherUnlockedRef.current) {
-        doomMessageRef.current = doomText("noLauncher");
-        return;
-      }
-      if (doomRocketsRef.current <= 0) {
-        doomMessageRef.current = doomText("noRockets");
-        return;
-      }
-      doomRocketsRef.current -= 1;
-      doomCooldownRef.current = 26;
-      doomFlashRef.current = 10;
-      doomMuzzleRef.current = 16;
-      doomMessageRef.current = doomText("rocket");
-      const dirX = Math.cos(player.angle);
-      const dirY = Math.sin(player.angle);
-      doomProjectilesRef.current.push({
-        x: player.x + dirX * 0.35,
-        y: player.y + dirY * 0.35,
-        vx: dirX * 0.24,
-        vy: dirY * 0.24,
-        life: 70,
-        kind: "rocket",
-        friendly: true,
-        damage: 18,
-        radius: 2.8,
-      });
-      return;
-    }
-
-    if (weapon === "shotgun") {
-      if (!doomShotgunUnlockedRef.current) {
-        doomMessageRef.current = doomText("noShotgun");
-        return;
-      }
-      if (doomShellsRef.current <= 0) {
-        doomMessageRef.current = doomText("noShells");
-        return;
-      }
-      doomShellsRef.current -= 1;
-      doomCooldownRef.current = 18;
-      doomFlashRef.current = 8;
-      doomMuzzleRef.current = 14;
-      doomMessageRef.current = doomText("fire");
-      const pellets = 7;
-      const spread = 0.22;
-      const pelletFov = 0.14;
-      const pelletHits = new Array(enemies.length).fill(0);
-      for (let pellet = 0; pellet < pellets; pellet += 1) {
-        const aimAngle = player.angle + (Math.random() - 0.5) * spread;
-        const target = pickEnemyTarget(aimAngle, 8.5, pelletFov);
-        if (target) {
-          pelletHits[target.index] += 1;
-        }
-      }
-      let anyHit = false;
-      for (let i = enemies.length - 1; i >= 0; i -= 1) {
-        const hits = pelletHits[i] ?? 0;
-        if (hits <= 0) {
-          continue;
-        }
-        anyHit = true;
-        applyDamage(i, hits);
-      }
-      if (!anyHit) {
-        const propTarget = pickPropTarget(player.angle, 8.5, 0.16);
-        if (propTarget) {
-          damageProp(propTarget.index, 4);
-        } else {
-          doomMessageRef.current = doomText("fire");
-        }
-      }
-      return;
-    }
-
-    const isChaingun = weapon === "chaingun";
-    if (isChaingun && !doomChaingunUnlockedRef.current) {
-      doomMessageRef.current = doomText("noChaingun");
-      return;
-    }
-    if (doomAmmoRef.current <= 0) {
-      doomMessageRef.current = doomText("noAmmo");
-      return;
-    }
-    doomAmmoRef.current -= 1;
-    doomCooldownRef.current = isChaingun ? 4 : 10;
-    doomFlashRef.current = isChaingun ? 5 : 6;
-    doomMuzzleRef.current = isChaingun ? 8 : 10;
-    doomMessageRef.current = doomText("fire");
-    const aimAngle =
-      player.angle + (isChaingun ? (Math.random() - 0.5) * 0.06 : 0);
-    const enemyTarget = pickEnemyTarget(aimAngle, 9, isChaingun ? 0.18 : 0.22);
-    const propTarget = pickPropTarget(aimAngle, 9, isChaingun ? 0.16 : 0.18);
-    if (propTarget && (!enemyTarget || propTarget.dist <= enemyTarget.dist)) {
-      damageProp(propTarget.index, 1);
-      return;
-    }
-    if (enemyTarget) {
-      applyDamage(enemyTarget.index, 1);
-    }
-  }, [castDoomDistance, doomText, spawnDoomBlood, triggerDoomExplosion]);
-
-  const throwDoomBomb = useCallback(() => {
-    if (doomGameOverRef.current) {
-      return;
-    }
-    if (doomBombsRef.current <= 0) {
-      doomMessageRef.current = doomText("noBombs");
-      return;
-    }
-    doomBombsRef.current -= 1;
-    const player = doomPlayerRef.current;
-    const dirX = Math.cos(player.angle);
-    const dirY = Math.sin(player.angle);
-    doomBombRef.current = {
-      active: true,
-      x: player.x + dirX * 0.3,
-      y: player.y + dirY * 0.3,
-      z: 0.25,
-      vx: dirX * 0.18,
-      vy: dirY * 0.18,
-      vz: 0.18,
-      spin: Math.random() * Math.PI * 2,
-      life: 52,
-    };
-    doomMessageRef.current = doomText("boom");
-  }, [doomText]);
-
-  const reloadDoom = useCallback(() => {
-    if (getDoomBootProgress() < 1) {
-      return;
-    }
-    if (doomGameOverRef.current) {
-      beginDoomBoot();
-      resetDoom();
-      return;
-    }
-    if (doomReloadRef.current > 0) {
-      return;
-    }
-    const weapon = doomWeaponRef.current;
-    if (weapon === "fist" || weapon === "chainsaw") {
-      doomMessageRef.current = doomText("ready");
-      return;
-    }
-    const duration =
-      weapon === "pistol"
-        ? 18
-        : weapon === "shotgun"
-          ? 26
-          : weapon === "chaingun"
-            ? 22
-            : weapon === "launcher"
-              ? 28
-              : 20;
-    doomReloadRef.current = duration;
-    doomReloadMaxRef.current = duration;
-    doomMessageRef.current = doomText("reload");
-  }, [beginDoomBoot, doomText, getDoomBootProgress, resetDoom]);
-
-  const openDoomDoor = useCallback(() => {
-    const map = doomMapRef.current;
-    if (!map.length) {
-      return false;
-    }
-    const player = doomPlayerRef.current;
-    const lookX = player.x + Math.cos(player.angle) * 0.8;
-    const lookY = player.y + Math.sin(player.angle) * 0.8;
-    const gx = Math.floor(lookX);
-    const gy = Math.floor(lookY);
-    if (map[gy]?.[gx] !== 2) {
-      doomMessageRef.current = doomText("noDoor");
-      return false;
-    }
-    const key = `${gx},${gy}`;
-    const door = doomDoorStatesRef.current[key];
-    if (!door) {
-      doomMessageRef.current = doomText("noDoor");
-      return false;
-    }
-    const nextTarget = door.target > 0.5 ? 0 : 1;
-    door.target = nextTarget;
-    door.cooldown = 140;
-    doomMessageRef.current =
-      nextTarget > 0 ? doomText("doorOpen") : doomText("doorClose");
-    return true;
-  }, [doomText]);
-
-  const interactDoom = useCallback(() => {
-    if (doomGameOverRef.current) {
-      return false;
-    }
-
-    const player = doomPlayerRef.current;
-    const exit = doomExitRef.current;
-    if (exit && Math.hypot(exit.x - player.x, exit.y - player.y) < 1.05) {
-      const nextLevel = doomLevelRef.current + 1;
-      if (nextLevel < doomLevels.length) {
-        doomAmmoRef.current = Math.min(99, doomAmmoRef.current + 8);
-        doomHealthRef.current = Math.min(100, doomHealthRef.current + 10);
-        loadDoomLevel(nextLevel, false);
-      } else {
-        doomMessageRef.current = doomText("clear");
-      }
-      return true;
-    }
-
-    const pickupTarget = findNearestDoomPickupInFront(1.05, 0.55);
-    if (pickupTarget) {
-      const pickup = doomPickupsRef.current[pickupTarget.index];
-      if (pickup) {
-        const angle = Math.atan2(pickup.y - player.y, pickup.x - player.x);
-        const wallDist = castDoomDistance(
-          player,
-          angle,
-          pickupTarget.dist + 0.12,
-        );
-        if (wallDist + 0.05 >= pickupTarget.dist) {
-          applyDoomPickup(pickup);
-          doomPickupsRef.current = doomPickupsRef.current.filter(
-            (_, index) => index !== pickupTarget.index,
-          );
-          return true;
-        }
-      }
-    }
-
-    if (openDoomDoor()) {
-      return true;
-    }
-    const nearest = findNearestDoomPickup(0.9);
-    if (!nearest) {
-      return false;
-    }
-    const pickup = doomPickupsRef.current[nearest.index];
-    if (!pickup) {
-      return false;
-    }
-    applyDoomPickup(pickup);
-    doomPickupsRef.current = doomPickupsRef.current.filter(
-      (_, index) => index !== nearest.index,
-    );
-    return true;
-  }, [
-    applyDoomPickup,
-    castDoomDistance,
-    doomLevels.length,
-    doomText,
-    findNearestDoomPickup,
-    findNearestDoomPickupInFront,
-    loadDoomLevel,
-    openDoomDoor,
-  ]);
-
-  const stepDoom = useCallback(() => {
-    const map = doomMapRef.current;
-    if (!map.length) {
-      return;
-    }
-    if (getDoomBootProgress() < 1) {
-      return;
-    }
-    if (doomGameOverRef.current) {
-      return;
-    }
-    const player = doomPlayerRef.current;
-    const impulse = doomImpulseRef.current;
-    if (doomFlashRef.current > 0) {
-      doomFlashRef.current -= 1;
-    }
-    if (doomMuzzleRef.current > 0) {
-      doomMuzzleRef.current -= 1;
-    }
-    if (doomHurtRef.current > 0) {
-      doomHurtRef.current -= 1;
-    }
-    if (doomExplosionRef.current) {
-      doomExplosionRef.current.life -= 1;
-      if (doomExplosionRef.current.life <= 0) {
-        doomExplosionRef.current = null;
-      }
-    }
-    if (doomCooldownRef.current > 0) {
-      doomCooldownRef.current -= 1;
-    }
-    if (doomReloadRef.current > 0) {
-      doomReloadRef.current -= 1;
-      if (doomReloadRef.current <= 0) {
-        doomReloadRef.current = 0;
-        doomReloadMaxRef.current = 0;
-      }
-    }
-    impulse.move *= 0.82;
-    impulse.strafe *= 0.82;
-    impulse.turn *= 0.7;
-    player.angle += impulse.turn;
-    const speed = Math.abs(impulse.move) + Math.abs(impulse.strafe);
-    doomBobRef.current = (doomBobRef.current + speed * 4) % (Math.PI * 2);
-    const cos = Math.cos(player.angle);
-    const sin = Math.sin(player.angle);
-    const moveX = cos * impulse.move + -sin * impulse.strafe;
-    const moveY = sin * impulse.move + cos * impulse.strafe;
-    const nextX = player.x + moveX;
-    const nextY = player.y + moveY;
-    const radius = 0.18;
-    const isWall = (x: number, y: number) => {
-      const gx = Math.floor(x);
-      const gy = Math.floor(y);
-      const cell = map[gy]?.[gx] ?? 0;
-      if (cell === 2) {
-        const door = doomDoorStatesRef.current[`${gx},${gy}`];
-        return (door?.open ?? 0) < 0.7;
-      }
-      if (cell >= 1) {
-        return true;
-      }
-      const props = doomPropsRef.current;
-      for (let i = 0; i < props.length; i += 1) {
-        const prop = props[i];
-        if (!prop || prop.type === "torch") {
-          continue;
-        }
-        const dx = prop.x - x;
-        const dy = prop.y - y;
-        const radius =
-          prop.type === "pillar" ? 0.28 : prop.type === "barrel" ? 0.24 : 0.26;
-        if (dx * dx + dy * dy < radius * radius) {
-          return true;
-        }
-      }
-      return false;
-    };
-    if (
-      !isWall(nextX + radius, player.y) &&
-      !isWall(nextX - radius, player.y)
-    ) {
-      player.x = nextX;
-    }
-    if (
-      !isWall(player.x, nextY + radius) &&
-      !isWall(player.x, nextY - radius)
-    ) {
-      player.y = nextY;
-    }
-
-    const blood = doomBloodRef.current;
-    for (let i = blood.length - 1; i >= 0; i -= 1) {
-      const drop = blood[i];
-      drop.life -= 1;
-      if (drop.life <= 0) {
-        blood.splice(i, 1);
-        continue;
-      }
-      if (drop.z > 0 || drop.vz !== 0) {
-        drop.vz -= 0.018;
-        drop.z += drop.vz;
-        if (drop.z <= 0) {
-          drop.z = 0;
-          drop.vz = 0;
-        }
-      }
-      const nextX = drop.x + drop.vx;
-      const nextY = drop.y + drop.vy;
-      if (!isWall(nextX, drop.y)) {
-        drop.x = nextX;
-      } else {
-        drop.vx *= -0.18;
-      }
-      if (!isWall(drop.x, nextY)) {
-        drop.y = nextY;
-      } else {
-        drop.vy *= -0.18;
-      }
-      const drag = drop.z > 0 ? 0.92 : 0.86;
-      drop.vx *= drag;
-      drop.vy *= drag;
-    }
-
-    const doors = doomDoorStatesRef.current;
-    Object.entries(doors).forEach(([key, door]) => {
-      const [sx, sy] = key.split(",").map((value) => Number(value));
-      const centerX = sx + 0.5;
-      const centerY = sy + 0.5;
-      const dist = Math.hypot(centerX - player.x, centerY - player.y);
-      if (door.cooldown > 0) {
-        door.cooldown -= 1;
-      }
-      if (door.target > 0.5 && dist < 1.1) {
-        door.target = 1;
-      } else if (door.cooldown <= 0) {
-        door.target = 0;
-      }
-      const next = door.open + (door.target - door.open) * 0.18;
-      door.open = clamp(next, 0, 1);
-    });
-
-    const autoPickup = findNearestDoomPickup(0.6);
-    if (autoPickup) {
-      const pickup = doomPickupsRef.current[autoPickup.index];
-      if (pickup) {
-        applyDoomPickup(pickup);
-        doomPickupsRef.current = doomPickupsRef.current.filter(
-          (_, index) => index !== autoPickup.index,
-        );
-      }
-    }
-
-    const pickups = doomPickupsRef.current;
-    const nearestPickup = findNearestDoomPickupInFront(1.15, 0.6);
-    let hint: string | null = null;
-    if (nearestPickup) {
-      const pickup = pickups[nearestPickup.index];
-      const labelMap: Record<string, string> = {
-        ammo: "AMMO",
-        shells: "SHELLS",
-        rockets: "ROCKETS",
-        med: "MED",
-        shield: "SHIELD",
-        bomb: "BOMB",
-        chest: "CHEST",
-        shotgun: "SHOTGUN",
-        chainsaw: "CHAINSAW",
-        chaingun: "CHAINGUN",
-        launcher: "LAUNCHER",
-      };
-      hint =
-        `${doomText("interactPickup")} ${labelMap[pickup.type] ?? ""}`.trim();
-    }
-    const lookX = player.x + Math.cos(player.angle) * 0.9;
-    const lookY = player.y + Math.sin(player.angle) * 0.9;
-    const lookGX = Math.floor(lookX);
-    const lookGY = Math.floor(lookY);
-    if (!hint && map[lookGY]?.[lookGX] === 2) {
-      hint = doomText("interactDoor");
-    }
-    const exit = doomExitRef.current;
-    if (
-      !hint &&
-      exit &&
-      Math.hypot(exit.x - player.x, exit.y - player.y) < 1.1
-    ) {
-      hint = doomText("interactExit");
-    }
-    doomHintRef.current = hint;
-
-    const bomb = doomBombRef.current;
-    if (bomb?.active) {
-      bomb.life -= 1;
-      const gravity = 0.028;
-      bomb.vz -= gravity;
-
-      const airDrag = bomb.z > 0 ? 0.995 : 0.92;
-      bomb.vx *= airDrag;
-      bomb.vy *= airDrag;
-
-      const radius = 0.16;
-      let nextX = bomb.x + bomb.vx;
-      let nextY = bomb.y + bomb.vy;
-      const hitX =
-        isWall(nextX + radius, bomb.y) || isWall(nextX - radius, bomb.y);
-      if (hitX) {
-        bomb.vx = -bomb.vx * 0.55;
-        bomb.vy *= 0.75;
-        nextX = bomb.x;
-      }
-      const hitY =
-        isWall(bomb.x, nextY + radius) || isWall(bomb.x, nextY - radius);
-      if (hitY) {
-        bomb.vy = -bomb.vy * 0.55;
-        bomb.vx *= 0.75;
-        nextY = bomb.y;
-      }
-      bomb.x = nextX;
-      bomb.y = nextY;
-
-      bomb.z += bomb.vz;
-      if (bomb.z <= 0) {
-        bomb.z = 0;
-        if (bomb.vz < -0.08) {
-          bomb.vz = -bomb.vz * 0.48;
-          bomb.vx *= 0.82;
-          bomb.vy *= 0.82;
-        } else {
-          bomb.vz = 0;
-        }
-      }
-
-      const planarSpeed = Math.hypot(bomb.vx, bomb.vy);
-      bomb.spin += planarSpeed * 6 + (bomb.vz + 0.1) * 0.8;
-
-      if (bomb.life <= 0) {
-        doomBombRef.current = null;
-        triggerDoomExplosion(bomb.x, bomb.y, {
-          radius: 2.6,
-          damage: 14,
-          flash: 8,
-          life: 12,
-          scorePerKill: 2,
-        });
-      }
-    }
-
-    const projectiles = doomProjectilesRef.current;
-    for (let i = projectiles.length - 1; i >= 0; i -= 1) {
-      const projectile = projectiles[i];
-      projectile.x += projectile.vx;
-      projectile.y += projectile.vy;
-      projectile.life -= 1;
-      const hitWall = isWall(projectile.x, projectile.y);
-      if (projectile.life <= 0 || hitWall) {
-        if (projectile.kind === "rocket") {
-          triggerDoomExplosion(projectile.x, projectile.y, {
-            radius: projectile.radius,
-            damage: projectile.damage,
-            flash: 10,
-            life: 14,
-            scorePerKill: 2,
-          });
-        }
-        projectiles.splice(i, 1);
-        continue;
-      }
-      if (projectile.friendly) {
-        if (projectile.kind === "rocket") {
-          const enemies = doomEnemiesRef.current;
-          let hit = false;
-          for (let e = 0; e < enemies.length; e += 1) {
-            const enemy = enemies[e];
-            if (enemy.dead) {
-              continue;
-            }
-            if (
-              Math.hypot(enemy.x - projectile.x, enemy.y - projectile.y) < 0.25
-            ) {
-              hit = true;
-              break;
-            }
-          }
-          if (hit) {
-            triggerDoomExplosion(projectile.x, projectile.y, {
-              radius: projectile.radius,
-              damage: projectile.damage,
-              flash: 10,
-              life: 14,
-              scorePerKill: 2,
-            });
-            projectiles.splice(i, 1);
-          }
-        }
-        continue;
-      }
-      const dist = Math.hypot(projectile.x - player.x, projectile.y - player.y);
-      if (dist < 0.22) {
-        projectiles.splice(i, 1);
-        applyDoomPlayerDamage(projectile.damage, 3);
-      }
-    }
-
-    const enemies = doomEnemiesRef.current;
-    const maxEnemyProjectiles =
-      perfTier === "low" ? 8 : perfTier === "mid" ? 12 : 18;
-    const hasEnemyLineOfSight = (enemyX: number, enemyY: number) => {
-      const dx = player.x - enemyX;
-      const dy = player.y - enemyY;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 0.0001) {
-        return true;
-      }
-      const angle = Math.atan2(dy, dx);
-      const wallDist = castDoomDistance(
-        { x: enemyX, y: enemyY },
-        angle,
-        dist + 0.05,
-      );
-      return wallDist + 0.05 >= dist;
-    };
-    for (let index = 0; index < enemies.length; index += 1) {
-      const enemy = enemies[index];
-      if (enemy.hurt > 0) {
-        enemy.hurt -= 1;
-      }
-      if (enemy.dead) {
-        enemy.deadTimer -= 1;
-        if (enemy.deadTimer <= 0) {
-          enemies.splice(index, 1);
-          index -= 1;
-        }
-        continue;
-      }
-      if (enemy.cooldown > 0) {
-        enemy.cooldown -= 1;
-      }
-      const dx = player.x - enemy.x;
-      const dy = player.y - enemy.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 0.0001) {
-        continue;
-      }
-      const inv = 1 / Math.max(0.0001, dist);
-      const dirX = dx * inv;
-      const dirY = dy * inv;
-
-      let speed = 0.018;
-      let meleeRange = 0.6;
-      let meleeDamage = 5;
-      let meleeCooldown = 26;
-      let canShoot = true;
-      let shootRange = 4.8;
-      let shootCooldown = 56;
-      let projectileSpeed = 0.12;
-      let projectileDamage = 6;
-      let projectileVariance = 0.06;
-      let strafe = 0;
-
-      if (enemy.type === "raider") {
-        speed = 0.017;
-        meleeRange = 0.55;
-        meleeDamage = 4;
-        meleeCooldown = 30;
-        canShoot = true;
-        shootRange = 6.4;
-        shootCooldown = 46;
-        projectileSpeed = 0.13;
-        projectileDamage = 4;
-        projectileVariance = 0.12;
-        if (dist < 2.8) {
-          strafe = (index % 2 === 0 ? 1 : -1) * 0.55;
-        }
-      } else if (enemy.type === "spitter") {
-        speed = 0.014;
-        meleeRange = 0.55;
-        meleeDamage = 3;
-        meleeCooldown = 34;
-        canShoot = true;
-        shootRange = 7.2;
-        shootCooldown = 54;
-        projectileSpeed = 0.115;
-        projectileDamage = 6;
-        projectileVariance = 0.08;
-      } else if (enemy.type === "charger") {
-        speed = dist < 3.2 ? 0.028 : 0.021;
-        meleeRange = 0.76;
-        meleeDamage = 7;
-        meleeCooldown = 22;
-        canShoot = false;
-      } else if (enemy.type === "brute") {
-        speed = 0.012;
-        meleeRange = 0.82;
-        meleeDamage = 10;
-        meleeCooldown = 30;
-        canShoot = true;
-        shootRange = 6.2;
-        shootCooldown = 68;
-        projectileSpeed = 0.105;
-        projectileDamage = 8;
-        projectileVariance = 0.05;
-      }
-
-      if (dist < meleeRange) {
-        if (enemy.cooldown <= 0) {
-          enemy.cooldown = meleeCooldown;
-          applyDoomPlayerDamage(meleeDamage, 2);
-        }
-        enemy.anim = (enemy.anim + 0.06) % (Math.PI * 2);
-        continue;
-      }
-
-      if (
-        canShoot &&
-        dist < shootRange &&
-        enemy.cooldown <= 0 &&
-        doomProjectilesRef.current.length < maxEnemyProjectiles &&
-        hasEnemyLineOfSight(enemy.x, enemy.y)
-      ) {
-        const variance = (Math.random() - 0.5) * projectileVariance;
-        const rotX = dirX * Math.cos(variance) - dirY * Math.sin(variance);
-        const rotY = dirX * Math.sin(variance) + dirY * Math.cos(variance);
-        doomProjectilesRef.current.push({
-          x: enemy.x + rotX * 0.2,
-          y: enemy.y + rotY * 0.2,
-          vx: rotX * projectileSpeed,
-          vy: rotY * projectileSpeed,
-          life: 90,
-          kind: "fireball",
-          friendly: false,
-          damage: projectileDamage,
-          radius: 0,
-        });
-        enemy.cooldown = shootCooldown;
-      }
-
-      const prevX = enemy.x;
-      const prevY = enemy.y;
-      const sideX = -dirY;
-      const sideY = dirX;
-      const moveX = dirX + sideX * strafe;
-      const moveY = dirY + sideY * strafe;
-      const moveInv = 1 / Math.max(0.0001, Math.hypot(moveX, moveY));
-      const nx = enemy.x + moveX * moveInv * speed;
-      const ny = enemy.y + moveY * moveInv * speed;
-      if (!isWall(nx, enemy.y)) {
-        enemy.x = nx;
-      }
-      if (!isWall(enemy.x, ny)) {
-        enemy.y = ny;
-      }
-      const moved = Math.hypot(enemy.x - prevX, enemy.y - prevY);
-      enemy.anim = (enemy.anim + moved * 22 + 0.02) % (Math.PI * 2);
-    }
-    if (!enemies.some((enemy) => !enemy.dead)) {
-      doomMessageRef.current = doomText("clear");
-    }
-  }, [
-    applyDoomPickup,
-    applyDoomPlayerDamage,
-    castDoomDistance,
-    doomText,
-    findNearestDoomPickup,
-    findNearestDoomPickupInFront,
-    getDoomBootProgress,
-    perfTier,
-    triggerDoomExplosion,
-  ]);
-
   const stepPong = useCallback(() => {
     if (pongOverRef.current) {
       return;
@@ -3687,6 +1821,10 @@ export default function TerminalCanvas({
     chessCastlingRef.current = { wK: true, wQ: true, bK: true, bQ: true };
     chessEnPassantRef.current = null;
     chessPendingPromotionRef.current = null;
+    chessLastMoveRef.current = null;
+    chessHistoryRef.current = [];
+    // Drop any search still running for the previous game.
+    chessBotRef.current?.cancel();
     dirtyRef.current = true;
   }, [messages.chess.selectPiece]);
 
@@ -4064,8 +2202,22 @@ export default function TerminalCanvas({
     [getChessColor, getChessLegalMoves],
   );
 
+  // Snapshot of the game in the engine's format (also used for repetition keys).
+  const buildChessState = useCallback(
+    (): ChessState => ({
+      board: chessBoardRef.current.map((row) => row.slice()),
+      turn: chessTurnRef.current,
+      castling: { ...chessCastlingRef.current },
+      enPassant: chessEnPassantRef.current
+        ? { ...chessEnPassantRef.current }
+        : null,
+      history: chessHistoryRef.current.slice(),
+    }),
+    [],
+  );
+
   const attemptChessMove = useCallback(
-    (from: GridPoint, to: GridPoint) => {
+    (from: GridPoint, to: GridPoint, promotion?: EngineMove["promotion"]) => {
       if (chessPendingPromotionRef.current) {
         chessStatusRef.current = messages.chess.promotePawn;
         return false;
@@ -4088,6 +2240,8 @@ export default function TerminalCanvas({
         return false;
       }
       const captured = board[to.y]?.[to.x] ?? "";
+      // Remember the position we are leaving (threefold-repetition detection).
+      chessHistoryRef.current.push(positionKey(buildChessState()));
       const nextBoard = applyChessMove(board, from, to);
       const lower = piece.toLowerCase();
       const isWhite = color === "w";
@@ -4131,6 +2285,7 @@ export default function TerminalCanvas({
       chessCastlingRef.current = rights;
 
       chessBoardRef.current = nextBoard;
+      chessLastMoveRef.current = { from: { ...from }, to: { ...to } };
 
       const isPromotion = lower === "p" && to.y === promoteRow;
       const nextTurn = isWhite ? "b" : "w";
@@ -4139,7 +2294,10 @@ export default function TerminalCanvas({
           chessModeRef.current === "bot" &&
           chessTurnRef.current === chessBotColorRef.current;
         if (isBotTurn) {
-          chessBoardRef.current[to.y][to.x] = isWhite ? "Q" : "q";
+          const promoted = promotion ?? "q";
+          chessBoardRef.current[to.y][to.x] = isWhite
+            ? promoted.toUpperCase()
+            : promoted;
           chessTurnRef.current = nextTurn;
           chessMovesRef.current += 1;
         } else {
@@ -4165,12 +2323,21 @@ export default function TerminalCanvas({
           ? messages.chess.checkmate
           : messages.chess.stalemate;
       } else {
-        chessStatusRef.current = inCheck ? messages.chess.check : null;
+        const { status } = getGameStatus(buildChessState());
+        chessStatusRef.current =
+          status === "threefold" ||
+          status === "fifty-move" ||
+          status === "insufficient-material"
+            ? messages.chess.draw
+            : inCheck
+              ? messages.chess.check
+              : null;
       }
       return true;
     },
     [
       applyChessMove,
+      buildChessState,
       getChessColor,
       getChessLegalMoves,
       hasChessLegalMove,
@@ -4197,112 +2364,78 @@ export default function TerminalCanvas({
     chessStatusRef.current = messages.chess.botThinking;
     dirtyRef.current = true;
 
-    const pickMove = () => {
-      const board = chessBoardRef.current;
-      const moves: Array<{
-        from: GridPoint;
-        to: GridPoint;
-        capture: boolean;
-        score: number;
-      }> = [];
-      const pieceValue: Record<string, number> = {
-        p: 1,
-        n: 3,
-        b: 3,
-        r: 5,
-        q: 9,
-        k: 100,
-      };
-      for (let y = 0; y < 8; y += 1) {
-        for (let x = 0; x < 8; x += 1) {
-          const piece = board[y]?.[x] ?? "";
-          const color = getChessColor(piece);
-          if (!piece || color !== botColor) {
-            continue;
-          }
-          const candidates = getChessLegalMoves(board, x, y);
-          candidates.forEach((to) => {
-            const target = board[to.y]?.[to.x] ?? "";
-            const isEnPassant = Boolean(
-              piece.toLowerCase() === "p" &&
-              x !== to.x &&
-              !target &&
-              chessEnPassantRef.current &&
-              chessEnPassantRef.current.x === to.x &&
-              chessEnPassantRef.current.y === to.y,
-            );
-            const capture = Boolean(target) || isEnPassant;
-            const clone = applyChessMove(board, { x, y }, to);
-            const promoteRow = botColor === "w" ? 0 : 7;
-            if (piece.toLowerCase() === "p" && to.y === promoteRow) {
-              clone[to.y][to.x] = botColor === "w" ? "Q" : "q";
-            }
-            const capturedValue = isEnPassant
-              ? pieceValue.p
-              : target
-                ? (pieceValue[target.toLowerCase()] ?? 0)
-                : 0;
-            const givesCheck = isChessInCheck(
-              clone,
-              botColor === "w" ? "b" : "w",
-            );
-            const score = capturedValue + (givesCheck ? 0.6 : 0);
-            moves.push({ from: { x, y }, to, capture, score });
-          });
-        }
-      }
-      return moves;
-    };
-
-    window.setTimeout(() => {
-      if (appModeRef.current !== "chess") {
-        chessBotThinkingRef.current = false;
-        return;
-      }
-      if (chessTurnRef.current !== chessBotColorRef.current) {
-        chessBotThinkingRef.current = false;
-        return;
-      }
-      const moves = pickMove();
-      if (!moves.length) {
-        const isCheck = isChessInCheck(
-          chessBoardRef.current,
-          chessTurnRef.current,
-        );
-        chessStatusRef.current = isCheck
-          ? messages.chess.checkmate
-          : messages.chess.stalemate;
-        chessBotThinkingRef.current = false;
-        dirtyRef.current = true;
-        return;
-      }
-      const difficulty = chessDifficultyRef.current;
-      let chosen = moves[Math.floor(Math.random() * moves.length)];
-      if (difficulty !== "easy") {
-        const sorted = moves.slice().sort((a, b) => b.score - a.score);
-        if (difficulty === "medium") {
-          const top = sorted.slice(0, Math.min(4, sorted.length));
-          chosen = top[Math.floor(Math.random() * top.length)];
-        } else {
-          chosen = sorted[0];
-        }
-      }
-      const moved = attemptChessMove(chosen.from, chosen.to);
-      if (moved) {
-        chessSelectedRef.current = null;
-      }
+    // The engine (alpha-beta search, see ./chess/engine.ts) runs in a Web
+    // Worker so the terminal keeps animating while it thinks. A result is only
+    // applied if the game is still at the position it was computed for.
+    if (!chessBotRef.current) {
+      chessBotRef.current = createChessBot();
+    }
+    const bot = chessBotRef.current;
+    const startedAt = performance.now();
+    const moveNumber = chessMovesRef.current;
+    const stateAtRequest = buildChessState();
+    const minThinkMs = 280;
+    const finish = () => {
       chessBotThinkingRef.current = false;
       dirtyRef.current = true;
-      scheduleChessBotMove();
-    }, 240);
+    };
+    bot
+      .bestMove(stateAtRequest, chessDifficultyRef.current)
+      .then((result) => {
+        const stillValid = () =>
+          appModeRef.current === "chess" &&
+          chessModeRef.current === "bot" &&
+          chessMovesRef.current === moveNumber &&
+          chessTurnRef.current === botColor &&
+          !chessPendingPromotionRef.current;
+        const apply = () => {
+          if (!stillValid()) {
+            finish();
+            return;
+          }
+          if (!result.move) {
+            const inCheck = isChessInCheck(chessBoardRef.current, botColor);
+            chessStatusRef.current = inCheck
+              ? messages.chess.checkmate
+              : messages.chess.stalemate;
+            finish();
+            return;
+          }
+          const moved = attemptChessMove(
+            result.move.from,
+            result.move.to,
+            result.move.promotion,
+          );
+          if (moved) {
+            chessSelectedRef.current = null;
+          }
+          finish();
+        };
+        // A tiny minimum delay so instant replies don't feel jarring.
+        const wait = Math.max(0, minThinkMs - (performance.now() - startedAt));
+        if (wait > 0) {
+          window.setTimeout(apply, wait);
+        } else {
+          apply();
+        }
+      })
+      .catch(() => {
+        finish();
+      });
   }, [
-    applyChessMove,
     attemptChessMove,
-    getChessColor,
-    getChessLegalMoves,
+    buildChessState,
     isChessInCheck,
     messages.chess,
   ]);
+
+  useEffect(
+    () => () => {
+      chessBotRef.current?.dispose();
+      chessBotRef.current = null;
+    },
+    [],
+  );
 
   const resetSolitaire = useCallback(() => {
     const deck: SolitaireCard[] = [];
@@ -4436,103 +2569,30 @@ export default function TerminalCanvas({
     [loadPyodideOnce],
   );
 
-  const buildAudioFrames = useCallback(
-    (bars: number, frames: number, seed = 0) => {
-      const result: number[][] = [];
-      const rand = mulberry32(seed || 1);
-      const phaseJitter = rand() * Math.PI * 2;
-      const drift = 0.25 + rand() * 0.35;
-      const alt = 0.18 + rand() * 0.22;
-      for (let f = 0; f < frames; f += 1) {
-        const row: number[] = [];
-        for (let i = 0; i < bars; i += 1) {
-          const phase = (f / frames) * Math.PI * 2 + i * (0.26 + rand() * 0.12);
-          const wave =
-            (Math.sin(phase + phaseJitter) +
-              Math.sin(phase * (drift + 0.2) + 1.2 + alt)) *
-              0.5 +
-            0.5;
-          row.push(Math.max(0.06, Math.min(1, wave)));
-        }
-        result.push(row);
-      }
-      return result;
-    },
-    [],
-  );
-
-  const createDriveCurve = useCallback(() => {
-    const curve = new Float32Array(256);
-    for (let i = 0; i < curve.length; i += 1) {
-      const x = (i / (curve.length - 1)) * 2 - 1;
-      curve[i] = Math.tanh(x * 1.4) * 0.45;
+  // Procedural music (./media/music.ts: sequenced drums, bass, chords and
+  // lead, with a real analyser) replaces the old three-oscillator drone.
+  const getMusicPlayer = useCallback(() => {
+    if (!musicPlayerRef.current) {
+      const player = createMusicPlayer();
+      player.onEnded(() => {
+        musicEndedRef.current = true;
+        dirtyRef.current = true;
+      });
+      musicPlayerRef.current = player;
     }
-    return curve;
+    return musicPlayerRef.current;
   }, []);
 
   const stopSynthAudio = useCallback((hard = false) => {
-    audioOscillatorsRef.current.forEach((osc) => {
-      try {
-        osc.stop();
-      } catch {
-        // ignore
-      }
-      try {
-        osc.disconnect();
-      } catch {
-        // ignore
-      }
-    });
-    audioOscillatorsRef.current = [];
-    if (audioLfoRef.current) {
-      try {
-        audioLfoRef.current.stop();
-      } catch {
-        // ignore
-      }
-      try {
-        audioLfoRef.current.disconnect();
-      } catch {
-        // ignore
-      }
-      audioLfoRef.current = null;
+    const player = musicPlayerRef.current;
+    if (!player) {
+      return;
     }
-    if (audioLfoGainRef.current) {
-      try {
-        audioLfoGainRef.current.disconnect();
-      } catch {
-        // ignore
-      }
-      audioLfoGainRef.current = null;
-    }
-    if (audioPulseRef.current) {
-      try {
-        audioPulseRef.current.stop();
-      } catch {
-        // ignore
-      }
-      try {
-        audioPulseRef.current.disconnect();
-      } catch {
-        // ignore
-      }
-      audioPulseRef.current = null;
-    }
-    if (audioPulseGainRef.current) {
-      try {
-        audioPulseGainRef.current.disconnect();
-      } catch {
-        // ignore
-      }
-      audioPulseGainRef.current = null;
-    }
+    player.pause();
     if (hard) {
-      audioDriveRef.current?.disconnect();
-      audioFilterRef.current?.disconnect();
-      audioMasterRef.current?.disconnect();
-      audioDriveRef.current = null;
-      audioFilterRef.current = null;
-      audioMasterRef.current = null;
+      player.dispose();
+      musicPlayerRef.current = null;
+      musicTrackRef.current = null;
     }
   }, []);
 
@@ -4540,125 +2600,23 @@ export default function TerminalCanvas({
     if (typeof window === "undefined") {
       return;
     }
-    const AudioCtor =
-      window.AudioContext ??
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioCtor) {
-      return;
-    }
-    let ctx = audioContextRef.current;
-    if (!ctx) {
-      ctx = new AudioCtor();
-      audioContextRef.current = ctx;
-    }
-    if (ctx.state === "suspended") {
-      try {
-        await ctx.resume();
-      } catch {
-        return;
+    const player = getMusicPlayer();
+    const fileName =
+      playerTitleRef.current.split("/").pop() || playerTitleRef.current;
+    try {
+      if (musicTrackRef.current !== fileName) {
+        musicTrackRef.current = fileName;
+        musicEndedRef.current = false;
+        player.setVolume(audioVolumeRef.current);
+        await player.play(fileName);
+      } else if (!player.isPlaying()) {
+        musicEndedRef.current = false;
+        await player.resume();
       }
+    } catch {
+      // Autoplay blocked or no Web Audio: the visualiser simply stays idle.
     }
-    if (audioOscillatorsRef.current.length) {
-      return;
-    }
-
-    const master = audioMasterRef.current ?? ctx.createGain();
-    master.gain.value = 0;
-    audioMasterRef.current = master;
-
-    const filter = audioFilterRef.current ?? ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 1050;
-    filter.Q.value = 0.6;
-    audioFilterRef.current = filter;
-
-    const drive = audioDriveRef.current ?? ctx.createWaveShaper();
-    drive.curve = createDriveCurve();
-    drive.oversample = "2x";
-    audioDriveRef.current = drive;
-
-    const pulseGain = audioPulseGainRef.current ?? ctx.createGain();
-    pulseGain.gain.value = 0.85;
-    audioPulseGainRef.current = pulseGain;
-
-    drive.connect(pulseGain);
-    pulseGain.connect(filter);
-    filter.connect(master);
-    master.connect(ctx.destination);
-
-    const oscA = ctx.createOscillator();
-    oscA.type = "sawtooth";
-    oscA.frequency.value = 110;
-    oscA.detune.value = -7;
-    const gainA = ctx.createGain();
-    gainA.gain.value = 0.24;
-    oscA.connect(gainA);
-    gainA.connect(drive);
-
-    const oscB = ctx.createOscillator();
-    oscB.type = "square";
-    oscB.frequency.value = 220;
-    oscB.detune.value = 4;
-    const gainB = ctx.createGain();
-    gainB.gain.value = 0.18;
-    oscB.connect(gainB);
-    gainB.connect(drive);
-
-    const oscC = ctx.createOscillator();
-    oscC.type = "sine";
-    oscC.frequency.value = 55;
-    oscC.detune.value = -8;
-    const gainC = ctx.createGain();
-    gainC.gain.value = 0.1;
-    oscC.connect(gainC);
-    gainC.connect(drive);
-
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 0.35;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 180;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
-
-    const pulseOsc = ctx.createOscillator();
-    pulseOsc.type = "square";
-    pulseOsc.frequency.value = 1.8;
-    const pulseDepth = ctx.createGain();
-    pulseDepth.gain.value = 0.45;
-    pulseOsc.connect(pulseDepth);
-    pulseDepth.connect(pulseGain.gain);
-
-    const seed = hashString(playerTitleRef.current || "mp3");
-    const rand = mulberry32(seed || 1);
-    oscA.type = rand() > 0.5 ? "sawtooth" : "triangle";
-    oscA.frequency.value = 96 + rand() * 60;
-    oscA.detune.value = -12 + rand() * 24;
-    gainA.gain.value = 0.14 + rand() * 0.06;
-    oscB.type = rand() > 0.5 ? "square" : "sawtooth";
-    oscB.frequency.value = 180 + rand() * 140;
-    oscB.detune.value = -6 + rand() * 12;
-    gainB.gain.value = 0.1 + rand() * 0.06;
-    oscC.frequency.value = 48 + rand() * 28;
-    oscC.detune.value = -16 + rand() * 10;
-    gainC.gain.value = 0.08 + rand() * 0.05;
-    lfo.frequency.value = 0.18 + rand() * 0.6;
-    lfoGain.gain.value = 120 + rand() * 120;
-    pulseOsc.frequency.value = 1.6 + rand() * 1.2;
-    pulseDepth.gain.value = 0.35 + rand() * 0.25;
-
-    oscA.start();
-    oscB.start();
-    oscC.start();
-    lfo.start();
-    pulseOsc.start();
-
-    audioOscillatorsRef.current = [oscA, oscB, oscC];
-    audioLfoRef.current = lfo;
-    audioLfoGainRef.current = lfoGain;
-    audioPulseRef.current = pulseOsc;
-  }, [createDriveCurve]);
+  }, [getMusicPlayer]);
 
   const computeMp3TargetVolume = useCallback(() => {
     if (appModeRef.current !== "player" || playerModeRef.current !== "mp3") {
@@ -4689,15 +2647,6 @@ export default function TerminalCanvas({
       }
     };
   }, [stopSynthAudio]);
-
-  const parseVideoFrames = useCallback((content: string) => {
-    const raw = content.trim();
-    if (!raw) {
-      return ["(empty)"];
-    }
-    const frames = raw.split(/\n---+\n/);
-    return frames.length ? frames : [raw];
-  }, []);
 
   const buildAsciiFromImage = useCallback(
     (image: HTMLImageElement) => {
@@ -4782,26 +2731,36 @@ export default function TerminalCanvas({
     if (!playerIsPlayingRef.current) {
       return;
     }
+    const now = performance.now();
+    const last = playerLastTickRef.current || now;
+    playerLastTickRef.current = now;
+    const dtSeconds = Math.min(0.5, Math.max(0, (now - last) / 1000));
     if (playerModeRef.current === "mp3") {
-      playerProgressRef.current = Math.min(
-        playerDurationRef.current,
-        playerProgressRef.current + 1,
-      );
-      if (playerProgressRef.current >= playerDurationRef.current) {
+      const player = musicPlayerRef.current;
+      if (player) {
+        // Real position and a real spectrum from the Web Audio analyser.
+        playerProgressRef.current = Math.min(
+          playerDurationRef.current,
+          player.currentTime(),
+        );
+        player.getSpectrum(playerSpectrumRef.current);
+      } else {
+        playerProgressRef.current = Math.min(
+          playerDurationRef.current,
+          playerProgressRef.current + dtSeconds,
+        );
+      }
+      if (
+        musicEndedRef.current ||
+        playerProgressRef.current >= playerDurationRef.current
+      ) {
+        musicEndedRef.current = false;
         playerIsPlayingRef.current = false;
         playerStatusRef.current = messages.media.playbackComplete;
       }
-      playerFrameIndexRef.current =
-        (playerFrameIndexRef.current + 1) %
-        Math.max(1, playerBarsRef.current.length);
     } else if (playerModeRef.current === "video") {
-      playerFrameIndexRef.current =
-        (playerFrameIndexRef.current + 1) %
-        Math.max(1, playerFramesRef.current.length);
-      playerProgressRef.current = Math.min(
-        playerDurationRef.current,
-        playerProgressRef.current + 1,
-      );
+      // ASCII demos are endless: progress is simply elapsed play time.
+      playerProgressRef.current += dtSeconds;
     }
   }, [messages.media.playbackComplete]);
 
@@ -4817,7 +2776,9 @@ export default function TerminalCanvas({
               ? 32
               : mode === "doom"
                 ? 34
-                : 90;
+                : mode === "player"
+                  ? 40
+                  : 90;
       const lowPowerInterval =
         mode === "snake"
           ? 200
@@ -4827,7 +2788,9 @@ export default function TerminalCanvas({
               ? 52
               : mode === "doom"
                 ? 60
-                : 150;
+                : mode === "player"
+                  ? 70
+                  : 150;
       let interval = baseInterval;
       if (perfTier === "low") {
         interval = lowPowerInterval;
@@ -4846,8 +2809,6 @@ export default function TerminalCanvas({
           stepPacman();
         } else if (mode === "pong") {
           stepPong();
-        } else if (mode === "doom") {
-          stepDoom();
         } else if (mode === "player") {
           stepPlayer();
         }
@@ -4858,7 +2819,6 @@ export default function TerminalCanvas({
       isMobile,
       perfTier,
       stepPacman,
-      stepDoom,
       stepPlayer,
       stepPong,
       stepSnake,
@@ -4908,20 +2868,26 @@ export default function TerminalCanvas({
       playerTitleRef.current = title;
       playerFrameIndexRef.current = 0;
       playerProgressRef.current = 0;
+      playerLastTickRef.current = 0;
       playerStatusRef.current = null;
       playerIsPlayingRef.current = mode !== "image";
       if (mode === "image") {
         playerImageZoomRef.current = 1;
       }
       audioAutoPausedRef.current = false;
+      const fileName = title.split("/").pop() ?? title;
       if (mode === "mp3") {
-        playerDurationRef.current = 180;
-        playerBarsRef.current = buildAudioFrames(32, 48, hashString(title));
+        playerDurationRef.current = describeTrack(fileName).durationSec;
+        playerSpectrumRef.current.fill(0);
+        // Force a fresh start even when the same file is replayed.
+        musicTrackRef.current = null;
         startGameLoop("player");
         void startSynthAudio();
       } else if (mode === "video") {
-        playerFramesRef.current = parseVideoFrames(content ?? "");
-        playerDurationRef.current = Math.max(1, playerFramesRef.current.length);
+        demoIdRef.current = demoForFile(fileName);
+        demoStateRef.current = undefined;
+        playerFramesRef.current = [];
+        playerDurationRef.current = 0;
         startGameLoop("player");
         stopSynthAudio();
       } else {
@@ -4939,8 +2905,6 @@ export default function TerminalCanvas({
       dirtyRef.current = true;
     },
     [
-      buildAudioFrames,
-      parseVideoFrames,
       resolveImagePlaylist,
       startGameLoop,
       startSynthAudio,
@@ -5004,6 +2968,49 @@ export default function TerminalCanvas({
     ],
   );
 
+  const listMediaFiles = useCallback(
+    (pattern: RegExp) => {
+      const home = envRef.current.HOME || homePath;
+      const mediaDir = `${home}/media`;
+      const node = findNode(fsRef.current, mediaDir);
+      if (!node || node.type !== "dir") {
+        return [] as string[];
+      }
+      return Object.entries(node.children)
+        .filter(([name, child]) => child.type === "file" && pattern.test(name))
+        .map(([name]) => `${mediaDir}/${name}`.replace(/\/+/g, "/"))
+        .sort();
+    },
+    [homePath],
+  );
+
+  const cycleTrack = useCallback(
+    (direction: number) => {
+      const mode = playerModeRef.current;
+      if (mode !== "mp3" && mode !== "video") {
+        return;
+      }
+      const paths = listMediaFiles(mode === "mp3" ? /\.mp3$/i : /\.vid$/i);
+      if (!paths.length) {
+        return;
+      }
+      const currentBase =
+        playerTitleRef.current.split("/").pop() ?? playerTitleRef.current;
+      const index = paths.findIndex((path) =>
+        path.endsWith(`/${currentBase}`),
+      );
+      const nextPath =
+        paths[(Math.max(0, index) + direction + paths.length) % paths.length];
+      const node = findNode(fsRef.current, nextPath);
+      startPlayer(
+        mode,
+        nextPath,
+        node && node.type === "file" ? node.content : undefined,
+      );
+    },
+    [listMediaFiles, startPlayer],
+  );
+
   const startApp = useCallback(
     (mode: AppMode) => {
       stopGameLoop();
@@ -5022,9 +3029,13 @@ export default function TerminalCanvas({
       } else if (mode === "calc") {
         resetCalc();
       } else if (mode === "doom") {
-        beginDoomBoot();
-        resetDoom();
-        startGameLoop(mode);
+        // HELLRUN runs off the draw loop (update + render every frame).
+        hellrunRef.current?.dispose();
+        hellrunRef.current = new HellrunGame({
+          lang: language,
+          lowPower: perfTier === "low" || isMobile,
+        });
+        hellrunLastFrameRef.current = 0;
       } else if (mode === "chess") {
         resetChess();
         scheduleChessBotMove();
@@ -5039,7 +3050,6 @@ export default function TerminalCanvas({
       placeSnakeFood,
       resetCalc,
       resetChess,
-      resetDoom,
       resetPacman,
       resetPong,
       resetSnake,
@@ -5047,9 +3057,34 @@ export default function TerminalCanvas({
       scheduleChessBotMove,
       startGameLoop,
       stopGameLoop,
-      beginDoomBoot,
+      language,
+      perfTier,
+      isMobile,
     ],
   );
+
+  // HELLRUN needs key-ups (held movement keys) and must release keys when
+  // the window loses focus; it also follows language switches.
+  useEffect(() => {
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (appModeRef.current === "doom") {
+        hellrunRef.current?.keyUp({ key: event.key, code: event.code });
+      }
+    };
+    const handleBlur = () => hellrunRef.current?.blur();
+    window.addEventListener("keyup", handleKeyUp, { capture: true });
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keyup", handleKeyUp, { capture: true });
+      window.removeEventListener("blur", handleBlur);
+      hellrunRef.current?.dispose();
+      hellrunRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    hellrunRef.current?.setLang(language);
+  }, [language]);
 
   const setSelectionRange = useCallback((start: number, end: number) => {
     const input = inputRef.current;
@@ -5291,6 +3326,10 @@ export default function TerminalCanvas({
     if (!isActive) {
       audioTargetRef.current = 0;
       audioVolumeRef.current = 0;
+      if (musicPlayerRef.current?.isPlaying()) {
+        // Remember to continue where we left off when the hero is back.
+        audioAutoPausedRef.current = true;
+      }
       stopSynthAudio();
       if (audioTimerRef.current) {
         window.clearTimeout(audioTimerRef.current);
@@ -5304,6 +3343,15 @@ export default function TerminalCanvas({
     let alive = true;
     audioLastTickRef.current =
       typeof performance !== "undefined" ? performance.now() : 0;
+    if (
+      audioAutoPausedRef.current &&
+      appModeRef.current === "player" &&
+      playerModeRef.current === "mp3" &&
+      playerIsPlayingRef.current
+    ) {
+      audioAutoPausedRef.current = false;
+      void startSynthAudio();
+    }
 
     const tick = () => {
       if (!alive) {
@@ -5312,48 +3360,20 @@ export default function TerminalCanvas({
       const now = typeof performance !== "undefined" ? performance.now() : 0;
       const dt = Math.max(0, now - (audioLastTickRef.current || now));
       audioLastTickRef.current = now;
+      // Volume follows the scroll position (fades out as the camera pulls
+      // back); playback itself is only paused/resumed by the user or when
+      // the terminal becomes inactive.
       const target = computeMp3TargetVolume();
       audioTargetRef.current = target;
-      const ctx = audioContextRef.current;
-      const master = audioMasterRef.current;
-      if (ctx && master) {
-        const { current } = audioVolumeRef;
-        const tau = 200;
-        const alpha = tau > 0 ? 1 - Math.exp(-dt / tau) : 1;
-        const next = current + (target - current) * alpha;
-        audioVolumeRef.current = next;
-        master.gain.setTargetAtTime(next * 0.24, ctx.currentTime, 0.18);
-        if (audioFilterRef.current) {
-          audioFilterRef.current.frequency.setTargetAtTime(
-            420 + next * 1200,
-            ctx.currentTime,
-            0.22,
-          );
-        }
-      }
+      const { current } = audioVolumeRef;
+      const alpha = 1 - Math.exp(-dt / 200);
+      const next = current + (target - current) * alpha;
+      audioVolumeRef.current = next;
+      musicPlayerRef.current?.setVolume(next);
 
       const isMp3Player =
         appModeRef.current === "player" && playerModeRef.current === "mp3";
-      const shouldAudiblyPlay =
-        isMp3Player &&
-        playerIsPlayingRef.current &&
-        target > 0.02 &&
-        !(typeof document !== "undefined" && document.hidden);
-
-      if (shouldAudiblyPlay) {
-        if (!audioOscillatorsRef.current.length) {
-          void startSynthAudio();
-        }
-      } else if (audioOscillatorsRef.current.length) {
-        stopSynthAudio();
-      }
-
-      const delay =
-        shouldAudiblyPlay || audioOscillatorsRef.current.length
-          ? 50
-          : isMp3Player && playerIsPlayingRef.current
-            ? 120
-            : 260;
+      const delay = isMp3Player && playerIsPlayingRef.current ? 50 : 260;
       audioTimerRef.current = window.setTimeout(tick, delay);
     };
 
@@ -5441,6 +3461,10 @@ export default function TerminalCanvas({
       stopGameLoop();
       stopSynthAudio();
       audioAutoPausedRef.current = false;
+      if (hellrunRef.current) {
+        hellrunRef.current.dispose();
+        hellrunRef.current = null;
+      }
       const ended = appModeRef.current;
       appModeRef.current = null;
       if (ended) {
@@ -5665,8 +3689,9 @@ export default function TerminalCanvas({
       if (node.section) {
         onNavigateAction(node.section);
       }
-      markdownToLines(node.content).forEach((line) =>
-        appendLine(line.text, line.color ?? theme.palette.terminalText),
+      markdownToLines(node.content, languageMeta[language].locale).forEach(
+        (line) =>
+          appendLine(line.text, line.color ?? theme.palette.terminalText),
       );
     },
     [
@@ -5674,6 +3699,7 @@ export default function TerminalCanvas({
       files,
       formatMessage,
       homePath,
+      language,
       messages.fileNotFound,
       onNavigateAction,
       theme.palette.terminalDim,
@@ -7020,7 +5046,7 @@ export default function TerminalCanvas({
           break;
         case "doom":
         case "hellrun":
-          appendLine(doomText("launch"));
+          appendLine(messages.doom.launch);
           startApp("doom");
           break;
         case "chess":
@@ -7109,7 +5135,6 @@ export default function TerminalCanvas({
       formatLsLong,
       homePath,
       language,
-      doomText,
       listDir,
       loadImageAscii,
       messages,
@@ -7552,88 +5577,245 @@ export default function TerminalCanvas({
           );
         }
       } else if (mode === "player") {
-        const pad = Math.floor(Math.min(width, height) * 0.12);
+        const playerMode = playerModeRef.current ?? "mp3";
+        const pad = Math.floor(Math.min(width, height) * 0.08);
+        const lineGap = Math.max(16, Math.floor(headerSize * 1.45));
+        const footerSpace = lineGap * 2;
+        const boxX = pad;
+        const boxY = pad;
         const boxW = width - pad * 2;
-        const controlsArea = Math.max(28, Math.floor(headerSize * 1.6));
-        const boxH = height - pad * 2 - controlsArea;
+        const boxH = height - pad * 2 - footerSpace;
+        const monoFont = (size: number) =>
+          `${size}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        const fitText = (text: string, maxW: number) => {
+          if (ctx.measureText(text).width <= maxW) {
+            return text;
+          }
+          let cut = text;
+          while (cut.length > 4 && ctx.measureText(`${cut}…`).width > maxW) {
+            cut = cut.slice(0, -1);
+          }
+          return `${cut}…`;
+        };
+        const formatClock = (seconds: number) => {
+          const total = Math.max(0, Math.floor(seconds));
+          return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+        };
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.fillRect(boxX, boxY, boxW, boxH);
         ctx.strokeStyle = dim;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(pad, pad, boxW, boxH);
-        ctx.fillStyle = accent;
-        const playerMode = playerModeRef.current ?? "media";
-        ctx.fillText(
-          formatMessage(messages.ui.player, {
-            mode: playerMode.toUpperCase(),
-          }),
-          pad + 12,
-          pad + 8,
-        );
-        ctx.fillStyle = dim;
-        ctx.fillText(playerTitleRef.current, pad + 12, pad + 32);
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1);
 
-        const innerTop = pad + 64;
-        const innerHeight = boxH - 120;
+        // Header: type glyph + file name, position in the playlist on the right.
+        const title = playerTitleRef.current;
+        const fileName = title.split("/").pop() ?? title;
+        const playlist =
+          playerMode === "mp3"
+            ? listMediaFiles(/\.mp3$/i)
+            : playerMode === "video"
+              ? listMediaFiles(/\.vid$/i)
+              : resolveImagePlaylist().paths;
+        const playlistIndex = playlist.findIndex((path) =>
+          path.endsWith(`/${fileName}`),
+        );
+        const counter =
+          playlist.length > 0 && playlistIndex >= 0
+            ? `${playlistIndex + 1}/${playlist.length}`
+            : "";
+        const glyph =
+          playerMode === "mp3" ? "♪" : playerMode === "video" ? "▶" : "▣";
+        const trackInfo = playerMode === "mp3" ? describeTrack(fileName) : null;
+        const demoTitle =
+          playerMode === "video"
+            ? (DEMOS.find((demo) => demo.id === demoIdRef.current)?.title[
+                language
+              ] ?? fileName)
+            : null;
+        const headerName = trackInfo
+          ? `${trackInfo.title} · ${trackInfo.style} · ${trackInfo.bpm} BPM`
+          : (demoTitle ?? fileName);
+        ctx.font = monoFont(headerSize);
+        const counterW = counter ? ctx.measureText(counter).width : 0;
+        ctx.fillStyle = dim;
+        if (counter) {
+          ctx.fillText(counter, boxX + boxW - 14 - counterW, boxY + 12);
+        }
+        ctx.fillStyle = accent;
+        ctx.fillText(
+          fitText(
+            `${glyph}  ${formatMessage(messages.ui.player, {
+              mode:
+                language === "tr"
+                  ? { mp3: "MÜZİK", video: "VİDEO", image: "GÖRSEL" }[
+                      playerMode
+                    ]
+                  : { mp3: "MUSIC", video: "VIDEO", image: "IMAGE" }[
+                      playerMode
+                    ],
+            })}  ${headerName}`,
+            boxW - 40 - counterW,
+          ),
+          boxX + 14,
+          boxY + 12,
+        );
+        const headerBottom = boxY + 12 + lineGap + 4;
+        ctx.strokeStyle = dim;
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath();
+        ctx.moveTo(boxX + 14, headerBottom);
+        ctx.lineTo(boxX + boxW - 14, headerBottom);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        const hasTimeline = playerMode !== "image";
+        const contentTop = headerBottom + 12;
+        const contentBottom =
+          boxY + boxH - (hasTimeline ? lineGap * 2 + 18 : 14);
+        const contentH = Math.max(20, contentBottom - contentTop);
+        const contentX = boxX + 18;
+        const contentW = boxW - 36;
+        const playing = playerIsPlayingRef.current;
+
         if (playerMode === "mp3") {
-          const bars = playerBarsRef.current[playerFrameIndexRef.current] ?? [];
+          const spectrum = playerSpectrumRef.current;
+          const bars = Array.from(spectrum, (value) => value / 255);
           const barCount = Math.max(1, bars.length);
-          const barWidth = Math.max(4, Math.floor(boxW / (barCount + 2)));
-          const maxBarHeight = Math.max(18, Math.floor(innerHeight * 0.7));
+          const slot = contentW / barCount;
+          const barW = Math.max(2, Math.floor(slot * 0.72));
+          const baseY = contentTop + contentH;
+          ctx.globalAlpha = playing ? 1 : 0.35;
           bars.forEach((value, index) => {
-            const heightScale = Math.floor(value * maxBarHeight);
-            const x = pad + barWidth + index * barWidth;
-            const y = innerTop + innerHeight - heightScale;
-            ctx.fillStyle = "#f6c27a";
-            ctx.fillRect(x, y, barWidth - 2, heightScale);
+            const h = Math.max(2, Math.floor(value * contentH * 0.92));
+            const x = Math.floor(contentX + index * slot + (slot - barW) / 2);
+            ctx.fillStyle = index % 2 === 0 ? "#f6c27a" : "#e9a95e";
+            ctx.fillRect(x, baseY - h, barW, h);
+            ctx.fillStyle = "#fff1d6";
+            ctx.fillRect(x, baseY - h - 3, barW, 2);
           });
+          ctx.globalAlpha = 1;
+        } else if (playerMode === "video") {
+          // Real-time ASCII demo (./media/asciiDemos.ts), sized to the box.
+          const demoSize = Math.max(7, Math.floor(fontSize * 0.78));
+          ctx.font = monoFont(demoSize);
+          const charW = Math.max(1, ctx.measureText("M").width || demoSize * 0.6);
+          const lineH = Math.max(6, Math.floor(demoSize * 1.12));
+          const cols = Math.max(8, Math.floor(contentW / charW));
+          const rows = Math.max(4, Math.floor(contentH / lineH));
+          const result = renderDemo(
+            demoIdRef.current,
+            playerProgressRef.current,
+            cols,
+            rows,
+            demoStateRef.current,
+          );
+          demoStateRef.current = result.state;
+          const demoLines = result.text.split("\n");
+          const startX = contentX + (contentW - cols * charW) / 2;
+          const startY = contentTop + (contentH - demoLines.length * lineH) / 2;
+          ctx.fillStyle = accent;
+          demoLines.forEach((line, index) => {
+            ctx.fillText(line, startX, startY + index * lineH);
+          });
+          ctx.font = monoFont(headerSize);
         } else {
           const frame =
             playerFramesRef.current[playerFrameIndexRef.current] ?? "";
-          const lines = frame.split("\n");
-          const isImage = playerMode === "image";
-          const zoom = isImage ? clamp(playerImageZoomRef.current, 0.5, 3) : 1;
-          const fontSizeAscii = Math.max(8, Math.floor(fontSize * 0.95 * zoom));
-          ctx.font = `${fontSizeAscii}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-          const lineHeight = Math.floor(fontSizeAscii * 1.35);
-          const maxLines = Math.max(1, Math.floor(innerHeight / lineHeight));
-          const charWidth = Math.max(1, ctx.measureText("M").width || 1);
-          const maxChars = Math.max(1, Math.floor((boxW - 24) / charWidth));
+          const lines = frame.replace(/\s+$/, "").split("\n");
+          const longest = lines.reduce(
+            (max, line) => Math.max(max, line.length),
+            1,
+          );
+          const zoom =
+            playerMode === "image"
+              ? clamp(playerImageZoomRef.current, 0.5, 3)
+              : 1;
+          // Fit the whole picture into the content area, then apply zoom.
+          ctx.font = monoFont(100);
+          const charRatio = (ctx.measureText("M").width || 60) / 100;
+          const fitSize = Math.min(
+            contentW / (longest * charRatio),
+            contentH / (lines.length * 1.18),
+          );
+          const asciiSize = Math.max(
+            5,
+            Math.min(Math.floor(fontSize * 1.8), Math.floor(fitSize * zoom)),
+          );
+          ctx.font = monoFont(asciiSize);
+          const lineH = Math.max(5, Math.floor(asciiSize * 1.18));
+          const blockW = longest * asciiSize * charRatio;
+          const blockH = lines.length * lineH;
+          const startX = contentX + Math.max(0, (contentW - blockW) / 2);
+          const startY = contentTop + Math.max(0, (contentH - blockH) / 2);
           ctx.save();
           ctx.beginPath();
-          ctx.rect(pad + 12, innerTop, boxW - 24, innerHeight);
+          ctx.rect(contentX, contentTop, contentW, contentH);
           ctx.clip();
-          lines.slice(0, maxLines).forEach((line, index) => {
-            const visible = isImage ? line.slice(0, maxChars) : line;
-            ctx.fillStyle = accent;
-            ctx.fillText(visible, pad + 12, innerTop + index * lineHeight);
+          ctx.fillStyle = accent;
+          lines.forEach((line, index) => {
+            ctx.fillText(line, startX, startY + index * lineH);
           });
           ctx.restore();
-          ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+          ctx.font = monoFont(headerSize);
         }
 
-        const progress =
-          playerDurationRef.current > 0
-            ? playerProgressRef.current / playerDurationRef.current
-            : 0;
-        const barW = Math.floor(boxW * 0.78);
-        const barX = pad + 12;
-        const barY = pad + boxH - 44;
-        ctx.strokeStyle = dim;
-        ctx.strokeRect(barX, barY, barW, 10);
-        ctx.fillStyle = accent;
-        ctx.fillRect(barX, barY, Math.floor(barW * progress), 10);
-        if (playerStatusRef.current) {
+        if (hasTimeline) {
+          const barX = boxX + 18;
+          const barW = boxW - 36;
+          const barY = boxY + boxH - lineGap - 16;
+          // Demos are endless: the bar sweeps once per minute instead.
+          const progress =
+            playerMode === "video"
+              ? (playerProgressRef.current % 60) / 60
+              : playerDurationRef.current > 0
+                ? clamp(
+                    playerProgressRef.current / playerDurationRef.current,
+                    0,
+                    1,
+                  )
+                : 0;
+          ctx.fillStyle = "rgba(246, 194, 122, 0.16)";
+          ctx.fillRect(barX, barY, barW, 6);
+          ctx.fillStyle = accent;
+          ctx.fillRect(barX, barY, Math.floor(barW * progress), 6);
+          ctx.beginPath();
+          ctx.arc(barX + barW * progress, barY + 3, 6, 0, Math.PI * 2);
+          ctx.fill();
+          const stateGlyph = playing ? "▶" : "❚❚";
+          const timeText =
+            playerMode === "mp3"
+              ? `${stateGlyph}  ${formatClock(playerProgressRef.current)} / ${formatClock(playerDurationRef.current)}`
+              : `${stateGlyph}  ${formatClock(playerProgressRef.current)}`;
+          ctx.fillStyle = accent;
+          ctx.fillText(timeText, barX, barY + 14);
+          if (playerStatusRef.current) {
+            const statusW = ctx.measureText(playerStatusRef.current).width;
+            ctx.fillStyle = dim;
+            ctx.fillText(
+              playerStatusRef.current,
+              barX + barW - statusW,
+              barY + 14,
+            );
+          }
+        } else if (playerStatusRef.current) {
           ctx.fillStyle = dim;
-          ctx.fillText(playerStatusRef.current, pad + 12, pad + boxH - 24);
+          ctx.fillText(
+            playerStatusRef.current,
+            boxX + 18,
+            boxY + boxH - lineGap - 6,
+          );
         }
+
         ctx.fillStyle = dim;
         const controlsText =
           playerMode === "image"
             ? messages.ui.playerControlsImage
             : messages.ui.playerControlsMedia;
-        const controlsGapStart = pad + boxH;
-        const controlsOffset = Math.max(18, Math.floor(controlsArea * 0.7));
-        const controlsY = Math.floor(controlsGapStart + controlsOffset);
-        ctx.fillText(controlsText, pad + 12, controlsY);
+        ctx.fillText(
+          fitText(controlsText, boxW),
+          boxX,
+          boxY + boxH + Math.floor(lineGap * 0.6),
+        );
       } else if (mode === "calc") {
         const pad = Math.floor(Math.min(width, height) * 0.12);
         const boxW = width - pad * 2;
@@ -7687,2093 +5869,51 @@ export default function TerminalCanvas({
         ctx.fillText(messages.calc.hintLine1, pad + 12, height - 54);
         ctx.fillText(messages.calc.hintLine2, pad + 12, height - 36);
       } else if (mode === "doom") {
-        const map = doomMapRef.current;
-        const pad = Math.floor(Math.min(width, height) * 0.1);
-        const viewX = pad;
-        const viewY = pad;
-        const viewW = width - pad * 2;
-        const viewH = height - pad * 2;
-        const bootProgress = getDoomBootProgress();
-        if (bootProgress < 1) {
-          ctx.fillStyle = "#120d0b";
-          ctx.fillRect(viewX, viewY, viewW, viewH);
-          ctx.fillStyle = "#1a1411";
-          ctx.fillRect(viewX, viewY, viewW, Math.floor(viewH * 0.55));
-          ctx.fillStyle = "#2b231d";
-          ctx.fillRect(
-            viewX,
-            viewY + Math.floor(viewH * 0.55),
-            viewW,
-            Math.ceil(viewH * 0.45),
-          );
-          ctx.fillStyle = theme.palette.terminalText;
-          ctx.fillText(messages.ui.retroFps, viewX + 12, viewY + 10);
-          ctx.fillStyle = theme.palette.terminalDim;
-          ctx.fillText(doomText("loading"), viewX + 12, viewY + 34);
-          const barW = Math.floor(viewW * 0.6);
-          const barH = 12;
-          const barX = Math.floor(viewX + (viewW - barW) / 2);
-          const barY = Math.floor(viewY + viewH * 0.62);
-          ctx.strokeStyle = theme.palette.terminalDim;
-          ctx.strokeRect(barX, barY, barW, barH);
-          ctx.fillStyle = "#f4d35e";
-          ctx.fillRect(
-            barX + 1,
-            barY + 1,
-            Math.floor((barW - 2) * bootProgress),
-            barH - 2,
-          );
-          ctx.fillStyle = theme.palette.terminalDim;
-          ctx.fillText(
-            `${Math.floor(bootProgress * 100)}%`,
-            barX + barW + 10,
-            barY - 2,
-          );
-          finalizeFrame();
-          return;
-        }
-        ctx.fillStyle = "#1b1512";
-        ctx.fillRect(viewX, viewY, viewW, viewH);
-        ctx.fillStyle = "#1a1411";
-        ctx.fillRect(viewX, viewY, viewW, Math.floor(viewH / 2));
-        ctx.fillStyle = "#2b231d";
-        ctx.fillRect(
-          viewX,
-          viewY + Math.floor(viewH / 2),
-          viewW,
-          Math.ceil(viewH / 2),
-        );
-        ctx.globalAlpha = 0.08;
-        ctx.fillStyle = "#000";
-        for (let y = viewY + Math.floor(viewH / 2); y < viewY + viewH; y += 6) {
-          ctx.fillRect(viewX, y, viewW, 1);
-        }
-        ctx.fillStyle = "#fff";
-        for (let y = viewY + 6; y < viewY + viewH / 2; y += 8) {
-          ctx.fillRect(viewX, y, viewW, 1);
-        }
-        ctx.globalAlpha = 1;
-        if (map.length) {
-          ctx.imageSmoothingEnabled = false;
-          const player = doomPlayerRef.current;
-          const fov = Math.PI / 3;
-          const rayDivisor =
-            perfTier === "low" ? 5 : perfTier === "mid" ? 4 : 3;
-          const rayCount = Math.max(28, Math.floor(viewW / rayDivisor));
-          const colWidth = viewW / rayCount;
-          const maxSteps =
-            perfTier === "low" ? 48 : perfTier === "mid" ? 56 : 64;
-          const wallDistances = new Array(rayCount).fill(999);
-          const doorDistances = new Array(rayCount).fill(0);
-          const doorBandBottoms = new Array(rayCount).fill(0);
-          const cameraBob = Math.sin(doomBobRef.current) * 4;
-          const textures = ensureDoomTextures();
-          const texSize = textures?.size ?? 64;
-          const pickWallTexture = (tileX: number, tileY: number) => {
-            if (!textures) {
-              return null;
-            }
-            const level = doomLevelRef.current;
-            const palette = [textures.brick, textures.tech, textures.stone];
-            const base = palette[level % palette.length] ?? textures.brick;
-            const accentA =
-              palette[(level + 1) % palette.length] ?? textures.tech;
-            const accentB =
-              palette[(level + 2) % palette.length] ?? textures.stone;
-            const key =
-              (tileX * 11 + tileY * 7 + (tileX ^ tileY) * 3 + level * 13) % 17;
-            if (key === 0) {
-              return accentA;
-            }
-            if (key === 1) {
-              return accentB;
-            }
-            return base;
-          };
-          const now =
-            typeof performance !== "undefined" ? performance.now() : Date.now();
-          const sampleDoomLight = (x: number, y: number) => {
-            let boost = 0;
-            let warm = 0;
-            let hot = 0;
-
-            const props = doomPropsRef.current;
-            for (let i = 0; i < props.length; i += 1) {
-              const prop = props[i];
-              if (!prop || prop.type !== "torch") {
-                continue;
-              }
-              const dx = x - prop.x;
-              const dy = y - prop.y;
-              const dist = Math.hypot(dx, dy);
-              const radius = 4.4;
-              if (dist > radius) {
-                continue;
-              }
-              const flicker =
-                0.82 +
-                0.18 *
-                  Math.sin(now / 140 + prop.x * 2.3 + prop.y * 1.7 + i * 0.6);
-              const t = (1 - dist / radius) * 0.35 * flicker;
-              boost += t;
-              warm += t;
-            }
-
-            const explosion = doomExplosionRef.current;
-            if (explosion) {
-              const dx = x - explosion.x;
-              const dy = y - explosion.y;
-              const dist = Math.hypot(dx, dy);
-              const radius = 5.2;
-              if (dist < radius) {
-                const t = (1 - dist / radius) * 0.9;
-                boost += t;
-                hot += t;
-              }
-            }
-
-            const bomb = doomBombRef.current;
-            if (bomb?.active) {
-              const dx = x - bomb.x;
-              const dy = y - bomb.y;
-              const dist = Math.hypot(dx, dy);
-              const radius = 2.2;
-              if (dist < radius) {
-                const fuse = clamp(1 - bomb.life / 52, 0, 1);
-                const flicker =
-                  0.75 + 0.25 * Math.sin(now / 70 + bomb.spin * 0.6);
-                const intensity = (0.14 + 0.18 * fuse) * flicker;
-                const t = (1 - dist / radius) * intensity;
-                boost += t;
-                hot += t * 0.6;
-                warm += t * 0.3;
-              }
-            }
-
-            if (perfTier !== "low") {
-              const projectiles = doomProjectilesRef.current;
-              const maxLights = perfTier === "mid" ? 8 : 12;
-              for (let i = 0; i < projectiles.length && i < maxLights; i += 1) {
-                const projectile = projectiles[i];
-                const dx = x - projectile.x;
-                const dy = y - projectile.y;
-                const dist = Math.hypot(dx, dy);
-                const radius = projectile.kind === "rocket" ? 3.2 : 2.4;
-                if (dist > radius) {
-                  continue;
-                }
-                const t =
-                  (1 - dist / radius) *
-                  (projectile.kind === "rocket" ? 0.22 : 0.18);
-                boost += t;
-                hot += t;
-              }
-            }
-
-            if (doomMuzzleRef.current > 0) {
-              const intensity = clamp(doomMuzzleRef.current / 16, 0, 1) * 0.16;
-              boost += intensity;
-              warm += intensity;
-            }
-
-            boost = clamp(boost, 0, 0.9);
-            warm = clamp(warm, 0, 0.7);
-            hot = clamp(hot, 0, 0.8);
-            return { boost, warm, hot };
-          };
-          for (let i = 0; i < rayCount; i += 1) {
-            const rayAngle = player.angle + (i / rayCount - 0.5) * fov;
-            const dirX = Math.cos(rayAngle) || 0.0001;
-            const dirY = Math.sin(rayAngle) || 0.0001;
-            let mapX = Math.floor(player.x);
-            let mapY = Math.floor(player.y);
-            const deltaDistX = Math.abs(1 / dirX);
-            const deltaDistY = Math.abs(1 / dirY);
-            const stepX = dirX < 0 ? -1 : 1;
-            const stepY = dirY < 0 ? -1 : 1;
-            let sideDistX =
-              (dirX < 0 ? player.x - mapX : mapX + 1 - player.x) * deltaDistX;
-            let sideDistY =
-              (dirY < 0 ? player.y - mapY : mapY + 1 - player.y) * deltaDistY;
-            let side = 0;
-            let doorHit: {
-              rawDist: number;
-              side: number;
-              open: number;
-              x: number;
-              y: number;
-            } | null = null;
-            let wallHit: {
-              rawDist: number;
-              side: number;
-              type: number;
-              x: number;
-              y: number;
-            } | null = null;
-            for (let step = 0; step < maxSteps; step += 1) {
-              if (sideDistX < sideDistY) {
-                sideDistX += deltaDistX;
-                mapX += stepX;
-                side = 0;
-              } else {
-                sideDistY += deltaDistY;
-                mapY += stepY;
-                side = 1;
-              }
-              const cell = map[mapY]?.[mapX] ?? 0;
-              const rawDist =
-                side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-              if (cell === 2 && !doorHit) {
-                doorHit = {
-                  rawDist,
-                  side,
-                  open: doomDoorStatesRef.current[`${mapX},${mapY}`]?.open ?? 0,
-                  x: mapX,
-                  y: mapY,
-                };
-                continue;
-              }
-              if (cell >= 1) {
-                wallHit = { rawDist, side, type: cell, x: mapX, y: mapY };
-                break;
-              }
-            }
-
-            const wall =
-              wallHit ??
-              (doorHit
-                ? {
-                    rawDist: doorHit.rawDist,
-                    side: doorHit.side,
-                    type: 2,
-                    x: doorHit.x,
-                    y: doorHit.y,
-                  }
-                : null);
-            if (!wall) {
-              continue;
-            }
-            const correction = Math.cos(rayAngle - player.angle);
-            const correctedWall = Math.max(0.0001, wall.rawDist * correction);
-            wallDistances[i] = correctedWall;
-
-            const wallHeight = Math.min(
-              viewH,
-              Math.floor(viewH / correctedWall),
-            );
-            const wallTop = Math.floor(
-              viewY + (viewH - wallHeight) / 2 + cameraBob,
-            );
-            const wallX = Math.floor(viewX + i * colWidth);
-            const wallW = Math.ceil(colWidth) + 1;
-            const wallCoord =
-              wall.side === 0
-                ? player.y + wall.rawDist * dirY
-                : player.x + wall.rawDist * dirX;
-            const wallFrac = wallCoord - Math.floor(wallCoord);
-            let texX = clamp(Math.floor(wallFrac * texSize), 0, texSize - 1);
-            if (wall.side === 0 && dirX > 0) {
-              texX = texSize - texX - 1;
-            }
-            if (wall.side === 1 && dirY < 0) {
-              texX = texSize - texX - 1;
-            }
-            const wallTex =
-              wall.type === 2
-                ? (textures?.door ?? null)
-                : pickWallTexture(wall.x, wall.y);
-            if (wallTex) {
-              ctx.drawImage(
-                wallTex,
-                texX,
-                0,
-                1,
-                texSize,
-                wallX,
-                wallTop,
-                wallW,
-                wallHeight,
-              );
-            } else {
-              ctx.fillStyle = "#6b4a2a";
-              ctx.fillRect(wallX, wallTop, wallW, wallHeight);
-            }
-            const hitX = player.x + dirX * wall.rawDist;
-            const hitY = player.y + dirY * wall.rawDist;
-            const lighting = sampleDoomLight(hitX, hitY);
-            const distShadeRaw = clamp(1 - correctedWall / 12, 0.1, 1);
-            const sideShade = wall.side === 1 ? 0.72 : 1;
-            const baseLight = distShadeRaw * sideShade;
-            const light = clamp(baseLight + lighting.boost * 0.55, 0, 1);
-            const quant = Math.floor(light * 8) / 8;
-            const dark = clamp(1 - quant, 0, 1);
-            if (dark > 0.001) {
-              ctx.fillStyle = `rgba(0,0,0,${0.7 * dark})`;
-              ctx.fillRect(wallX, wallTop, wallW, wallHeight);
-            }
-            const warmAlpha = clamp(lighting.warm * 0.18, 0, 0.18);
-            if (warmAlpha > 0.001) {
-              ctx.fillStyle = `rgba(246,194,122,${warmAlpha})`;
-              ctx.fillRect(wallX, wallTop, wallW, wallHeight);
-            }
-            const hotAlpha = clamp(lighting.hot * 0.16, 0, 0.16);
-            if (hotAlpha > 0.001) {
-              ctx.fillStyle = `rgba(214,115,91,${hotAlpha})`;
-              ctx.fillRect(wallX, wallTop, wallW, wallHeight);
-            }
-
-            if (doorHit) {
-              const correctedDoor = Math.max(
-                0.0001,
-                doorHit.rawDist * correction,
-              );
-              doorDistances[i] = correctedDoor;
-
-              const doorHeight = Math.min(
-                viewH,
-                Math.floor(viewH / correctedDoor),
-              );
-              const doorTop = Math.floor(
-                viewY + (viewH - doorHeight) / 2 + cameraBob,
-              );
-              const open = clamp(doorHit.open, 0, 1);
-              const visibleHeight = Math.max(
-                0,
-                Math.floor(doorHeight * (1 - open)),
-              );
-              if (visibleHeight > 0) {
-                doorBandBottoms[i] = doorTop + visibleHeight;
-                const doorCoord =
-                  doorHit.side === 0
-                    ? player.y + doorHit.rawDist * dirY
-                    : player.x + doorHit.rawDist * dirX;
-                const doorFrac = doorCoord - Math.floor(doorCoord);
-                let doorTexX = clamp(
-                  Math.floor(doorFrac * texSize),
-                  0,
-                  texSize - 1,
-                );
-                if (doorHit.side === 0 && dirX > 0) {
-                  doorTexX = texSize - doorTexX - 1;
-                }
-                if (doorHit.side === 1 && dirY < 0) {
-                  doorTexX = texSize - doorTexX - 1;
-                }
-                const doorTex = textures?.door ?? null;
-                if (doorTex) {
-                  ctx.drawImage(
-                    doorTex,
-                    doorTexX,
-                    0,
-                    1,
-                    texSize,
-                    wallX,
-                    doorTop,
-                    wallW,
-                    visibleHeight,
-                  );
-                } else {
-                  ctx.fillStyle = "#8f7b6a";
-                  ctx.fillRect(wallX, doorTop, wallW, visibleHeight);
-                }
-                const doorX = player.x + dirX * doorHit.rawDist;
-                const doorY = player.y + dirY * doorHit.rawDist;
-                const doorLighting = sampleDoomLight(doorX, doorY);
-                const distShadeDoor = clamp(1 - correctedDoor / 11, 0.1, 1);
-                const sideShadeDoor = doorHit.side === 1 ? 0.72 : 1;
-                const baseDoorLight = distShadeDoor * sideShadeDoor;
-                const lightDoor = clamp(
-                  baseDoorLight + doorLighting.boost * 0.55,
-                  0,
-                  1,
-                );
-                const quantDoor = Math.floor(lightDoor * 8) / 8;
-                const darkDoor = clamp(1 - quantDoor, 0, 1);
-                if (darkDoor > 0.001) {
-                  ctx.fillStyle = `rgba(0,0,0,${0.62 * darkDoor})`;
-                  ctx.fillRect(wallX, doorTop, wallW, visibleHeight);
-                }
-                const warmAlphaDoor = clamp(doorLighting.warm * 0.16, 0, 0.16);
-                if (warmAlphaDoor > 0.001) {
-                  ctx.fillStyle = `rgba(246,194,122,${warmAlphaDoor})`;
-                  ctx.fillRect(wallX, doorTop, wallW, visibleHeight);
-                }
-                const hotAlphaDoor = clamp(doorLighting.hot * 0.14, 0, 0.14);
-                if (hotAlphaDoor > 0.001) {
-                  ctx.fillStyle = `rgba(214,115,91,${hotAlphaDoor})`;
-                  ctx.fillRect(wallX, doorTop, wallW, visibleHeight);
-                }
-              } else {
-                doorBandBottoms[i] = 0;
-              }
-            } else {
-              doorBandBottoms[i] = 0;
-            }
-          }
-
-          const drawDoomSprite = (
-            kind:
-              | "pillar"
-              | "crate"
-              | "torch"
-              | "barrel"
-              | "ammo"
-              | "shells"
-              | "rockets"
-              | "med"
-              | "shield"
-              | "bomb"
-              | "chest"
-              | "shotgun"
-              | "chainsaw"
-              | "chaingun"
-              | "launcher",
-            x: number,
-            y: number,
-            w: number,
-            h: number,
-          ) => {
-            const left = Math.floor(x - w / 2);
-            const top = Math.floor(y);
-            if (kind === "pillar") {
-              ctx.fillStyle = "#6d5c4f";
-              ctx.fillRect(left + w * 0.22, top, w * 0.56, h);
-              ctx.fillStyle = "rgba(0,0,0,0.35)";
-              ctx.fillRect(left + w * 0.22, top, w * 0.14, h);
-              ctx.fillStyle = "rgba(255,255,255,0.08)";
-              ctx.fillRect(left + w * 0.62, top + h * 0.1, w * 0.08, h * 0.8);
-              return;
-            }
-            if (kind === "crate") {
-              ctx.fillStyle = "#b8894f";
-              ctx.fillRect(left, top + h * 0.15, w, h * 0.7);
-              ctx.strokeStyle = "rgba(40,30,25,0.6)";
-              ctx.lineWidth = 2;
-              ctx.strokeRect(left, top + h * 0.15, w, h * 0.7);
-              ctx.beginPath();
-              ctx.moveTo(left + w * 0.15, top + h * 0.2);
-              ctx.lineTo(left + w * 0.85, top + h * 0.8);
-              ctx.stroke();
-              return;
-            }
-            if (kind === "barrel") {
-              ctx.fillStyle = "#d6735b";
-              ctx.fillRect(left + w * 0.22, top + h * 0.22, w * 0.56, h * 0.66);
-              ctx.fillStyle = "rgba(0,0,0,0.28)";
-              ctx.fillRect(left + w * 0.22, top + h * 0.22, w * 0.14, h * 0.66);
-              ctx.fillStyle = "#f4d35e";
-              ctx.fillRect(left + w * 0.22, top + h * 0.32, w * 0.56, h * 0.06);
-              ctx.fillRect(left + w * 0.22, top + h * 0.68, w * 0.56, h * 0.06);
-              ctx.fillStyle = "rgba(255,255,255,0.12)";
-              ctx.fillRect(left + w * 0.62, top + h * 0.28, w * 0.08, h * 0.5);
-              return;
-            }
-            if (kind === "torch") {
-              ctx.fillStyle = "#8f7b6a";
-              ctx.fillRect(left + w * 0.42, top + h * 0.4, w * 0.16, h * 0.5);
-              ctx.fillStyle = "#f6c27a";
-              ctx.beginPath();
-              ctx.arc(left + w * 0.5, top + h * 0.3, w * 0.18, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.fillStyle = "#d6735b";
-              ctx.beginPath();
-              ctx.arc(left + w * 0.5, top + h * 0.28, w * 0.1, 0, Math.PI * 2);
-              ctx.fill();
-              return;
-            }
-            if (kind === "chest") {
-              ctx.fillStyle = "#d6a45b";
-              ctx.fillRect(left, top + h * 0.35, w, h * 0.5);
-              ctx.fillStyle = "#b8894f";
-              ctx.fillRect(left, top + h * 0.2, w, h * 0.2);
-              ctx.fillStyle = "#f4d35e";
-              ctx.fillRect(left + w * 0.45, top + h * 0.45, w * 0.1, h * 0.18);
-              return;
-            }
-            if (kind === "shotgun") {
-              ctx.fillStyle = "#8f7b6a";
-              ctx.fillRect(left + w * 0.18, top + h * 0.58, w * 0.64, h * 0.14);
-              ctx.fillStyle = "#d6735b";
-              ctx.fillRect(left + w * 0.22, top + h * 0.42, w * 0.5, h * 0.18);
-              ctx.fillStyle = "#b8894f";
-              ctx.fillRect(left + w * 0.26, top + h * 0.62, w * 0.22, h * 0.22);
-              ctx.fillStyle = "#1b1512";
-              ctx.fillRect(left + w * 0.66, top + h * 0.52, w * 0.06, h * 0.06);
-              return;
-            }
-            if (kind === "ammo") {
-              ctx.fillStyle = "#f4d35e";
-              ctx.fillRect(left, top + h * 0.35, w, h * 0.4);
-              ctx.fillStyle = "#6b4a2a";
-              ctx.fillRect(left + w * 0.12, top + h * 0.4, w * 0.15, h * 0.3);
-              ctx.fillRect(left + w * 0.38, top + h * 0.4, w * 0.15, h * 0.3);
-              ctx.fillRect(left + w * 0.64, top + h * 0.4, w * 0.15, h * 0.3);
-              return;
-            }
-            if (kind === "shells") {
-              ctx.fillStyle = "#d6735b";
-              ctx.fillRect(left, top + h * 0.34, w, h * 0.42);
-              ctx.fillStyle = "rgba(0,0,0,0.25)";
-              ctx.fillRect(left, top + h * 0.34, w, h * 0.06);
-              ctx.fillStyle = "#f4d35e";
-              for (let i = 0; i < 4; i += 1) {
-                const cx = left + w * (0.18 + i * 0.2);
-                ctx.fillRect(cx, top + h * 0.42, w * 0.08, h * 0.26);
-                ctx.fillStyle = "#1b1512";
-                ctx.fillRect(cx, top + h * 0.4, w * 0.08, h * 0.04);
-                ctx.fillStyle = "#f4d35e";
-              }
-              return;
-            }
-            if (kind === "rockets") {
-              ctx.fillStyle = "#8f7b6a";
-              ctx.fillRect(left + w * 0.18, top + h * 0.38, w * 0.64, h * 0.34);
-              ctx.fillStyle = "#1b1512";
-              ctx.fillRect(left + w * 0.18, top + h * 0.52, w * 0.64, h * 0.06);
-              ctx.fillStyle = "#f4d35e";
-              ctx.beginPath();
-              ctx.moveTo(left + w * 0.5, top + h * 0.18);
-              ctx.lineTo(left + w * 0.62, top + h * 0.38);
-              ctx.lineTo(left + w * 0.38, top + h * 0.38);
-              ctx.closePath();
-              ctx.fill();
-              ctx.fillStyle = "#d6735b";
-              ctx.fillRect(left + w * 0.36, top + h * 0.72, w * 0.28, h * 0.1);
-              return;
-            }
-            if (kind === "med") {
-              ctx.fillStyle = "#6fd68d";
-              ctx.fillRect(left, top + h * 0.3, w, h * 0.45);
-              ctx.fillStyle = "#1b1512";
-              ctx.fillRect(left + w * 0.42, top + h * 0.35, w * 0.16, h * 0.35);
-              ctx.fillRect(left + w * 0.32, top + h * 0.47, w * 0.36, h * 0.12);
-              return;
-            }
-            if (kind === "shield") {
-              ctx.fillStyle = "#5bb5d6";
-              ctx.beginPath();
-              ctx.moveTo(left + w * 0.5, top + h * 0.2);
-              ctx.lineTo(left + w * 0.85, top + h * 0.35);
-              ctx.lineTo(left + w * 0.7, top + h * 0.85);
-              ctx.lineTo(left + w * 0.5, top + h * 0.95);
-              ctx.lineTo(left + w * 0.3, top + h * 0.85);
-              ctx.lineTo(left + w * 0.15, top + h * 0.35);
-              ctx.closePath();
-              ctx.fill();
-              return;
-            }
-            if (kind === "bomb") {
-              ctx.fillStyle = "#d6735b";
-              ctx.beginPath();
-              ctx.arc(left + w * 0.5, top + h * 0.55, w * 0.35, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.strokeStyle = "#f4d35e";
-              ctx.lineWidth = 2;
-              ctx.beginPath();
-              ctx.moveTo(left + w * 0.5, top + h * 0.2);
-              ctx.lineTo(left + w * 0.72, top + h * 0.05);
-              ctx.stroke();
-              return;
-            }
-            if (kind === "chainsaw") {
-              ctx.fillStyle = "#8f7b6a";
-              ctx.fillRect(left + w * 0.18, top + h * 0.42, w * 0.64, h * 0.32);
-              ctx.fillStyle = "#d6735b";
-              ctx.fillRect(left + w * 0.28, top + h * 0.52, w * 0.18, h * 0.26);
-              ctx.fillStyle = "#1b1512";
-              ctx.fillRect(left + w * 0.46, top + h * 0.44, w * 0.28, h * 0.08);
-              ctx.fillRect(left + w * 0.78, top + h * 0.42, w * 0.12, h * 0.32);
-              ctx.fillStyle = "#f4d35e";
-              for (let i = 0; i < 6; i += 1) {
-                ctx.fillRect(left + w * (0.8 + i * 0.03), top + h * 0.42, 2, 3);
-              }
-              return;
-            }
-            if (kind === "chaingun") {
-              ctx.fillStyle = "#8f7b6a";
-              ctx.fillRect(left + w * 0.18, top + h * 0.48, w * 0.64, h * 0.22);
-              ctx.fillStyle = "#1b1512";
-              ctx.fillRect(left + w * 0.22, top + h * 0.42, w * 0.56, h * 0.08);
-              ctx.fillStyle = "#f4d35e";
-              ctx.fillRect(left + w * 0.34, top + h * 0.72, w * 0.14, h * 0.14);
-              ctx.fillRect(left + w * 0.52, top + h * 0.72, w * 0.14, h * 0.14);
-              return;
-            }
-            if (kind === "launcher") {
-              ctx.fillStyle = "#6fd68d";
-              ctx.fillRect(left + w * 0.16, top + h * 0.46, w * 0.68, h * 0.24);
-              ctx.fillStyle = "#1b1512";
-              ctx.fillRect(left + w * 0.6, top + h * 0.42, w * 0.24, h * 0.08);
-              ctx.fillStyle = "#d6735b";
-              ctx.fillRect(left + w * 0.28, top + h * 0.7, w * 0.18, h * 0.14);
-            }
-          };
-
-          const bloodDrops = doomBloodRef.current.slice().sort((a, b) => {
-            const da = Math.hypot(a.x - player.x, a.y - player.y);
-            const db = Math.hypot(b.x - player.x, b.y - player.y);
-            return db - da;
-          });
-          const maxBlood =
-            perfTier === "low" ? 30 : perfTier === "mid" ? 50 : 70;
-          bloodDrops.slice(0, maxBlood).forEach((drop) => {
-            const dx = drop.x - player.x;
-            const dy = drop.y - player.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 0.2 || dist > 12) {
-              return;
-            }
-            const angle = Math.atan2(dy, dx);
-            const delta = Math.atan2(
-              Math.sin(angle - player.angle),
-              Math.cos(angle - player.angle),
-            );
-            if (Math.abs(delta) > fov * 0.65) {
-              return;
-            }
-            const screenX = viewX + (0.5 + delta / fov) * Math.max(1, viewW);
-            const column = Math.floor((screenX - viewX) / colWidth);
-            if (column < 0 || column >= wallDistances.length) {
-              return;
-            }
-            if (dist >= wallDistances[column]) {
-              return;
-            }
-            const baseH = Math.min(viewH, Math.floor(viewH / dist));
-            const floorY = Math.floor(viewY + (viewH + baseH) / 2 + cameraBob);
-            const zLift = clamp(drop.z, 0, 1.2) * baseH * 0.55;
-            const y = floorY - zLift - 2;
-            const size = clamp(Math.floor(baseH * 0.08 * drop.size), 2, 18);
-            const t = clamp(drop.life / Math.max(1, drop.maxLife), 0, 1);
-            const baseAlpha = drop.z > 0 ? 0.6 : 0.42;
-            const alpha = baseAlpha * (drop.z > 0 ? t : Math.pow(t, 0.65));
-            if (alpha <= 0.01) {
-              return;
-            }
-
-            const drawBlood = () => {
-              ctx.fillStyle = `rgba(214,115,91,${alpha})`;
-              ctx.beginPath();
-              ctx.ellipse(
-                screenX,
-                y,
-                size * 0.55,
-                size * (drop.z > 0 ? 0.55 : 0.28),
-                0,
-                0,
-                Math.PI * 2,
-              );
-              ctx.fill();
-              if (drop.z > 0) {
-                ctx.fillStyle = `rgba(246,194,122,${0.12 * alpha})`;
-                ctx.beginPath();
-                ctx.arc(
-                  screenX - size * 0.12,
-                  y - size * 0.1,
-                  size * 0.12,
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-              }
-            };
-
-            const doorDist = doorDistances[column] ?? 0;
-            const doorClipY = doorBandBottoms[column] ?? 0;
-            const behindDoor =
-              doorDist > 0 && dist > doorDist + 0.02 && doorClipY > 0;
-            if (behindDoor) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(
-                viewX,
-                doorClipY,
-                viewW,
-                Math.max(0, viewY + viewH - doorClipY),
-              );
-              ctx.clip();
-              drawBlood();
-              ctx.restore();
-              return;
-            }
-            drawBlood();
-          });
-
-          const props = doomPropsRef.current.slice();
-          const pickups = doomPickupsRef.current;
-          const sprites = [
-            ...props.map((prop) => ({
-              x: prop.x,
-              y: prop.y,
-              kind: prop.type,
-            })),
-            ...pickups.map((pickup) => ({
-              x: pickup.x,
-              y: pickup.y,
-              kind: pickup.type,
-            })),
-          ].sort((a, b) => {
-            const da = Math.hypot(a.x - player.x, a.y - player.y);
-            const db = Math.hypot(b.x - player.x, b.y - player.y);
-            return db - da;
-          });
-          const maxSprites =
-            perfTier === "low" ? 10 : perfTier === "mid" ? 14 : 20;
-          sprites.slice(0, maxSprites).forEach((sprite) => {
-            const dx = sprite.x - player.x;
-            const dy = sprite.y - player.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 0.2 || dist > 12) {
-              return;
-            }
-            const angle = Math.atan2(dy, dx);
-            const delta = Math.atan2(
-              Math.sin(angle - player.angle),
-              Math.cos(angle - player.angle),
-            );
-            if (Math.abs(delta) > fov * 0.6) {
-              return;
-            }
-            const screenX = viewX + (0.5 + delta / fov) * Math.max(1, viewW);
-            const column = Math.floor((screenX - viewX) / colWidth);
-            if (column < 0 || column >= wallDistances.length) {
-              return;
-            }
-            if (dist >= wallDistances[column]) {
-              return;
-            }
-            const baseH = Math.min(viewH, Math.floor(viewH / dist));
-            const scale =
-              sprite.kind === "pillar"
-                ? 1.05
-                : sprite.kind === "crate"
-                  ? 0.7
-                  : sprite.kind === "barrel"
-                    ? 0.75
-                    : sprite.kind === "torch"
-                      ? 0.8
-                      : sprite.kind === "ammo"
-                        ? 0.32
-                        : sprite.kind === "shells"
-                          ? 0.34
-                          : sprite.kind === "rockets"
-                            ? 0.38
-                            : sprite.kind === "med"
-                              ? 0.36
-                              : sprite.kind === "shield"
-                                ? 0.42
-                                : sprite.kind === "chainsaw"
-                                  ? 0.44
-                                  : sprite.kind === "chaingun"
-                                    ? 0.44
-                                    : sprite.kind === "launcher"
-                                      ? 0.44
-                                      : sprite.kind === "shotgun"
-                                        ? 0.4
-                                        : sprite.kind === "bomb"
-                                          ? 0.34
-                                          : 0.48;
-            const spriteH = Math.min(
-              Math.floor(viewH * 0.78),
-              Math.max(10, Math.floor(baseH * scale)),
-            );
-            const aspect =
-              sprite.kind === "pillar"
-                ? 0.35
-                : sprite.kind === "torch"
-                  ? 0.28
-                  : sprite.kind === "crate"
-                    ? 0.6
-                    : sprite.kind === "barrel"
-                      ? 0.5
-                      : sprite.kind === "shotgun"
-                        ? 0.8
-                        : sprite.kind === "chainsaw"
-                          ? 0.9
-                          : sprite.kind === "chaingun"
-                            ? 0.85
-                            : sprite.kind === "launcher"
-                              ? 0.9
-                              : sprite.kind === "rockets"
-                                ? 0.7
-                                : sprite.kind === "shells"
-                                  ? 0.7
-                                  : 0.65;
-            const spriteW = Math.max(10, Math.floor(spriteH * aspect));
-            const floorY = Math.floor(viewY + (viewH + baseH) / 2 + cameraBob);
-            const top = floorY - spriteH;
-            const spriteLeft = Math.floor(screenX - spriteW / 2);
-            const applySpriteLighting = () => {
-              const lighting = sampleDoomLight(sprite.x, sprite.y);
-              const warmAlpha = clamp(lighting.warm * 0.22, 0, 0.22);
-              if (warmAlpha > 0.001) {
-                ctx.fillStyle = `rgba(246,194,122,${warmAlpha})`;
-                ctx.fillRect(spriteLeft, top, spriteW, spriteH);
-              }
-              const hotAlpha = clamp(lighting.hot * 0.16, 0, 0.16);
-              if (hotAlpha > 0.001) {
-                ctx.fillStyle = `rgba(214,115,91,${hotAlpha})`;
-                ctx.fillRect(spriteLeft, top, spriteW, spriteH);
-              }
-            };
-
-            const doorDist = doorDistances[column] ?? 0;
-            const doorClipY = doorBandBottoms[column] ?? 0;
-            const behindDoor =
-              doorDist > 0 && dist > doorDist + 0.02 && doorClipY > 0;
-            if (behindDoor) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(
-                viewX,
-                doorClipY,
-                viewW,
-                Math.max(0, viewY + viewH - doorClipY),
-              );
-              ctx.clip();
-              drawDoomSprite(sprite.kind, screenX, top, spriteW, spriteH);
-              applySpriteLighting();
-              ctx.restore();
-              return;
-            }
-            drawDoomSprite(sprite.kind, screenX, top, spriteW, spriteH);
-            applySpriteLighting();
-          });
-
-          const enemies = doomEnemiesRef.current.slice().sort((a, b) => {
-            const da = Math.hypot(a.x - player.x, a.y - player.y);
-            const db = Math.hypot(b.x - player.x, b.y - player.y);
-            return db - da;
-          });
-          const maxEnemies =
-            perfTier === "low" ? 8 : perfTier === "mid" ? 12 : 18;
-          enemies.slice(0, maxEnemies).forEach((enemy) => {
-            const dx = enemy.x - player.x;
-            const dy = enemy.y - player.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 0.2 || dist > 12) {
-              return;
-            }
-            const angle = Math.atan2(dy, dx);
-            const delta = Math.atan2(
-              Math.sin(angle - player.angle),
-              Math.cos(angle - player.angle),
-            );
-            if (Math.abs(delta) > fov * 0.6) {
-              return;
-            }
-            const screenX = viewX + (0.5 + delta / fov) * Math.max(1, viewW);
-            const column = Math.floor((screenX - viewX) / colWidth);
-            if (column < 0 || column >= wallDistances.length) {
-              return;
-            }
-            if (dist >= wallDistances[column]) {
-              return;
-            }
-            const baseH = Math.min(viewH, Math.floor(viewH / dist));
-            const enemyScale =
-              enemy.type === "brute"
-                ? 1.28
-                : enemy.type === "charger"
-                  ? 1.14
-                  : enemy.type === "spitter"
-                    ? 1.05
-                    : 0.96;
-            const spriteH = Math.min(
-              Math.floor(viewH * 0.92),
-              Math.max(22, Math.floor(baseH * 0.92 * enemyScale)),
-            );
-            const spriteW = Math.max(
-              18,
-              Math.floor(spriteH * (enemy.type === "brute" ? 0.62 : 0.55)),
-            );
-            const floorY = Math.floor(viewY + (viewH + baseH) / 2 + cameraBob);
-            const top = floorY - spriteH;
-
-            const drawEnemy = () => {
-              const localLight = sampleDoomLight(enemy.x, enemy.y);
-              const shade = clamp(
-                1 - dist / 8 + localLight.boost * 0.35,
-                0.18,
-                1,
-              );
-              const base = Math.floor(170 * shade);
-              const clampC = (value: number) =>
-                clamp(Math.round(value), 0, 255);
-              const bodyW = Math.floor(spriteW * 0.78);
-              const headW = Math.floor(spriteW * 0.52);
-              const left = Math.floor(screenX - spriteW / 2);
-              const dead = enemy.dead;
-              const hurt = clamp(enemy.hurt / 12, 0, 1);
-              const walk = enemy.anim;
-              const stride = Math.sin(walk * 2);
-              const bob = dead ? 0 : Math.sin(walk) * 2;
-              let body = `rgb(${clampC(base + 40)}, ${clampC(base)}, ${clampC(
-                base - 20,
-              )})`;
-              let head = `rgb(${clampC(base + 60)}, ${clampC(base + 10)}, ${clampC(
-                base,
-              )})`;
-              let limb = `rgb(${clampC(base + 20)}, ${clampC(base - 5)}, ${clampC(
-                base - 30,
-              )})`;
-              let eye = "#1b1512";
-              if (enemy.type === "spitter") {
-                body = `rgb(${clampC(base - 25)}, ${clampC(base + 65)}, ${clampC(
-                  base - 10,
-                )})`;
-                head = `rgb(${clampC(base - 10)}, ${clampC(base + 85)}, ${clampC(
-                  base + 20,
-                )})`;
-                limb = `rgb(${clampC(base - 40)}, ${clampC(base + 35)}, ${clampC(
-                  base - 30,
-                )})`;
-                eye = "#f4d35e";
-              } else if (enemy.type === "charger") {
-                body = `rgb(${clampC(base + 85)}, ${clampC(base + 25)}, ${clampC(
-                  base - 10,
-                )})`;
-                head = `rgb(${clampC(base + 110)}, ${clampC(base + 35)}, ${clampC(
-                  base + 5,
-                )})`;
-                limb = `rgb(${clampC(base + 55)}, ${clampC(base + 10)}, ${clampC(
-                  base - 25,
-                )})`;
-                eye = "#1b1512";
-              } else if (enemy.type === "brute") {
-                body = `rgb(${clampC(base + 25)}, ${clampC(base - 15)}, ${clampC(
-                  base + 70,
-                )})`;
-                head = `rgb(${clampC(base + 45)}, ${clampC(base)}, ${clampC(
-                  base + 95,
-                )})`;
-                limb = `rgb(${clampC(base + 10)}, ${clampC(base - 25)}, ${clampC(
-                  base + 45,
-                )})`;
-                eye = "#f4d35e";
-              }
-
-              if (dead) {
-                const poolW = spriteW * (enemy.type === "brute" ? 0.55 : 0.46);
-                const poolH = Math.max(3, Math.floor(spriteH * 0.055));
-                ctx.fillStyle = "rgba(214,115,91,0.38)";
-                ctx.beginPath();
-                ctx.ellipse(
-                  screenX,
-                  floorY - 2,
-                  poolW,
-                  poolH,
-                  0,
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-
-                const corpseH = Math.max(10, Math.floor(spriteH * 0.22));
-                const corpseW = Math.max(14, Math.floor(spriteW * 0.86));
-                const corpseX = left + Math.floor((spriteW - corpseW) / 2);
-                const corpseY = floorY - corpseH - 4;
-                ctx.fillStyle = body;
-                ctx.fillRect(
-                  corpseX,
-                  corpseY,
-                  corpseW,
-                  Math.floor(corpseH * 0.62),
-                );
-                ctx.fillStyle = head;
-                ctx.fillRect(
-                  corpseX + Math.floor(corpseW * 0.62),
-                  corpseY + Math.floor(corpseH * 0.08),
-                  Math.floor(corpseW * 0.22),
-                  Math.floor(corpseH * 0.32),
-                );
-                ctx.fillStyle = "rgba(0,0,0,0.22)";
-                ctx.fillRect(
-                  corpseX + Math.floor(corpseW * 0.18),
-                  corpseY + Math.floor(corpseH * 0.42),
-                  Math.floor(corpseW * 0.55),
-                  Math.max(2, Math.floor(corpseH * 0.08)),
-                );
-                return;
-              }
-
-              ctx.fillStyle = body;
-              ctx.fillRect(
-                left + Math.floor((spriteW - bodyW) / 2),
-                top + Math.floor(spriteH * 0.28 + bob),
-                bodyW,
-                Math.floor(spriteH * 0.6),
-              );
-              ctx.fillStyle = head;
-              ctx.fillRect(
-                left + Math.floor((spriteW - headW) / 2),
-                top + Math.floor(spriteH * 0.12 + bob),
-                headW,
-                Math.floor(spriteH * 0.18),
-              );
-              ctx.fillStyle = eye;
-              ctx.fillRect(
-                left + Math.floor(spriteW * 0.38),
-                top + Math.floor(spriteH * 0.2 + bob),
-                Math.max(2, Math.floor(spriteW * 0.08)),
-                Math.max(2, Math.floor(spriteH * 0.06)),
-              );
-              ctx.fillRect(
-                left + Math.floor(spriteW * 0.56),
-                top + Math.floor(spriteH * 0.2 + bob),
-                Math.max(2, Math.floor(spriteW * 0.08)),
-                Math.max(2, Math.floor(spriteH * 0.06)),
-              );
-              ctx.fillStyle = limb;
-              ctx.fillRect(
-                left + Math.floor(spriteW * 0.02),
-                top + Math.floor(spriteH * (0.42 + stride * 0.02) + bob),
-                Math.floor(spriteW * 0.18),
-                Math.floor(spriteH * 0.28),
-              );
-              ctx.fillRect(
-                left + Math.floor(spriteW * 0.8),
-                top + Math.floor(spriteH * (0.42 - stride * 0.02) + bob),
-                Math.floor(spriteW * 0.18),
-                Math.floor(spriteH * 0.28),
-              );
-              const legW = Math.floor(spriteW * 0.18);
-              const legH = Math.floor(spriteH * 0.22);
-              const legY = top + Math.floor(spriteH * 0.78 + bob);
-              const liftA = Math.max(0, -stride) * Math.floor(spriteH * 0.06);
-              const liftB = Math.max(0, stride) * Math.floor(spriteH * 0.06);
-              ctx.fillRect(
-                left + Math.floor(spriteW * 0.3),
-                Math.floor(legY + liftA),
-                legW,
-                Math.max(2, Math.floor(legH - liftA)),
-              );
-              ctx.fillRect(
-                left + Math.floor(spriteW * 0.54),
-                Math.floor(legY + liftB),
-                legW,
-                Math.max(2, Math.floor(legH - liftB)),
-              );
-              if (enemy.type === "charger") {
-                ctx.fillStyle = "#f4d35e";
-                ctx.beginPath();
-                ctx.moveTo(
-                  left + Math.floor(spriteW * 0.22),
-                  top + Math.floor(spriteH * 0.12 + bob),
-                );
-                ctx.lineTo(
-                  left + Math.floor(spriteW * 0.34),
-                  top + Math.floor(spriteH * 0.06 + bob),
-                );
-                ctx.lineTo(
-                  left + Math.floor(spriteW * 0.4),
-                  top + Math.floor(spriteH * 0.14 + bob),
-                );
-                ctx.closePath();
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(
-                  left + Math.floor(spriteW * 0.78),
-                  top + Math.floor(spriteH * 0.12 + bob),
-                );
-                ctx.lineTo(
-                  left + Math.floor(spriteW * 0.66),
-                  top + Math.floor(spriteH * 0.06 + bob),
-                );
-                ctx.lineTo(
-                  left + Math.floor(spriteW * 0.6),
-                  top + Math.floor(spriteH * 0.14 + bob),
-                );
-                ctx.closePath();
-                ctx.fill();
-              } else if (enemy.type === "spitter") {
-                ctx.fillStyle = "rgba(0,0,0,0.18)";
-                ctx.fillRect(
-                  left + Math.floor(spriteW * 0.42),
-                  top + Math.floor(spriteH * 0.28 + bob),
-                  Math.floor(spriteW * 0.16),
-                  Math.floor(spriteH * 0.12),
-                );
-              } else if (enemy.type === "brute") {
-                ctx.fillStyle = "rgba(0,0,0,0.24)";
-                ctx.fillRect(
-                  left + Math.floor(spriteW * 0.2),
-                  top + Math.floor(spriteH * 0.24 + bob),
-                  Math.floor(spriteW * 0.6),
-                  Math.floor(spriteH * 0.08),
-                );
-              }
-              if (hurt > 0.001) {
-                ctx.fillStyle = `rgba(214,115,91,${0.28 * hurt})`;
-                ctx.fillRect(left, top, spriteW, spriteH);
-              }
-            };
-
-            const doorDist = doorDistances[column] ?? 0;
-            const doorClipY = doorBandBottoms[column] ?? 0;
-            const behindDoor =
-              doorDist > 0 && dist > doorDist + 0.02 && doorClipY > 0;
-            if (behindDoor) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(
-                viewX,
-                doorClipY,
-                viewW,
-                Math.max(0, viewY + viewH - doorClipY),
-              );
-              ctx.clip();
-              drawEnemy();
-              ctx.restore();
-              return;
-            }
-            drawEnemy();
-          });
-
-          const projectiles = doomProjectilesRef.current
-            .slice()
-            .sort((a, b) => {
-              const da = Math.hypot(a.x - player.x, a.y - player.y);
-              const db = Math.hypot(b.x - player.x, b.y - player.y);
-              return db - da;
-            });
-          const maxProjectiles =
-            perfTier === "low" ? 8 : perfTier === "mid" ? 12 : 18;
-          projectiles.slice(0, maxProjectiles).forEach((projectile) => {
-            const dx = projectile.x - player.x;
-            const dy = projectile.y - player.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < 0.2 || dist > 12) {
-              return;
-            }
-            const angle = Math.atan2(dy, dx);
-            const delta = Math.atan2(
-              Math.sin(angle - player.angle),
-              Math.cos(angle - player.angle),
-            );
-            if (Math.abs(delta) > fov * 0.65) {
-              return;
-            }
-            const screenX = viewX + (0.5 + delta / fov) * Math.max(1, viewW);
-            const column = Math.floor((screenX - viewX) / colWidth);
-            if (column < 0 || column >= wallDistances.length) {
-              return;
-            }
-            if (dist >= wallDistances[column]) {
-              return;
-            }
-            const baseH = Math.min(viewH, Math.floor(viewH / dist));
-            const isRocket = projectile.kind === "rocket";
-            const size = Math.min(
-              Math.floor(viewH * 0.28),
-              Math.max(
-                isRocket ? 10 : 8,
-                Math.floor(baseH * (isRocket ? 0.22 : 0.16)),
-              ),
-            );
-            const top = Math.floor(
-              viewY + viewH * 0.48 - size / 2 + cameraBob * 0.2,
-            );
-
-            const drawProjectile = () => {
-              if (isRocket) {
-                const bodyW = Math.max(6, Math.floor(size * 0.46));
-                const bodyH = Math.max(10, Math.floor(size * 0.82));
-                const left = Math.floor(screenX - bodyW / 2);
-                const bodyY = top + Math.floor(size * 0.14);
-                ctx.fillStyle = "rgba(143,123,106,0.9)";
-                ctx.fillRect(left, bodyY, bodyW, bodyH);
-                ctx.fillStyle = "rgba(0,0,0,0.22)";
-                ctx.fillRect(left, bodyY + Math.floor(bodyH * 0.56), bodyW, 2);
-                ctx.fillStyle = "#f4d35e";
-                ctx.beginPath();
-                ctx.moveTo(screenX, top);
-                ctx.lineTo(left + bodyW, bodyY);
-                ctx.lineTo(left, bodyY);
-                ctx.closePath();
-                ctx.fill();
-                const flame = clamp(doomFlashRef.current / 10, 0.2, 1);
-                ctx.fillStyle = `rgba(214,115,91,${0.5 * flame})`;
-                ctx.beginPath();
-                ctx.arc(
-                  screenX,
-                  bodyY + bodyH + Math.floor(size * 0.08),
-                  Math.floor(size * 0.22),
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-                ctx.fillStyle = `rgba(246,194,122,${0.55 * flame})`;
-                ctx.beginPath();
-                ctx.arc(
-                  screenX,
-                  bodyY + bodyH + Math.floor(size * 0.08),
-                  Math.floor(size * 0.14),
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-                return;
-              }
-              ctx.fillStyle = "rgba(214,115,91,0.78)";
-              ctx.beginPath();
-              ctx.arc(screenX, top + size * 0.52, size * 0.48, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.fillStyle = "rgba(246,194,122,0.72)";
-              ctx.beginPath();
-              ctx.arc(screenX, top + size * 0.5, size * 0.28, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.fillStyle = "rgba(255,255,255,0.28)";
-              ctx.fillRect(
-                screenX - size * 0.12,
-                top + size * 0.38,
-                size * 0.24,
-                size * 0.24,
-              );
-            };
-
-            const doorDist = doorDistances[column] ?? 0;
-            const doorClipY = doorBandBottoms[column] ?? 0;
-            const behindDoor =
-              doorDist > 0 && dist > doorDist + 0.02 && doorClipY > 0;
-            if (behindDoor) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(
-                viewX,
-                doorClipY,
-                viewW,
-                Math.max(0, viewY + viewH - doorClipY),
-              );
-              ctx.clip();
-              drawProjectile();
-              ctx.restore();
-              return;
-            }
-            drawProjectile();
-          });
-
-          const bomb = doomBombRef.current;
-          if (bomb?.active) {
-            const dx = bomb.x - player.x;
-            const dy = bomb.y - player.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist > 0.2 && dist < 10) {
-              const angle = Math.atan2(dy, dx);
-              const delta = Math.atan2(
-                Math.sin(angle - player.angle),
-                Math.cos(angle - player.angle),
-              );
-              if (Math.abs(delta) <= fov * 0.7) {
-                const screenX =
-                  viewX + (0.5 + delta / fov) * Math.max(1, viewW);
-                const column = Math.floor((screenX - viewX) / colWidth);
-                if (column < 0 || column >= wallDistances.length) {
-                  return;
-                }
-                if (dist >= wallDistances[column]) {
-                  return;
-                }
-
-                const spriteH = Math.min(viewH, Math.floor(viewH / dist));
-                const size = clamp(Math.floor(spriteH * 0.18), 10, 26);
-                const floorY = Math.floor(
-                  viewY + (viewH + spriteH) / 2 + cameraBob,
-                );
-                const zLift = clamp(bomb.z, 0, 1.2) * spriteH * 0.55;
-                const bottomY = floorY - zLift;
-                const top = Math.floor(bottomY - size);
-
-                const shadowScale = clamp(1 - bomb.z * 0.7, 0.25, 1);
-                ctx.fillStyle = `rgba(0,0,0,${0.32 * shadowScale})`;
-                ctx.beginPath();
-                ctx.ellipse(
-                  screenX,
-                  floorY - 2,
-                  size * 0.42 * shadowScale,
-                  size * 0.16 * shadowScale,
-                  0,
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-
-                const cx = screenX;
-                const cy = top + size * 0.62;
-                const r = size * 0.38;
-                ctx.fillStyle = "rgba(111,214,141,0.9)";
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = "rgba(0,0,0,0.28)";
-                ctx.lineWidth = Math.max(1, Math.floor(size * 0.08));
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.stroke();
-
-                const stripeAngle = bomb.spin;
-                const sx = Math.cos(stripeAngle) * r * 0.85;
-                const sy = Math.sin(stripeAngle) * r * 0.35;
-                ctx.strokeStyle = "rgba(0,0,0,0.24)";
-                ctx.lineWidth = Math.max(1, Math.floor(size * 0.12));
-                ctx.beginPath();
-                ctx.moveTo(cx - sx, cy - sy);
-                ctx.lineTo(cx + sx, cy + sy);
-                ctx.stroke();
-
-                ctx.fillStyle = "rgba(244,211,94,0.9)";
-                ctx.fillRect(
-                  Math.floor(cx - size * 0.08),
-                  Math.floor(top + size * 0.12),
-                  Math.max(2, Math.floor(size * 0.16)),
-                  Math.max(2, Math.floor(size * 0.22)),
-                );
-                ctx.fillStyle = "rgba(255,255,255,0.28)";
-                ctx.beginPath();
-                ctx.arc(cx - r * 0.35, cy - r * 0.25, r * 0.18, 0, Math.PI * 2);
-                ctx.fill();
-
-                const fuseT = clamp(bomb.life / 52, 0, 1);
-                const spark = 0.5 + 0.5 * Math.sin(now / 55 + bomb.spin * 0.6);
-                const sparkAlpha = clamp((1 - fuseT) * 0.9, 0.1, 0.9) * spark;
-                ctx.fillStyle = `rgba(246,194,122,${sparkAlpha})`;
-                ctx.beginPath();
-                ctx.arc(
-                  cx + Math.sin(bomb.spin) * r * 0.25,
-                  top + size * 0.06,
-                  Math.max(1, Math.floor(size * 0.12)),
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-              }
-            }
-          }
-          const explosion = doomExplosionRef.current;
-          if (explosion) {
-            const dx = explosion.x - player.x;
-            const dy = explosion.y - player.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist > 0.2 && dist < 10) {
-              const angle = Math.atan2(dy, dx);
-              const delta = Math.atan2(
-                Math.sin(angle - player.angle),
-                Math.cos(angle - player.angle),
-              );
-              if (Math.abs(delta) <= fov * 0.7) {
-                const screenX =
-                  viewX + (0.5 + delta / fov) * Math.max(1, viewW);
-                const spriteH = Math.min(viewH, Math.floor(viewH / dist));
-                const size = Math.min(
-                  Math.floor(viewH * 0.45),
-                  Math.max(16, Math.floor(spriteH * 0.35)),
-                );
-                const top = Math.floor(viewY + (viewH - size) / 2);
-                ctx.fillStyle = "rgba(246,194,122,0.6)";
-                ctx.beginPath();
-                ctx.arc(screenX, top + size * 0.5, size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = "rgba(214,115,91,0.35)";
-                ctx.beginPath();
-                ctx.arc(screenX, top + size * 0.5, size * 0.3, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
-          }
-        }
-        if (doomFlashRef.current > 0) {
-          ctx.fillStyle = `rgba(246, 194, 122, ${0.12 * doomFlashRef.current})`;
-          ctx.fillRect(viewX, viewY, viewW, viewH);
-        }
-        const healthNow = doomHealthRef.current;
-        const injuryNow = clamp(1 - healthNow / 100, 0, 1);
-        const hurtNow = clamp(doomHurtRef.current / 14, 0, 1);
-        const injuryAlpha = clamp(injuryNow * 0.22 + hurtNow * 0.3, 0, 0.48);
-        if (injuryAlpha > 0.001) {
-          const cx = viewX + viewW / 2;
-          const cy = viewY + viewH / 2;
-          const radius = Math.max(viewW, viewH) * 0.58;
-          const gradient = ctx.createRadialGradient(
-            cx,
-            cy,
-            radius * 0.18,
-            cx,
-            cy,
-            radius,
-          );
-          gradient.addColorStop(0, "rgba(214,115,91,0)");
-          gradient.addColorStop(1, `rgba(214,115,91,${injuryAlpha})`);
-          ctx.fillStyle = gradient;
-          ctx.fillRect(viewX, viewY, viewW, viewH);
-        }
-        const hudHeight = Math.max(68, Math.floor(viewH * 0.18));
-        const hudY = Math.floor(viewY + viewH - hudHeight);
-
-        const recoil = clamp(doomMuzzleRef.current / 10, 0, 1);
-        const bobX = Math.sin(doomBobRef.current) * 6;
-        const bobY = Math.abs(Math.cos(doomBobRef.current)) * 5;
-        const weaponMaxH = Math.max(72, Math.floor((hudY - viewY) * 0.62));
-        const weaponW = clamp(Math.floor(viewW * 0.46), 170, 320);
-        const weaponH = clamp(Math.floor(viewH * 0.22), 78, weaponMaxH);
-        const weaponX = Math.floor(viewX + (viewW - weaponW) / 2 + bobX);
-        const reloadMax = doomReloadMaxRef.current;
-        const reloadRemaining = doomReloadRef.current;
-        const reload =
-          reloadMax > 0 ? clamp(reloadRemaining / reloadMax, 0, 1) : 0;
-        const reloadPhase = 1 - reload;
-        const reloadDrop = Math.sin(reloadPhase * Math.PI);
-        const reloadY = reloadDrop * weaponH * 0.22;
-        const weaponY = Math.floor(
-          hudY - weaponH - 6 + bobY - recoil * 10 + reloadY,
-        );
-        const weapon = doomWeaponRef.current;
-        const attack = clamp(doomMuzzleRef.current / 14, 0, 1);
-        ctx.save();
-        ctx.globalAlpha = 0.98;
-
-        const drawHand = (x: number, y: number, w: number, h: number) => {
-          ctx.fillStyle = "#caa57a";
-          ctx.fillRect(x, y, w, h);
-          ctx.fillStyle = "#b8894f";
-          ctx.fillRect(x, y, w, Math.max(2, Math.floor(h * 0.18)));
-          ctx.fillStyle = "rgba(0,0,0,0.18)";
-          ctx.fillRect(x, y + Math.floor(h * 0.75), w, Math.floor(h * 0.25));
-        };
-
-        const drawFist = (x: number, y: number, w: number, h: number) => {
-          ctx.fillStyle = "#caa57a";
-          ctx.fillRect(x, y + Math.floor(h * 0.18), w, Math.floor(h * 0.82));
-          ctx.fillRect(
-            x + Math.floor(w * 0.08),
-            y,
-            Math.floor(w * 0.84),
-            Math.floor(h * 0.32),
-          );
-          ctx.fillStyle = "#b8894f";
-          ctx.fillRect(x, y + Math.floor(h * 0.18), w, Math.floor(h * 0.12));
-          ctx.fillStyle = "rgba(0,0,0,0.22)";
-          for (let i = 0; i < 4; i += 1) {
-            const fx = x + Math.floor(w * (0.18 + i * 0.2));
-            ctx.fillRect(fx, y + Math.floor(h * 0.34), 2, Math.floor(h * 0.36));
-          }
-        };
-
-        const drawMuzzleFlash = (mx: number, my: number, base: number) => {
-          if (doomMuzzleRef.current <= 0) {
-            return;
-          }
-          const glow = clamp(doomMuzzleRef.current / 12, 0, 1);
-          ctx.fillStyle = `rgba(246, 194, 122, ${0.65 * glow})`;
-          ctx.beginPath();
-          ctx.arc(mx, my, base * (0.75 + glow * 0.35), 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = `rgba(255,255,255,${0.55 * glow})`;
-          ctx.fillRect(
-            mx - base * 0.35,
-            my - base * 0.35,
-            base * 0.7,
-            base * 0.7,
-          );
-        };
-
-        if (weapon === "fist") {
-          const fistW = Math.floor(weaponW * 0.28);
-          const fistH = Math.floor(weaponH * 0.48);
-          const baseY = weaponY + Math.floor(weaponH * 0.52);
-          const leftX = weaponX + Math.floor(weaponW * 0.18);
-          const rightBaseX = weaponX + Math.floor(weaponW * 0.54);
-          const rightX = rightBaseX + Math.floor(attack * weaponW * 0.06);
-          const rightY = baseY - Math.floor(attack * weaponH * 0.14);
-          ctx.fillStyle = "rgba(0,0,0,0.18)";
-          ctx.fillRect(
-            weaponX + Math.floor(weaponW * 0.16),
-            weaponY + Math.floor(weaponH * 0.84),
-            Math.floor(weaponW * 0.68),
-            Math.floor(weaponH * 0.16),
-          );
-          drawFist(leftX, baseY, fistW, fistH);
-          drawFist(rightX, rightY, fistW, fistH);
-          ctx.restore();
-        } else if (weapon === "chainsaw") {
-          const handW = Math.floor(weaponW * 0.2);
-          const handH = Math.floor(weaponH * 0.4);
-          const handY = weaponY + weaponH - handH;
-          const leftHandX = weaponX + Math.floor(weaponW * 0.14);
-          const rightHandX = weaponX + Math.floor(weaponW * 0.62);
-          const sawJitter =
-            attack > 0 ? Math.sin(doomBobRef.current * 6) * 2 : 0;
-          ctx.fillStyle = "rgba(0,0,0,0.18)";
-          ctx.fillRect(
-            weaponX + Math.floor(weaponW * 0.12),
-            weaponY + Math.floor(weaponH * 0.84),
-            Math.floor(weaponW * 0.76),
-            Math.floor(weaponH * 0.16),
-          );
-          drawHand(leftHandX, handY, handW, handH);
-          drawHand(rightHandX, handY, handW, handH);
-
-          const bodyX = weaponX + Math.floor(weaponW * 0.32);
-          const bodyY = weaponY + Math.floor(weaponH * 0.54);
-          const bodyW = Math.floor(weaponW * 0.42);
-          const bodyH = Math.floor(weaponH * 0.22);
-          ctx.fillStyle = "#d6735b";
-          ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
-          ctx.fillStyle = "#1b1512";
-          ctx.fillRect(
-            bodyX + Math.floor(bodyW * 0.12),
-            bodyY + Math.floor(bodyH * 0.16),
-            Math.floor(bodyW * 0.26),
-            Math.floor(bodyH * 0.22),
-          );
-          ctx.fillStyle = "#8f7b6a";
-          const bladeX = bodyX + bodyW;
-          const bladeY =
-            bodyY - Math.floor(bodyH * 0.1) + Math.floor(sawJitter);
-          const bladeW = Math.floor(weaponW * 0.28);
-          const bladeH = Math.floor(bodyH * 1.2);
-          ctx.fillRect(bladeX, bladeY, bladeW, bladeH);
-          ctx.fillStyle = "rgba(0,0,0,0.22)";
-          ctx.fillRect(bladeX, bladeY + Math.floor(bladeH * 0.46), bladeW, 2);
-          ctx.fillStyle = "#f4d35e";
-          for (let t = 0; t < 10; t += 1) {
-            const tx = bladeX + Math.floor((t / 10) * bladeW);
-            const ty = bladeY + (t % 2 === 0 ? 0 : bladeH - 3);
-            ctx.fillRect(tx, ty, 2, 3);
-          }
-          if (attack > 0.35) {
-            const sparkX = bladeX + bladeW + 2;
-            const sparkY = bladeY + Math.floor(bladeH * 0.5);
-            ctx.strokeStyle = `rgba(246,194,122,${0.65 * attack})`;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(sparkX, sparkY);
-            ctx.lineTo(sparkX + 10, sparkY - 6);
-            ctx.moveTo(sparkX, sparkY);
-            ctx.lineTo(sparkX + 10, sparkY + 6);
-            ctx.stroke();
-          }
-          ctx.restore();
-        } else {
-          ctx.fillStyle = "rgba(0,0,0,0.18)";
-          ctx.fillRect(
-            weaponX + Math.floor(weaponW * 0.1),
-            weaponY + Math.floor(weaponH * 0.84),
-            Math.floor(weaponW * 0.8),
-            Math.floor(weaponH * 0.16),
-          );
-          const handW = Math.floor(weaponW * 0.22);
-          const handH = Math.floor(weaponH * 0.42);
-          const handY = weaponY + weaponH - handH;
-          drawHand(weaponX + Math.floor(weaponW * 0.14), handY, handW, handH);
-          drawHand(weaponX + Math.floor(weaponW * 0.64), handY, handW, handH);
-
-          const bodyX = weaponX + Math.floor(weaponW * 0.32);
-          const bodyY = weaponY + Math.floor(weaponH * 0.5);
-          const bodyW = Math.floor(weaponW * 0.36);
-          const bodyH = Math.floor(weaponH * 0.22);
-          const barrelW = Math.floor(weaponW * 0.28);
-          const barrelH =
-            weapon === "shotgun"
-              ? Math.floor(weaponH * 0.1)
-              : weapon === "chaingun"
-                ? Math.floor(weaponH * 0.12)
-                : weapon === "launcher"
-                  ? Math.floor(weaponH * 0.14)
-                  : Math.floor(weaponH * 0.08);
-          const barrelX = weaponX + Math.floor(weaponW * 0.5);
-          const barrelY =
-            weaponY +
-            (weapon === "shotgun"
-              ? Math.floor(weaponH * 0.4)
-              : weapon === "launcher"
-                ? Math.floor(weaponH * 0.36)
-                : Math.floor(weaponH * 0.42));
-
-          ctx.fillStyle =
-            weapon === "launcher"
-              ? "#6fd68d"
-              : weapon === "shotgun"
-                ? "#b8894f"
-                : "#8f7b6a";
-          ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
-          ctx.fillStyle = "#1b1512";
-          ctx.fillRect(barrelX, barrelY, barrelW, barrelH);
-          ctx.fillStyle = "rgba(255,255,255,0.12)";
-          ctx.fillRect(
-            bodyX + Math.floor(bodyW * 0.12),
-            bodyY + Math.floor(bodyH * 0.18),
-            Math.floor(bodyW * 0.76),
-            Math.max(2, Math.floor(bodyH * 0.08)),
-          );
-          if (weapon === "chaingun") {
-            ctx.fillStyle = "#d6735b";
-            ctx.fillRect(
-              weaponX + Math.floor(weaponW * 0.42),
-              weaponY + Math.floor(weaponH * 0.66),
-              Math.floor(weaponW * 0.08),
-              Math.floor(weaponH * 0.14),
-            );
-            ctx.fillRect(
-              weaponX + Math.floor(weaponW * 0.52),
-              weaponY + Math.floor(weaponH * 0.66),
-              Math.floor(weaponW * 0.08),
-              Math.floor(weaponH * 0.14),
-            );
-          } else if (weapon === "shotgun") {
-            ctx.fillStyle = "#d6735b";
-            ctx.fillRect(
-              weaponX + Math.floor(weaponW * 0.44),
-              weaponY + Math.floor(weaponH * 0.62),
-              Math.floor(weaponW * 0.18),
-              Math.floor(weaponH * 0.16),
-            );
-          } else if (weapon === "pistol") {
-            ctx.fillStyle = "#d6735b";
-            ctx.fillRect(
-              weaponX + Math.floor(weaponW * 0.46),
-              weaponY + Math.floor(weaponH * 0.62),
-              Math.floor(weaponW * 0.12),
-              Math.floor(weaponH * 0.2),
-            );
-          } else if (weapon === "launcher") {
-            ctx.fillStyle = "#d6735b";
-            ctx.fillRect(
-              weaponX + Math.floor(weaponW * 0.36),
-              weaponY + Math.floor(weaponH * 0.62),
-              Math.floor(weaponW * 0.14),
-              Math.floor(weaponH * 0.18),
-            );
-          }
-
-          if (weapon !== "launcher") {
-            drawMuzzleFlash(
-              barrelX + barrelW,
-              barrelY + barrelH / 2,
-              Math.floor(weaponW * (weapon === "shotgun" ? 0.06 : 0.05)),
-            );
-          } else if (doomMuzzleRef.current > 0) {
-            const mx = barrelX + barrelW;
-            const my = barrelY + barrelH / 2;
-            drawMuzzleFlash(mx, my, Math.floor(weaponW * 0.06));
-            ctx.fillStyle = `rgba(255,255,255,${0.18 * attack})`;
-            ctx.fillRect(mx + 4, my - 2, 10, 4);
-          }
-          ctx.restore();
-        }
-
-        ctx.fillStyle = accent;
-        ctx.fillText(messages.ui.retroFps, viewX, viewY - 24);
-        if (doomMessageRef.current) {
-          ctx.fillStyle = dim;
-          ctx.fillText(doomMessageRef.current, viewX + 110, viewY - 24);
-        }
-        ctx.save();
-        ctx.textBaseline = "top";
-        ctx.fillStyle = "#2c2c2c";
-        ctx.fillRect(viewX, hudY, viewW, hudHeight);
-        ctx.fillStyle = "#1b1b1b";
-        ctx.fillRect(viewX, hudY, viewW, 4);
-        ctx.fillStyle = "#3a3a3a";
-        ctx.fillRect(viewX, hudY + 4, viewW, 2);
-
-        const sectionPadding = Math.floor(hudHeight * 0.16);
-        const faceSize = Math.floor(hudHeight * 0.72);
-        const faceX = Math.floor(viewX + viewW / 2 - faceSize / 2);
-        const faceY = Math.floor(hudY + (hudHeight - faceSize) / 2);
-
-        const health = doomHealthRef.current;
-        const armor = doomShieldRef.current;
-        const ammo = doomAmmoRef.current;
-        const shells = doomShellsRef.current;
-        const rockets = doomRocketsRef.current;
-        const bombs = doomBombsRef.current;
-        const score = doomScoreRef.current;
-
-        const hurt = doomHurtRef.current > 0;
-        const dead = doomGameOverRef.current || health <= 0;
-        const injury = clamp(1 - health / 100, 0, 1);
-        const skin = dead
-          ? "#a37b58"
-          : injury > 0.65
-            ? "#b07b4a"
-            : injury > 0.35
-              ? "#c08f5f"
-              : "#caa57a";
-        ctx.fillStyle = "#1f1f1f";
-        ctx.fillRect(faceX - 6, faceY - 6, faceSize + 12, faceSize + 12);
-        ctx.fillStyle = skin;
-        ctx.fillRect(faceX, faceY, faceSize, faceSize);
-        const eyeSize = Math.max(4, Math.floor(faceSize * 0.12));
-        const eyeY = faceY + Math.floor(faceSize * (hurt ? 0.34 : 0.32));
-        const eyeOffset = Math.floor(faceSize * 0.22);
-        const leftEyeX = faceX + eyeOffset;
-        const rightEyeX = faceX + faceSize - eyeOffset - eyeSize;
-        ctx.fillStyle = "#1b1512";
-        if (dead) {
-          for (let i = 0; i < eyeSize; i += 2) {
-            ctx.fillRect(leftEyeX + i, eyeY + i, 2, 2);
-            ctx.fillRect(leftEyeX + (eyeSize - i - 2), eyeY + i, 2, 2);
-            ctx.fillRect(rightEyeX + i, eyeY + i, 2, 2);
-            ctx.fillRect(rightEyeX + (eyeSize - i - 2), eyeY + i, 2, 2);
-          }
-        } else if (hurt) {
-          ctx.fillRect(leftEyeX, eyeY + Math.floor(eyeSize * 0.45), eyeSize, 2);
-          ctx.fillRect(
-            rightEyeX,
-            eyeY + Math.floor(eyeSize * 0.45),
-            eyeSize,
-            2,
-          );
-        } else {
-          ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
-          ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
-        }
-
-        const mouthY = faceY + Math.floor(faceSize * 0.68);
-        const mouthW = Math.floor(faceSize * 0.46);
-        const mouthX = Math.floor(faceX + (faceSize - mouthW) / 2);
-        if (dead) {
-          ctx.fillRect(mouthX, mouthY, mouthW, Math.max(6, eyeSize));
-        } else if (health > 70 && !hurt) {
-          ctx.fillRect(mouthX, mouthY, Math.floor(mouthW * 0.4), 4);
-          ctx.fillRect(
-            mouthX + Math.floor(mouthW * 0.6),
-            mouthY,
-            Math.floor(mouthW * 0.4),
-            4,
-          );
-        } else if (health > 35 && !hurt) {
-          ctx.fillRect(mouthX, mouthY, mouthW, 4);
-        } else {
-          ctx.fillRect(mouthX, mouthY, mouthW, 6);
-          ctx.fillStyle = "#f4d35e";
-          ctx.fillRect(mouthX + 6, mouthY + 2, Math.max(6, mouthW - 12), 2);
-        }
-
-        if (!dead && injury > 0.25) {
-          ctx.fillStyle = `rgba(214,115,91,${clamp(0.12 + injury * 0.45, 0, 0.7)})`;
-          ctx.fillRect(
-            faceX + Math.floor(faceSize * 0.1),
-            faceY + Math.floor(faceSize * 0.58),
-            Math.floor(faceSize * 0.22),
-            Math.floor(faceSize * 0.12),
-          );
-          ctx.fillRect(
-            faceX + Math.floor(faceSize * 0.62),
-            faceY + Math.floor(faceSize * 0.5),
-            Math.floor(faceSize * 0.18),
-            Math.floor(faceSize * 0.1),
-          );
-        }
-        if (!dead && injury > 0.6) {
-          ctx.fillStyle = "rgba(240, 236, 224, 0.85)";
-          ctx.fillRect(
-            faceX + Math.floor(faceSize * 0.1),
-            faceY + Math.floor(faceSize * 0.22),
-            Math.floor(faceSize * 0.22),
-            Math.max(2, Math.floor(faceSize * 0.08)),
-          );
-        }
-
-        const labelFont = Math.max(8, Math.floor(hudHeight * 0.14));
-        const valueFont = Math.max(12, Math.floor(hudHeight * 0.15));
-        const labelY = hudY + Math.floor(hudHeight * 0.14);
-        const valueY = hudY + Math.floor(hudHeight * 0.4);
-        const statPad = Math.floor(sectionPadding * 0.4);
-
-        const leftAreaW = Math.max(0, faceX - viewX - sectionPadding * 2);
-        const rightAreaW = Math.max(
-          0,
-          viewX + viewW - (faceX + faceSize) - sectionPadding * 2,
-        );
-        const leftBlockW = Math.max(0, Math.floor(leftAreaW / 3));
-        const rightBlockW = Math.max(0, Math.floor(rightAreaW / 3));
-        const ammoX = viewX + sectionPadding;
-        const shellsX = ammoX + leftBlockW + sectionPadding;
-        const healthX = shellsX + leftBlockW + sectionPadding;
-        const armorX = faceX + faceSize + sectionPadding;
-        const rocketsX = armorX + rightBlockW + sectionPadding;
-        const bombsX = rocketsX + rightBlockW + sectionPadding;
-
-        ctx.font = `${labelFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-        ctx.fillStyle = "#d6735b";
-        ctx.fillText(doomText("ammoLabel"), ammoX + statPad, labelY);
-        ctx.fillText(doomText("shellsLabel"), shellsX + statPad, labelY);
-        ctx.fillText(doomText("hudLabel"), healthX + statPad, labelY);
-        ctx.fillText(doomText("shieldLabel"), armorX + statPad, labelY);
-        ctx.fillText(doomText("rocketsLabel"), rocketsX + statPad, labelY);
-        ctx.fillText(doomText("bombLabel"), bombsX + statPad, labelY);
-
-        ctx.font = `${valueFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-        ctx.fillStyle = "#f4d35e";
-        ctx.fillText(String(ammo).padStart(3, "0"), ammoX + statPad, valueY);
-        ctx.fillText(
-          String(shells).padStart(2, "0"),
-          shellsX + statPad,
-          valueY,
-        );
-        ctx.fillText(
-          `${String(Math.max(0, health)).padStart(3, "0")}%`,
-          healthX + statPad,
-          valueY,
-        );
-        ctx.fillStyle = "#5bb5d6";
-        ctx.fillText(
-          `${String(Math.max(0, armor)).padStart(3, "0")}%`,
-          armorX + statPad,
-          valueY,
-        );
-        ctx.fillStyle = "#f4d35e";
-        ctx.fillText(
-          String(rockets).padStart(2, "0"),
-          rocketsX + statPad,
-          valueY,
-        );
-        ctx.fillStyle = "#f4d35e";
-        ctx.fillText(String(bombs).padStart(2, "0"), bombsX + statPad, valueY);
-
-        ctx.font = `${Math.max(8, Math.floor(hudHeight * 0.13))}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        const weaponKeyMap: Record<string, string> = {
-          fist: "weaponFist",
-          chainsaw: "weaponChainsaw",
-          pistol: "weaponPistol",
-          shotgun: "weaponShotgun",
-          chaingun: "weaponChaingun",
-          launcher: "weaponLauncher",
-        };
-        const weaponLabel = doomText(
-          weaponKeyMap[doomWeaponRef.current] ?? "weaponPistol",
-        );
-        ctx.fillText(
-          `${doomText("scoreLabel")}: ${String(score).padStart(3, "0")}  |  ${weaponLabel}`,
-          viewX + sectionPadding,
-          hudY + hudHeight - Math.floor(hudHeight * 0.22),
-        );
-        ctx.restore();
-        if (doomGameOverRef.current) {
-          ctx.fillStyle = "rgba(0,0,0,0.55)";
-          ctx.fillRect(viewX, viewY, viewW, viewH);
-          ctx.fillStyle = "#d6735b";
-          ctx.fillText(
-            doomText("gameOver"),
-            viewX + Math.floor(viewW * 0.2),
-            viewY + Math.floor(viewH * 0.45),
-          );
-        }
-        if (doomMiniMapRef.current && map.length) {
-          const mapScale = Math.max(4, Math.floor(viewW / 120));
-          const mapW = map[0]?.length ?? 0;
-          const mapH = map.length;
-          const miniW = mapW * mapScale;
-          const miniH = mapH * mapScale;
-          const miniX = viewX + viewW - miniW - 8;
-          const miniY = Math.min(viewY + 8, hudY - miniH - 8);
-          ctx.fillStyle = "rgba(10, 8, 7, 0.6)";
-          ctx.fillRect(miniX - 4, miniY - 4, miniW + 8, miniH + 8);
-          for (let y = 0; y < mapH; y += 1) {
-            for (let x = 0; x < mapW; x += 1) {
-              if (map[y]?.[x] === 1) {
-                ctx.fillStyle = "#3b2f28";
-                ctx.fillRect(
-                  miniX + x * mapScale,
-                  miniY + y * mapScale,
-                  mapScale,
-                  mapScale,
-                );
-              } else if (map[y]?.[x] === 2) {
-                const doorOpen =
-                  doomDoorStatesRef.current[`${x},${y}`]?.open ?? 0;
-                ctx.fillStyle = doorOpen > 0.7 ? "#8f7b6a" : "#6b4a2a";
-                ctx.fillRect(
-                  miniX + x * mapScale,
-                  miniY + y * mapScale,
-                  mapScale,
-                  mapScale,
-                );
-              }
-            }
-          }
-          const exit = doomExitRef.current;
-          if (exit) {
-            ctx.fillStyle = "#f4d35e";
-            ctx.fillRect(
-              miniX + exit.x * mapScale - 2,
-              miniY + exit.y * mapScale - 2,
-              4,
-              4,
-            );
-          }
-          doomPropsRef.current.forEach((prop) => {
-            ctx.fillStyle =
-              prop.type === "torch"
-                ? "#f6c27a"
-                : prop.type === "barrel"
-                  ? "#d6735b"
-                  : prop.type === "crate"
-                    ? "#b8894f"
-                    : "#8f7b6a";
-            ctx.fillRect(
-              miniX + prop.x * mapScale - 1,
-              miniY + prop.y * mapScale - 1,
-              2,
-              2,
-            );
-          });
-          const pickupMiniColors: Record<string, string> = {
-            ammo: "#f6c27a",
-            shells: "#f6c27a",
-            rockets: "#8f7b6a",
-            med: "#6fd68d",
-            shield: "#5bb5d6",
-            bomb: "#f4d35e",
-            chest: "#d6a45b",
-            shotgun: "#d6735b",
-            chainsaw: "#d6735b",
-            chaingun: "#8f7b6a",
-            launcher: "#6fd68d",
-          };
-          doomPickupsRef.current.forEach((pickup) => {
-            ctx.fillStyle = pickupMiniColors[pickup.type] ?? "#6fd68d";
-            ctx.fillRect(
-              miniX + pickup.x * mapScale - 1,
-              miniY + pickup.y * mapScale - 1,
-              2,
-              2,
-            );
-          });
-          doomEnemiesRef.current.forEach((enemy) => {
-            ctx.fillStyle =
-              enemy.type === "spitter"
-                ? "#6fd68d"
-                : enemy.type === "charger"
-                  ? "#f4d35e"
-                  : enemy.type === "brute"
-                    ? "#8f7b6a"
-                    : "#d6735b";
-            ctx.fillRect(
-              miniX + enemy.x * mapScale - 1,
-              miniY + enemy.y * mapScale - 1,
-              2,
-              2,
-            );
-          });
-          ctx.fillStyle = "#f4d35e";
-          ctx.fillRect(
-            miniX + doomPlayerRef.current.x * mapScale - 2,
-            miniY + doomPlayerRef.current.y * mapScale - 2,
-            4,
-            4,
-          );
-        }
-        const infoY = Math.min(hudY - 16, viewY + viewH - 16);
-        const hintWindowVisible = doomHintWindowRef.current;
-        if (hintWindowVisible) {
-          const hintFont = Math.max(8, Math.floor(headerSize * 0.46));
-          const hintLineHeight = Math.max(12, Math.floor(hintFont * 1.35));
-          const panelPaddingX = 12;
-          const panelPaddingY = 10;
-          const colGap = 14;
-          const desiredPanelW = Math.min(Math.floor(viewW * 0.84), 640);
-          const panelW = clamp(
-            desiredPanelW,
-            Math.min(240, Math.floor(viewW)),
-            Math.floor(viewW),
-          );
-          const innerW = panelW - panelPaddingX * 2;
-          const colW = Math.max(80, Math.floor((innerW - colGap) / 2));
-          const panelX = Math.floor(viewX + (viewW - panelW) / 2);
-
-          ctx.save();
-          ctx.font = `${hintFont}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-          ctx.textBaseline = "top";
-
-          const splitGroups = (value: string) =>
-            value
-              .split("  ")
-              .map((part) => part.trim())
-              .filter(Boolean);
-          const packLines = (groups: string[], maxWidth: number) => {
-            const lines: string[] = [];
-            let current = "";
-            groups.forEach((group) => {
-              const next = current ? `${current}  ${group}` : group;
-              if (!current) {
-                current = next;
-                return;
-              }
-              if (ctx.measureText(next).width <= maxWidth) {
-                current = next;
-              } else {
-                lines.push(current);
-                current = group;
-              }
-            });
-            if (current) {
-              lines.push(current);
-            }
-            return lines;
-          };
-
-          const leftGroups = splitGroups(doomText("controls1"));
-          const rightGroups = splitGroups(doomText("controls2"));
-          const leftLines = packLines(leftGroups, colW);
-          const rightLines = packLines(rightGroups, colW);
-          const interactionHint = doomHintRef.current;
-          const rowCount = Math.max(leftLines.length, rightLines.length);
-          const panelH =
-            panelPaddingY * 2 +
-            rowCount * hintLineHeight +
-            (interactionHint ? hintLineHeight + 4 : 0);
-          const panelY = Math.floor(
-            viewY + Math.max(1, hudY - viewY) * 0.52 - panelH / 2,
-          );
-
-          ctx.fillStyle = "rgba(18,18,18,0.9)";
-          ctx.fillRect(panelX, panelY, panelW, panelH);
-          ctx.strokeStyle = "rgba(246,194,122,0.55)";
-          ctx.strokeRect(panelX, panelY, panelW, panelH);
-
-          const leftX = panelX + panelPaddingX;
-          const rightX = panelX + panelPaddingX + colW + colGap;
-          const startY = panelY + panelPaddingY;
-
-          for (let row = 0; row < rowCount; row += 1) {
-            const y = startY + row * hintLineHeight;
-            const leftText = leftLines[row];
-            const rightText = rightLines[row];
-            if (leftText) {
-              ctx.fillStyle = "#f4d35e";
-              ctx.fillText(leftText, leftX, y);
-            }
-            if (rightText) {
-              ctx.fillStyle = dim;
-              ctx.fillText(rightText, rightX, y);
-            }
-          }
-          if (interactionHint) {
-            const y = startY + rowCount * hintLineHeight + 4;
-            ctx.fillStyle = "#f4d35e";
-            ctx.fillText(interactionHint, leftX, y);
-          }
-          ctx.restore();
-        } else if (doomHintRef.current) {
-          ctx.fillStyle = "#f4d35e";
-          ctx.fillText(doomHintRef.current, viewX, infoY - 22);
+        // HELLRUN (./hellrun): raycaster with Freedoom art, its own HUD,
+        // menus and fixed-step simulation. It owns the whole canvas.
+        const game = hellrunRef.current;
+        if (game) {
+          const now = performance.now();
+          const last = hellrunLastFrameRef.current || now;
+          hellrunLastFrameRef.current = now;
+          game.update(Math.min(250, now - last));
+          game.render(ctx, 0, 0, width, height, now);
         }
       } else if (mode === "chess") {
         const board = chessBoardRef.current;
         const boardSize = 8;
-        const cellSize = Math.floor(
-          Math.min(
-            (width - padding * 2) / boardSize,
-            (height - padding * 2) / boardSize,
+        // Reserve room for the header line above and three text lines below
+        // the board (controls, options, status), plus file/rank labels -
+        // previously the board used the full height and the help text was
+        // pushed off the screen.
+        const labelGutter = Math.max(12, Math.floor(headerSize * 1.1));
+        const lineGap = Math.max(16, Math.floor(headerSize * 1.45));
+        const headerSpace = lineGap + 6;
+        const footerSpace = lineGap * 3 + 8;
+        const cellSize = Math.max(
+          8,
+          Math.floor(
+            Math.min(
+              (width - padding * 2 - labelGutter) / boardSize,
+              (height - padding * 2 - headerSpace - footerSpace - labelGutter) /
+                boardSize,
+            ),
           ),
         );
         const boardW = cellSize * boardSize;
         const boardH = cellSize * boardSize;
-        const offsetX = Math.floor((width - boardW) / 2);
-        const offsetY = Math.floor((height - boardH) / 2);
+        const offsetX = Math.floor((width - boardW + labelGutter) / 2);
+        const offsetY = Math.floor(
+          padding +
+            headerSpace +
+            (height -
+              padding * 2 -
+              headerSpace -
+              footerSpace -
+              labelGutter -
+              boardH) /
+              2,
+        );
         ctx.fillStyle = accent;
         const botColorLabel =
           chessBotColorRef.current === "w"
@@ -9797,9 +5937,10 @@ export default function TerminalCanvas({
             count: String(chessMovesRef.current),
           }),
           offsetX,
-          offsetY - 24,
+          offsetY - lineGap,
         );
         const cursor = chessCursorRef.current;
+        const lastMove = chessLastMoveRef.current;
         const selected = chessSelectedRef.current;
         const legalMoves = selected
           ? getChessLegalMoves(board, selected.x, selected.y)
@@ -9851,6 +5992,19 @@ export default function TerminalCanvas({
               cellSize,
               cellSize,
             );
+            if (
+              lastMove &&
+              ((lastMove.from.x === x && lastMove.from.y === y) ||
+                (lastMove.to.x === x && lastMove.to.y === y))
+            ) {
+              ctx.fillStyle = "rgba(246, 194, 122, 0.16)";
+              ctx.fillRect(
+                offsetX + x * cellSize,
+                offsetY + y * cellSize,
+                cellSize,
+                cellSize,
+              );
+            }
             if (legalMap.has(`${x},${y}`)) {
               const targetPiece = board[y]?.[x] ?? "";
               if (targetPiece) {
@@ -9919,13 +6073,58 @@ export default function TerminalCanvas({
             }
           }
         }
-        ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        // File (a-h) and rank (1-8) labels.
+        const labelSize = Math.max(10, Math.floor(labelGutter * 0.72));
+        ctx.font = `${labelSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         ctx.fillStyle = dim;
-        ctx.fillText(messages.ui.chessControls, offsetX, offsetY + boardH + 12);
-        ctx.fillText(messages.ui.chessMeta, offsetX, offsetY + boardH + 32);
-        if (chessStatusRef.current) {
+        for (let i = 0; i < boardSize; i += 1) {
+          const file = String.fromCharCode(97 + i);
+          const fileW = ctx.measureText(file).width;
+          ctx.fillText(
+            file,
+            offsetX + i * cellSize + cellSize / 2 - fileW / 2,
+            offsetY + boardH + 3,
+          );
+          const rank = String(8 - i);
+          const rankW = ctx.measureText(rank).width;
+          ctx.fillText(
+            rank,
+            offsetX - rankW - 6,
+            offsetY + i * cellSize + cellSize / 2 - labelSize / 2,
+          );
+        }
+        ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        const footerY = offsetY + boardH + labelGutter + 4;
+        const footerX = Math.max(padding, offsetX - labelGutter);
+        const fitText = (text: string, maxW: number) => {
+          if (ctx.measureText(text).width <= maxW) {
+            return text;
+          }
+          let cut = text;
+          while (cut.length > 4 && ctx.measureText(`${cut}…`).width > maxW) {
+            cut = cut.slice(0, -1);
+          }
+          return `${cut}…`;
+        };
+        const footerMaxW = width - footerX - padding;
+        ctx.fillStyle = dim;
+        ctx.fillText(
+          fitText(messages.ui.chessControls, footerMaxW),
+          footerX,
+          footerY,
+        );
+        ctx.fillText(
+          fitText(messages.ui.chessMeta, footerMaxW),
+          footerX,
+          footerY + lineGap,
+        );
+        if (chessStatusRef.current && !chessPendingPromotionRef.current) {
           ctx.fillStyle = accent;
-          ctx.fillText(chessStatusRef.current, offsetX, offsetY + boardH + 52);
+          ctx.fillText(
+            fitText(chessStatusRef.current, footerMaxW),
+            footerX,
+            footerY + lineGap * 2,
+          );
         }
         if (chessPendingPromotionRef.current) {
           const promotionLabels = ["Q", "R", "B", "N"];
@@ -9940,8 +6139,8 @@ export default function TerminalCanvas({
             formatMessage(messages.chess.promoteOptions, {
               options: optionText,
             }),
-            offsetX,
-            offsetY + boardH + 72,
+            footerX,
+            footerY + lineGap * 2,
           );
         }
       } else if (mode === "solitaire") {
@@ -10406,20 +6605,20 @@ export default function TerminalCanvas({
 
     finalizeFrame();
   }, [
+    language,
+    listMediaFiles,
+    resolveImagePlaylist,
     ensureEditorBuffer,
     normalizeEditorSelection,
     updateEditorScroll,
     fontScale,
     homePath,
     getChessLegalMoves,
-    getDoomBootProgress,
-    ensureDoomTextures,
     isChessInCheck,
     isFirefox,
     isMobile,
     perfTier,
     prompt,
-    doomText,
     formatMessage,
     messages,
     theme.crt.glow,
@@ -10518,6 +6717,7 @@ export default function TerminalCanvas({
   const handleAppKey = useCallback(
     (event: {
       key: string;
+      code?: string;
       ctrlKey: boolean;
       metaKey: boolean;
       altKey?: boolean;
@@ -10530,15 +6730,34 @@ export default function TerminalCanvas({
       }
       const { key } = event;
       const lower = key.toLowerCase();
+      if (mode === "doom") {
+        // HELLRUN owns every key (Esc pauses, Q quits from the pause menu,
+        // R restarts after death); key-ups are forwarded separately.
+        const game = hellrunRef.current;
+        if (!game) {
+          stopApp(messages.system.exitLine);
+          event.preventDefault();
+          return true;
+        }
+        const handled = game.keyDown({
+          key,
+          code: event.code ?? "",
+          shiftKey: event.shiftKey,
+        });
+        if (game.wantsExit) {
+          stopApp(messages.system.exitLine);
+        }
+        if (handled) {
+          event.preventDefault();
+        }
+        return handled;
+      }
       if (mode !== "editor" && (key === "Escape" || lower === "q")) {
         stopApp(messages.system.exitLine);
         event.preventDefault();
         return true;
       }
       if (lower === "r") {
-        if (mode === "doom" && !event.shiftKey) {
-          return false;
-        }
         if (mode === "snake") {
           resetSnake();
           placeSnakeFood();
@@ -10550,9 +6769,6 @@ export default function TerminalCanvas({
           resetPong();
         } else if (mode === "chess") {
           resetChess();
-        } else if (mode === "doom") {
-          beginDoomBoot();
-          resetDoom();
         } else if (mode === "solitaire") {
           resetSolitaire();
         }
@@ -10934,10 +7150,25 @@ export default function TerminalCanvas({
           return true;
         }
         if (
-          playerModeRef.current === "image" &&
-          (key === "ArrowLeft" || key === "ArrowRight")
+          (playerModeRef.current === "mp3" ||
+            playerModeRef.current === "video") &&
+          (key === "ArrowUp" ||
+            key === "ArrowDown" ||
+            lower === "n" ||
+            lower === "p")
         ) {
-          cycleImage(key === "ArrowLeft" ? -1 : 1);
+          cycleTrack(key === "ArrowUp" || lower === "p" ? -1 : 1);
+          event.preventDefault();
+          return true;
+        }
+        if (
+          playerModeRef.current === "image" &&
+          (key === "ArrowLeft" ||
+            key === "ArrowRight" ||
+            key === "ArrowUp" ||
+            key === "ArrowDown")
+        ) {
+          cycleImage(key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1);
           event.preventDefault();
           return true;
         }
@@ -10971,152 +7202,22 @@ export default function TerminalCanvas({
         }
         if (key === "ArrowLeft" || key === "ArrowRight") {
           const delta = key === "ArrowLeft" ? -5 : 5;
-          const next = clamp(
-            playerProgressRef.current + delta,
-            0,
-            playerDurationRef.current,
-          );
-          playerProgressRef.current = next;
           if (playerModeRef.current === "video") {
-            const total = Math.max(1, playerFramesRef.current.length);
-            playerFrameIndexRef.current = Math.floor(
-              (next / playerDurationRef.current) * total,
-            );
-          }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        event.preventDefault();
-        return true;
-      }
-      if (mode === "doom") {
-        if (getDoomBootProgress() < 1) {
-          event.preventDefault();
-          return true;
-        }
-        const impulse = doomImpulseRef.current;
-        const step = event.shiftKey ? 0.11 : 0.08;
-        const turn = 0.06;
-        if (key === "1") {
-          if (doomChainsawUnlockedRef.current) {
-            doomWeaponRef.current =
-              doomWeaponRef.current === "chainsaw" ? "fist" : "chainsaw";
-            doomMessageRef.current = doomText(
-              doomWeaponRef.current === "chainsaw"
-                ? "weaponChainsaw"
-                : "weaponFist",
+            // Endless demo: just move the demo clock.
+            playerProgressRef.current = Math.max(
+              0,
+              playerProgressRef.current + delta,
             );
           } else {
-            doomWeaponRef.current = "fist";
-            doomMessageRef.current = doomText("weaponFist");
+            const next = clamp(
+              playerProgressRef.current + delta,
+              0,
+              playerDurationRef.current,
+            );
+            playerProgressRef.current = next;
+            musicPlayerRef.current?.seek(next);
           }
           dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (key === "2") {
-          doomWeaponRef.current = "pistol";
-          doomMessageRef.current = doomText("weaponPistol");
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (key === "3") {
-          if (doomShotgunUnlockedRef.current) {
-            doomWeaponRef.current = "shotgun";
-            doomMessageRef.current = doomText("weaponShotgun");
-          } else {
-            doomMessageRef.current = doomText("noShotgun");
-          }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (key === "4") {
-          if (doomChaingunUnlockedRef.current) {
-            doomWeaponRef.current = "chaingun";
-            doomMessageRef.current = doomText("weaponChaingun");
-          } else {
-            doomMessageRef.current = doomText("noChaingun");
-          }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (key === "5") {
-          if (doomLauncherUnlockedRef.current) {
-            doomWeaponRef.current = "launcher";
-            doomMessageRef.current = doomText("weaponLauncher");
-          } else {
-            doomMessageRef.current = doomText("noLauncher");
-          }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (key === "ArrowUp" || lower === "w") {
-          impulse.move = clamp(impulse.move + step, -0.25, 0.25);
-          event.preventDefault();
-          return true;
-        }
-        if (key === "ArrowDown" || lower === "s") {
-          impulse.move = clamp(impulse.move - step, -0.25, 0.25);
-          event.preventDefault();
-          return true;
-        }
-        if (key === "ArrowLeft") {
-          impulse.turn = clamp(impulse.turn - turn, -0.2, 0.2);
-          event.preventDefault();
-          return true;
-        }
-        if (key === "ArrowRight") {
-          impulse.turn = clamp(impulse.turn + turn, -0.2, 0.2);
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "a") {
-          impulse.strafe = clamp(impulse.strafe - step, -0.25, 0.25);
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "d") {
-          impulse.strafe = clamp(impulse.strafe + step, -0.25, 0.25);
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "m") {
-          doomMiniMapRef.current = !doomMiniMapRef.current;
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "h") {
-          doomHintWindowRef.current = !doomHintWindowRef.current;
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "r") {
-          reloadDoom();
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "e") {
-          interactDoom();
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (lower === "b") {
-          throwDoomBomb();
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
-        }
-        if (key === " " || key === "Enter") {
-          shootDoom();
           event.preventDefault();
           return true;
         }
@@ -11486,15 +7587,13 @@ export default function TerminalCanvas({
     },
     [
       attemptChessMove,
-      beginDoomBoot,
       cycleImage,
+      cycleTrack,
       deleteEditorChar,
       deleteEditorSelection,
-      doomText,
       ensureEditorBuffer,
       executeEditorCommand,
       getEditorSelectionText,
-      getDoomBootProgress,
       getSolitaireRankIndex,
       isSolitaireRed,
       insertEditorNewline,
@@ -11502,17 +7601,12 @@ export default function TerminalCanvas({
       placeSnakeFood,
       resetCalc,
       resetChess,
-      resetDoom,
       resetPacman,
       resetPong,
       resetSnake,
       resetSolitaire,
       scheduleChessBotMove,
       moveEditorCursor,
-      interactDoom,
-      shootDoom,
-      reloadDoom,
-      throwDoomBomb,
       hasChessLegalMove,
       isChessInCheck,
       solitaireCardLabel,
@@ -11974,19 +8068,29 @@ export default function TerminalCanvas({
     let rafId = 0;
     const drawLoop = () => {
       const now = performance.now();
-      const targetInterval = focusedRef.current
+      // HELLRUN is a real-time game: redraw every display frame (capped at
+      // ~30 fps on low-power devices) instead of the terminal's text cadence.
+      const playingGame = appModeRef.current === "doom" && hellrunRef.current;
+      if (playingGame) {
+        dirtyRef.current = true;
+      }
+      const targetInterval = playingGame
         ? isMobile || perfTier === "low"
-          ? 90
-          : isFirefox
+          ? 32
+          : 0
+        : focusedRef.current
+          ? isMobile || perfTier === "low"
             ? 90
-            : perfTier === "mid"
-              ? 50
-              : 33
-        : isMobile || isFirefox || perfTier === "low"
-          ? 180
-          : perfTier === "high"
-            ? 120
-            : 140;
+            : isFirefox
+              ? 90
+              : perfTier === "mid"
+                ? 50
+                : 33
+          : isMobile || isFirefox || perfTier === "low"
+            ? 180
+            : perfTier === "high"
+              ? 120
+              : 140;
       if (
         dirtyRef.current &&
         !document.hidden &&

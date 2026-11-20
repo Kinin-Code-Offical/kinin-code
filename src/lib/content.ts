@@ -3,6 +3,8 @@ import path from "node:path";
 import { profile } from "@/content/profile";
 import { projects } from "@/content/projects";
 import { capabilities } from "@/content/capabilities";
+import { experience } from "@/content/experience";
+import { research } from "@/content/research";
 import { theme } from "@/content/theme";
 import type { Language } from "@/lib/i18n";
 
@@ -21,6 +23,8 @@ export type ContentData = {
   profile: typeof profile;
   projects: typeof projects;
   capabilities: typeof capabilities;
+  experience: typeof experience;
+  research: typeof research;
   theme: typeof theme;
   pages: ContentPages;
 };
@@ -45,6 +49,8 @@ export async function getContent(): Promise<ContentData> {
     profile,
     projects,
     capabilities,
+    experience,
+    research,
     theme,
     pages: {
       about: { tr: aboutTr, en: aboutEn },

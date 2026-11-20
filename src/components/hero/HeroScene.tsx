@@ -1796,7 +1796,7 @@ function SceneContent({
     const lastScrollRef = { value: initialScroll };
     lastScrollValueRef.current = initialScroll;
     lastScrollTimeRef.current = performance.now();
-    const diffThreshold = lowPower ? 0.001 : 0.0004;
+    const diffThreshold = lowPower ? 0.0006 : 0.00008;
     // ~30 fps cap on low-power devices, display refresh rate otherwise.
     const minInterval = lowPower ? 32 : 0;
     const tick = () => {
@@ -2150,7 +2150,10 @@ function SceneContent({
   });
 
   const lights = DEFAULT_LIGHTS;
-  const lightingActive = active && enhancedLighting && !performanceMode;
+  // Deliberately independent of `active`: toggling lights/shadows/environment
+  // when the hero scrolls out (and back in) forced every shader to recompile.
+  // While inactive nothing renders anyway (frameloop="never").
+  const lightingActive = enhancedLighting && !performanceMode;
   const shadowsEnabled = lightingActive && !isFirefox;
   useEffect(() => {
     requestShadowMapUpdate(gl);
@@ -2335,10 +2338,9 @@ export default function HeroScene(props: HeroSceneProps) {
   // Device-pixel-ratio range. The scene is now light enough (meshopt model,
   // static shadows, no per-scroll recompiles) to render sharply: the old
   // 0.55-0.75 range made everything blurry on 3x phone screens.
+  // Not tied to `isActive`: changing the dpr resizes (and clears) the WebGL
+  // drawing buffer, a GPU stall right at the hero -> content transition.
   const dpr = useMemo(() => {
-    if (!isActive) {
-      return [0.5, 0.75] as [number, number];
-    }
     if (isMobile) {
       return [1, 1.75] as [number, number];
     }
@@ -2346,7 +2348,7 @@ export default function HeroScene(props: HeroSceneProps) {
       return [0.85, 1.25] as [number, number];
     }
     return [1, 1.5] as [number, number];
-  }, [isActive, isFirefox, isMobile, lowPower]);
+  }, [isFirefox, isMobile, lowPower]);
   useEffect(() => {
     const handleInteraction = (event: Event) => {
       const { detail } = event as CustomEvent<{ active?: boolean }>;
@@ -2373,11 +2375,9 @@ export default function HeroScene(props: HeroSceneProps) {
       dpr={dpr}
       camera={{ position: [0.2, 0.8, 3.6], fov: 42 }}
       gl={{
-        antialias: isActive && !isMobile && !performanceMode && !isFirefox,
+        antialias: !isMobile && !performanceMode && !isFirefox,
         powerPreference:
-          !isActive || performanceMode || isFirefox
-            ? "low-power"
-            : "high-performance",
+          performanceMode || isFirefox ? "low-power" : "high-performance",
         // logarithmicDepthBuffer writes gl_FragDepth in every shader, which
         // disables early depth testing (expensive fill-rate) - not needed here.
         logarithmicDepthBuffer: false,
@@ -2440,16 +2440,17 @@ export default function HeroScene(props: HeroSceneProps) {
         background:
           "radial-gradient(circle at 20% 0%, rgba(var(--hero-accent-rgb), .08), transparent 55%), var(--content-bg)",
       }}>
-      {isActive ? (
-        <SceneContent
-          {...props}
-          active={isActive}
-          lowPower={lowPower}
-          performanceMode={performanceMode}
-          enhancedLighting={enhancedLighting}
-          interactionActive={interactionActive}
-        />
-      ) : null}
+      {/* Stays mounted when the hero scrolls out: unmounting tore down the
+          model/materials and remounting recompiled every shader, a long
+          freeze when scrolling back up. frameloop="never" pauses it instead. */}
+      <SceneContent
+        {...props}
+        active={isActive}
+        lowPower={lowPower}
+        performanceMode={performanceMode}
+        enhancedLighting={enhancedLighting}
+        interactionActive={interactionActive}
+      />
     </Canvas>
   );
 }

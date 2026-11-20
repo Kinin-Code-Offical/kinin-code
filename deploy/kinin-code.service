@@ -1,0 +1,25 @@
+[Unit]
+Description=kinin-code.dev (Next.js standalone server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kinin
+Group=kinin
+WorkingDirectory=/opt/kinin-code/current
+# Secrets (contact form, GitHub token...) live only on the server.
+EnvironmentFile=-/opt/kinin-code/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+MemoryMax=700M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -4,8 +4,22 @@ import type { Language } from "@/lib/i18n";
 
 const DEFAULT_LANG: Language = "en";
 
+export const PRODUCTION_SITE_URL = "https://kinin-code.dev";
+
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  // Production builds default to the real domain so canonical URLs, the
+  // sitemap and Open Graph tags never point at localhost.
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.NODE_ENV === "production"
+      ? PRODUCTION_SITE_URL
+      : "http://localhost:3000")
+  );
+}
+
+/** Google Search Console HTML-tag verification token (optional). */
+export function getGoogleVerification() {
+  return process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined;
 }
 
 export function getLocale(lang: Language) {
