@@ -43,7 +43,7 @@ export const profile = {
     },
     {
       label: "Email",
-      href: "mailto:developer@kinin-code.dev",
+      href: "mailto:developer@kinin.dev",
       icon: "@",
     },
   ],

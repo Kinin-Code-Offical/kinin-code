@@ -101,6 +101,7 @@ export async function generateMetadata(): Promise<Metadata> {
             "max-video-preview": -1,
           },
         },
+    manifest: "/site.webmanifest",
     icons: {
       icon: "/favicon.ico",
       shortcut: "/favicon.ico",

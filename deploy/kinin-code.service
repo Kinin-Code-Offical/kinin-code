@@ -1,5 +1,5 @@
 [Unit]
-Description=kinin-code.dev (Next.js standalone server)
+Description=kinin.dev (Next.js standalone server)
 After=network-online.target
 Wants=network-online.target
 

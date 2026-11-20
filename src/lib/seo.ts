@@ -4,7 +4,7 @@ import type { Language } from "@/lib/i18n";
 
 const DEFAULT_LANG: Language = "en";
 
-export const PRODUCTION_SITE_URL = "https://kinin-code.dev";
+export const PRODUCTION_SITE_URL = "https://kinin.dev";
 
 export function getSiteUrl() {
   // Production builds default to the real domain so canonical URLs, the

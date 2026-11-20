@@ -1,13 +1,13 @@
-# kinin-code.dev reverse proxy (Caddy obtains and renews the TLS certificate).
+# kinin.dev reverse proxy (Caddy obtains and renews the TLS certificate).
 # Cloudflare sits in front with SSL mode "Full (strict)"; keep Cloudflare's
 # "Always Use HTTPS" off so ACME HTTP-01 renewals reach Caddy on port 80
 # (Caddy itself redirects every other HTTP request to HTTPS).
 
-www.kinin-code.dev {
-	redir https://kinin-code.dev{uri} permanent
+www.kinin.dev {
+	redir https://kinin.dev{uri} permanent
 }
 
-kinin-code.dev {
+kinin.dev {
 	encode zstd gzip
 
 	header {

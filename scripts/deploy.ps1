@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds kinin-code.dev and deploys it to the Compute Engine VM.
+  Builds kinin.dev and deploys it to the Compute Engine VM.
 
 .EXAMPLE
   # first time (installs Node, Caddy, systemd unit on the VM), then deploy
@@ -26,8 +26,8 @@ $gcloudArgs = @("--zone", $Zone, "--quiet", "--strict-host-key-checking=no")
 if ($Project) { $gcloudArgs += @("--project", $Project) }
 
 if (-not $SkipBuild) {
-  Write-Host "==> Building (NEXT_PUBLIC_SITE_URL=https://kinin-code.dev)"
-  $env:NEXT_PUBLIC_SITE_URL = "https://kinin-code.dev"
+  Write-Host "==> Building (NEXT_PUBLIC_SITE_URL=https://kinin.dev)"
+  $env:NEXT_PUBLIC_SITE_URL = "https://kinin.dev"
   & node node_modules/next/dist/bin/next build
   if ($LASTEXITCODE -ne 0) { throw "next build failed" }
 }
@@ -68,4 +68,4 @@ if ($LASTEXITCODE -ne 0) { throw "remote install failed" }
 
 Remove-Item -Recurse -Force $stage
 Remove-Item -Force $bundle
-Write-Host "==> Done: https://kinin-code.dev"
+Write-Host "==> Done: https://kinin.dev"
