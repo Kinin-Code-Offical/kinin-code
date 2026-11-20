@@ -868,6 +868,48 @@ const findNode = (root: FsNode, path: string) => {
   return node;
 };
 
+type DirNode = { type: "dir"; children: Record<string, FsNode> };
+
+/** Walks to an absolute path, creating missing directories along the way
+ * (only the last one unless `recursive`). Returns the directory or null. */
+const ensureDirIn = (
+  root: FsNode,
+  absolutePath: string,
+  recursive: boolean,
+): DirNode | null => {
+  const parts = absolutePath.split("/").filter((part) => part.length > 0);
+  let node: FsNode = root;
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i];
+    if (node.type !== "dir") {
+      return null;
+    }
+    const existing: FsNode | undefined = node.children[part];
+    if (!existing) {
+      if (!recursive && i < parts.length - 1) {
+        return null;
+      }
+      node.children[part] = { type: "dir", children: {} };
+    } else if (existing.type !== "dir") {
+      return null;
+    }
+    node = node.children[part];
+  }
+  return node.type === "dir" ? node : null;
+};
+
+/** Deep copy of a virtual file-system node (used by cp -r / mv). */
+const cloneNode = (node: FsNode): FsNode => {
+  if (node.type === "file") {
+    return { type: "file", content: node.content, section: node.section };
+  }
+  const children: Record<string, FsNode> = {};
+  Object.entries(node.children).forEach(([key, child]) => {
+    children[key] = cloneNode(child);
+  });
+  return { type: "dir", children };
+};
+
 const markdownToLines = (text: string, locale?: string): Line[] => {
   const rawLines = text.split("\n");
   const lines: Line[] = [];
@@ -1044,7 +1086,8 @@ export default function TerminalCanvas({
   const editorStatusRef = useRef<string | null>(null);
   const editorQuitArmedRef = useRef(false);
   const editorClipboardRef = useRef<string | null>(null);
-  const sessionStartRef = useRef(Date.now());
+  // Set on mount (Date.now() during render is impure).
+  const sessionStartRef = useRef(0);
   const lastCanvasSizeRef = useRef({ width: 0, height: 0 });
   const dirtyRef = useRef(true);
   const appModeRef = useRef<AppMode | null>(null);
@@ -1277,6 +1320,12 @@ export default function TerminalCanvas({
       height: Math.max(1, Math.round(height * scale)),
     };
   }, [baseSize, isFirefox, isMobile, perfTier, resolutionScale, screenAspect]);
+
+  useEffect(() => {
+    if (!sessionStartRef.current) {
+      sessionStartRef.current = Date.now();
+    }
+  }, []);
 
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -3498,31 +3547,12 @@ export default function TerminalCanvas({
   }, [userName]);
 
   const ensureDir = useCallback(
-    (input: string, recursive = false) => {
-      const target = resolvePath(cwdRef.current, input, homePath);
-      const parts = target.split("/").filter((part) => part.length > 0);
-      let node = fsRef.current;
-      for (let i = 0; i < parts.length; i += 1) {
-        const part = parts[i];
-        if (node.type !== "dir") {
-          return null;
-        }
-        const existing = node.children[part];
-        if (!existing) {
-          if (!recursive && i < parts.length - 1) {
-            return null;
-          }
-          node.children[part] = { type: "dir", children: {} };
-        } else if (existing.type !== "dir") {
-          return null;
-        }
-        node = node.children[part] as {
-          type: "dir";
-          children: Record<string, FsNode>;
-        };
-      }
-      return node;
-    },
+    (input: string, recursive = false) =>
+      ensureDirIn(
+        fsRef.current,
+        resolvePath(cwdRef.current, input, homePath),
+        recursive,
+      ),
     [homePath],
   );
 
@@ -3605,17 +3635,6 @@ export default function TerminalCanvas({
     },
     [homePath],
   );
-
-  const cloneNode = useCallback((node: FsNode): FsNode => {
-    if (node.type === "file") {
-      return { type: "file", content: node.content, section: node.section };
-    }
-    const children: Record<string, FsNode> = {};
-    Object.entries(node.children).forEach(([key, child]) => {
-      children[key] = cloneNode(child);
-    });
-    return { type: "dir", children };
-  }, []);
 
   const listDir = useCallback(
     (input: string, options?: { all?: boolean }) => {
@@ -5125,7 +5144,6 @@ export default function TerminalCanvas({
     [
       appendLine,
       appendLines,
-      cloneNode,
       builtinCommands,
       createDir,
       createFile,
