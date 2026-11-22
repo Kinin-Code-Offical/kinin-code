@@ -2620,6 +2620,32 @@ export default function HomeClient({
               </div>
             </div>
           </div>
+          {/* Electrical-electronics first: the three hardware focus areas
+              lead, full-stack follows (details in the capabilities section). */}
+          <ul className="section-inner intro-focus">
+            {localizedCapabilities
+              .filter((item) =>
+                ["pcb", "signalling", "embedded", "full-stack"].includes(
+                  item.id,
+                ),
+              )
+              .map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={`intro-focus__item${item.id === "full-stack" ? "" : " is-hardware"}`}
+                    onClick={() => scrollToSection("capabilities")}>
+                    <span className="capability-icon">
+                      {capabilityIcons[item.icon] ?? capabilityIcons.layers}
+                    </span>
+                    <span className="intro-focus__text">
+                      <strong>{item.title}</strong>
+                      <span>{item.bullets?.[0]}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+          </ul>
         </motion.section>
 
         <section id="featured" className="section section-featured">

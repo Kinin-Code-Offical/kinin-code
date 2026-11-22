@@ -8,9 +8,9 @@ export const profile = {
   },
   description: {
     tr:
-      "Elektrik-elektronik mühendisliği öğrencisi ve full-stack builder. PCB tasarımı, sinyalizasyon ve gömülü sistemlerden web, mobil ve bulut ürünlerine; Gong Global'in yazılım ekosistemini kurdu, ZMUT teorik fizik makalesinin yazarı.",
+      "Elektrik-elektronik mühendisliği öğrencisi: devre ve PCB tasarımı, sinyalizasyon ve gömülü sistemler. RobotWin Studio'nun geliştiricisi; web, mobil ve bulut ürünleri de kuran bir full-stack builder.",
     en:
-      "Electrical & Electronics Engineering student and full-stack builder. From PCB design, signalling and embedded systems to web, mobile and cloud products; built Gong Global's software ecosystem and authored the ZMUT theoretical-physics paper.",
+      "Electrical & Electronics Engineering student: circuit and PCB design, signalling and embedded systems. Creator of RobotWin Studio and a full-stack builder who also ships web, mobile and cloud products.",
   },
   ogImage: "/og.png",
   roles: {

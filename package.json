@@ -1,6 +1,8 @@
 {
   "name": "kinin-code",
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Yamaç Gürsel (https://kinin.dev)",
   "private": true,
   "scripts": {
     "dev": "next dev",

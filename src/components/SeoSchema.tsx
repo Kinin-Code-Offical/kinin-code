@@ -89,10 +89,13 @@ export default function SeoSchema({ language }: SeoSchemaProps) {
     alternativeHeadline: paper.subtitle[language],
     abstract: paper.summary[language],
     datePublished: paper.date,
-    inLanguage: language === "tr" ? "tr" : "en",
+    inLanguage: "en",
     author: { "@id": personId },
+    publisher: { "@type": "Organization", name: "OSF (Open Science Framework)", url: "https://osf.io" },
     keywords: paper.tags.join(", "),
-    url: new URL(paper.links[language === "tr" ? 0 : 1].href, baseUrl).toString(),
+    url: paper.links[0].href,
+    sameAs: paper.links.slice(1).map((link) => link.href),
+    isAccessibleForFree: true,
   }));
 
   const website = {

@@ -24,16 +24,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   );
 
-  // The ZMUT paper PDFs are indexable documents in their own right.
-  const papers: MetadataRoute.Sitemap = [
-    "/papers/zmut/zmut-tr.pdf",
-    "/papers/zmut/zmut-en.pdf",
-  ].map((file) => ({
-    url: `${baseUrl}${file}`,
-    lastModified: new Date("2026-08-07"),
-    changeFrequency: "yearly",
-    priority: 0.6,
-  }));
-
-  return [...pages, ...papers];
+  return pages;
 }

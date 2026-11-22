@@ -275,6 +275,15 @@ type TerminalCanvasProps = {
       botColor: string;
       header: string;
       promoteOptions: string;
+      checkmateTitle: string;
+      stalemateTitle: string;
+      drawTitle: string;
+      youWin: string;
+      botWins: string;
+      whiteWins: string;
+      blackWins: string;
+      drawResult: string;
+      newGameHint: string;
     };
     solitaire: {
       hint: string;
@@ -355,6 +364,10 @@ type FsNode =
   | { type: "file"; content: string; section?: string };
 
 type GridPoint = { x: number; y: number };
+type ChessOutcome = {
+  winner: "w" | "b" | null;
+  reason: "checkmate" | "stalemate" | "draw";
+} | null;
 type Vector2 = { x: number; y: number };
 type SolitaireCard = { rank: string; suit: string; faceUp: boolean };
 type PyodideInterface = {
@@ -1142,6 +1155,10 @@ export default function TerminalCanvas({
   // Default to playing against the engine: an empty PvP board on a single
   // keyboard is not what visitors expect when they type "chess".
   const chessModeRef = useRef<"pvp" | "bot">("bot");
+  const chessOutcomeCacheRef = useRef<{
+    key: string;
+    outcome: ChessOutcome;
+  } | null>(null);
   const chessLastMoveRef = useRef<{ from: GridPoint; to: GridPoint } | null>(
     null,
   );
@@ -1872,6 +1889,7 @@ export default function TerminalCanvas({
     chessPendingPromotionRef.current = null;
     chessLastMoveRef.current = null;
     chessHistoryRef.current = [];
+    chessOutcomeCacheRef.current = null;
     // Drop any search still running for the previous game.
     chessBotRef.current?.cancel();
     dirtyRef.current = true;
@@ -2265,8 +2283,46 @@ export default function TerminalCanvas({
     [],
   );
 
+  // Final result of the current position (null while the game goes on).
+  // Cached per position so drawing it every frame stays cheap.
+  const getChessOutcome = useCallback((): ChessOutcome => {
+    if (chessPendingPromotionRef.current) {
+      return null;
+    }
+    const board = chessBoardRef.current;
+    const turn = chessTurnRef.current;
+    const key = `${turn}:${chessHistoryRef.current.length}:${board
+      .map((row) => row.map((piece) => piece || ".").join(""))
+      .join("/")}`;
+    const cached = chessOutcomeCacheRef.current;
+    if (cached && cached.key === key) {
+      return cached.outcome;
+    }
+    let outcome: ChessOutcome = null;
+    if (!hasChessLegalMove(board, turn)) {
+      outcome = isChessInCheck(board, turn)
+        ? { winner: turn === "w" ? "b" : "w", reason: "checkmate" }
+        : { winner: null, reason: "stalemate" };
+    } else {
+      const { status } = getGameStatus(buildChessState());
+      if (
+        status === "threefold" ||
+        status === "fifty-move" ||
+        status === "insufficient-material"
+      ) {
+        outcome = { winner: null, reason: "draw" };
+      }
+    }
+    chessOutcomeCacheRef.current = { key, outcome };
+    return outcome;
+  }, [buildChessState, hasChessLegalMove, isChessInCheck]);
+
   const attemptChessMove = useCallback(
     (from: GridPoint, to: GridPoint, promotion?: EngineMove["promotion"]) => {
+      if (getChessOutcome()) {
+        // The game is over: no more moves until a new game starts.
+        return false;
+      }
       if (chessPendingPromotionRef.current) {
         chessStatusRef.current = messages.chess.promotePawn;
         return false;
@@ -2385,6 +2441,7 @@ export default function TerminalCanvas({
       return true;
     },
     [
+      getChessOutcome,
       applyChessMove,
       buildChessState,
       getChessColor,
@@ -2397,6 +2454,9 @@ export default function TerminalCanvas({
 
   const scheduleChessBotMove = useCallback(() => {
     if (appModeRef.current !== "chess") {
+      return;
+    }
+    if (getChessOutcome()) {
       return;
     }
     if (chessModeRef.current !== "bot") {
@@ -2472,6 +2532,7 @@ export default function TerminalCanvas({
         finish();
       });
   }, [
+    getChessOutcome,
     attemptChessMove,
     buildChessState,
     isChessInCheck,
@@ -6111,6 +6172,63 @@ export default function TerminalCanvas({
             offsetY + i * cellSize + cellSize / 2 - labelSize / 2,
           );
         }
+        // Game over: dim the board and say clearly who won.
+        const outcome = getChessOutcome();
+        if (outcome) {
+          const mono = `"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+          ctx.fillStyle = "rgba(10, 9, 8, 0.8)";
+          ctx.fillRect(offsetX, offsetY, boardW, boardH);
+          const isBotGame = chessModeRef.current === "bot";
+          const title =
+            outcome.reason === "checkmate"
+              ? messages.chess.checkmateTitle
+              : outcome.reason === "stalemate"
+                ? messages.chess.stalemateTitle
+                : messages.chess.drawTitle;
+          const result =
+            outcome.winner === null
+              ? messages.chess.drawResult
+              : isBotGame
+                ? outcome.winner === chessBotColorRef.current
+                  ? messages.chess.botWins
+                  : messages.chess.youWin
+                : outcome.winner === "w"
+                  ? messages.chess.whiteWins
+                  : messages.chess.blackWins;
+          const centerX = offsetX + boardW / 2;
+          const centerY = offsetY + boardH / 2;
+          const drawCentered = (text: string, y: number, size: number, color: string) => {
+            ctx.font = `700 ${size}px ${mono}`;
+            let w = ctx.measureText(text).width;
+            let fontSize = size;
+            while (w > boardW * 0.9 && fontSize > 10) {
+              fontSize -= 2;
+              ctx.font = `700 ${fontSize}px ${mono}`;
+              w = ctx.measureText(text).width;
+            }
+            ctx.fillStyle = color;
+            ctx.fillText(text, centerX - w / 2, y - fontSize / 2);
+          };
+          const titleSize = Math.max(18, Math.floor(cellSize * 0.85));
+          const resultSize = Math.max(14, Math.floor(cellSize * 0.45));
+          drawCentered(title, centerY - cellSize * 0.55, titleSize, "#ff8a1e");
+          drawCentered(
+            result,
+            centerY + cellSize * 0.35,
+            resultSize,
+            outcome.winner !== null &&
+              isBotGame &&
+              outcome.winner === chessBotColorRef.current
+              ? "#d6735b"
+              : "#f4d35e",
+          );
+          drawCentered(
+            messages.chess.newGameHint,
+            centerY + cellSize * 1.05,
+            Math.max(11, Math.floor(headerSize * 0.95)),
+            "#c2a87f",
+          );
+        }
         ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
         const footerY = offsetY + boardH + labelGutter + 4;
         const footerX = Math.max(padding, offsetX - labelGutter);
@@ -6623,6 +6741,7 @@ export default function TerminalCanvas({
 
     finalizeFrame();
   }, [
+    getChessOutcome,
     language,
     listMediaFiles,
     resolveImagePlaylist,
@@ -7243,6 +7362,17 @@ export default function TerminalCanvas({
         return true;
       }
       if (mode === "chess") {
+        if (getChessOutcome()) {
+          // Game over screen: Enter/Space starts a new game (R and Q are
+          // handled above), every other key is ignored.
+          if (key === "Enter" || key === " ") {
+            resetChess();
+            scheduleChessBotMove();
+          }
+          dirtyRef.current = true;
+          event.preventDefault();
+          return true;
+        }
         const pendingPromotion = chessPendingPromotionRef.current;
         if (pendingPromotion) {
           const promotionKeys = ["q", "r", "b", "n"] as const;
@@ -7604,6 +7734,7 @@ export default function TerminalCanvas({
       return false;
     },
     [
+      getChessOutcome,
       attemptChessMove,
       cycleImage,
       cycleTrack,

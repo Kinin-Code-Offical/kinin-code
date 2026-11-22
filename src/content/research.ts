@@ -1,64 +1,73 @@
-// Research / writing shown in the "research" section and in the terminal.
-// Source: D:\ZMUT (LaTeX source, PDFs and the internal stress-test report).
+// Research / writing shown in the "research" section, the terminal and llms.txt.
+// Source: the public OSF project https://osf.io/ewmsf/ (PDF: Discrete_Mode_Structure_of_Time.pdf).
+// It also closes off an earlier, unpublished idea (deriving the structure from a
+// five-dimensional geometry): §12–13 show why that derivation fails.
 
 export const research = [
   {
-    id: "zmut",
-    shortTitle: "ZMUT",
+    id: "discrete-mode-structure-of-time",
+    shortTitle: "OSF",
     title: {
-      tr: "Çok-Modlu Öz-Zaman Uzay–Zaman Formalizmi (ZMUT)",
-      en: "Multi-Mode Proper-Time Spacetime Formalism (ZMUT)",
+      tr: "Zamanın Ayrık Mod Yapısı: Koherans Canlanması ve Parametresiz Bir Oran Bağıntısı",
+      en: "The Discrete Mode Structure of Time: Coherence Revival, a Parameter-Free Ratio Relation",
     },
     subtitle: {
-      tr: "Birleşik kuram: aksiyomatik inşa, öz-eleştirel denetim, sistematik çürütme sınamaları ve klasik karşılıklılık",
-      en: "A unified theory: axiomatic construction, self-critical audit, systematic refutation tests and classical correspondence",
+      tr: "…ve geometrik türetimin neden kapalı olduğu",
+      en: "…and Why the Geometric Derivation Is Closed",
     },
-    date: "2026-08-06",
-    dateLabel: { tr: "6 Ağustos 2026", en: "August 6, 2026" },
+    date: "2026-08-09",
+    dateLabel: { tr: "9 Ağustos 2026", en: "August 9, 2026" },
     role: { tr: "Bağımsız araştırmacı", en: "Independent researcher" },
     field: {
-      tr: "Teorik fizik · kuantum kütle çekimi",
-      en: "Theoretical physics · quantum gravity",
+      tr: "Teorik fizik · zaman ve dekoherans",
+      en: "Theoretical physics · time and decoherence",
     },
     summary: {
-      tr: "Öz-zamanı Hilbert uzayında normalize bir zamansal mod dalga fonksiyonu olarak ele alan bir kuram. Genişletilmiş (4+1) boyutlu bir manifold üzerindeki tek bir master eylemden mod-Klein–Gordon ve genişletilmiş Einstein denklemleri türetiliyor; Newton yasası, Schrödinger denklemi ve klasik fizik limit teoremleri olarak geri kazanılıyor ve kuram güncel deney verileriyle yüzleştiriliyor.",
-      en: "A theory that represents proper time as a normalised temporal-mode wave function in Hilbert space. A single master action on an extended (4+1)-dimensional manifold yields the mode Klein–Gordon and extended Einstein equations; Newton's law, the Schrödinger equation and classical physics are recovered as limit theorems, and the theory is confronted with current experimental data.",
+      tr: "Zamanın evrensel aralıklı, ayrık bir mod tarağı taşıdığını varsayan ve gözlemsel sonuçlarını çıkaran bir model. Tek bir ayrık adım tekdüze sönüm üretirken tarak yapısı koherans canlanması (revival) üretir; bu imzayı sürekli dağılımlı hiçbir teknik gürültü taklit edemez. Makale optik saatlerle sınanabilir parametresiz bağıntılar türetir, sınamak için gereken veri kalitesini sayısal olarak belirler ve beş boyutlu geometrik türetimin neden geçersiz olduğunu teorem düzeyinde gösterir.",
+      en: "A model that postulates time carries a discrete mode comb with universal spacing and works out the observational consequences. A single discrete step gives monotonic damping, whereas a comb gives coherence revival — a signature no continuously distributed technical noise can mimic. The paper derives parameter-free relations testable with optical clocks, quantifies the data quality needed to test them, and shows at theorem level why the five-dimensional geometric derivation fails.",
     },
     stats: [
-      { value: "48", label: { tr: "sayfa", en: "pages" } },
-      { value: "25/25", label: { tr: "tersten doğrulama", en: "reverse checks" } },
-      { value: "79/79", label: { tr: "stres testi", en: "stress tests" } },
-      { value: "0", label: { tr: "çelişki / 14 veri sınıfı", en: "conflicts / 14 data classes" } },
+      { value: "14", label: { tr: "sayfa", en: "pages" } },
+      { value: "2", label: { tr: "serbest parametre (δ, nᵣₘₛ)", en: "free parameters (δ, nᵣₘₛ)" } },
+      { value: "≈210 s", label: { tr: "beklenen canlanma (nᵣₘₛ ≈ 0,1)", en: "expected revival (nᵣₘₛ ≈ 0.1)" } },
+      { value: "10¹⁰", label: { tr: "5B türetimdeki kısıt çelişkisi", en: "constraint violation of the 5D derivation" } },
     ],
     highlights: {
       tr: [
-        "Planck kütlesi, λₘ = ħ/mc² bağıntısıyla doğal kuantum–klasik eşik olarak ortaya çıkıyor.",
-        "Dokuz yapısal zayıflık (Z1–Z9) teşhis edilip teorem düzeyinde kapatılıyor.",
-        "Karanlık enerji lif ölçeğiyle özdeşleşiyor: c·ℓξ ≈ 88 µm.",
-        "Deneysel sınırlar: Θ* ≥ 2,6×10⁻⁹ s ve αξ ≲ 1,1×10⁻⁴; birincil sınama ²²⁹Th koherans bandı [4,3 – 66] s.",
+        "Parametresiz bağıntılar: t(canlanma) / t(dekoherans) = 2π·nᵣₘₛ ve türler arasında t(canlanma) ∝ 1/ΔE.",
+        "Canlanmayı sürekli dağılımlı hiçbir gürültü kaynağı üretemez (Riemann–Lebesgue); kanal CP-bölünemez olduğundan ölçülebilir bir Markov-dışılık imzasıdır.",
+        "⁸⁷Sr verisinin hata bütçesiyle Θ* ≥ 7,4×10⁻⁹ s; nᵣₘₛ ≈ 0,1 için ≈210 s civarında ≈%2 derinlikte canlanma beklenir.",
+        "Yayımlanmış veriler bu imzaya kör (Δχ² ≈ 1,6); ayırt etme eşiği: N ≳ 20–30 nokta, Tₘₐₓ ≳ 250–300 s, σ ≲ %1.",
+        "Yapıyı beş boyutlu bir geometriden türetme girişiminin kendi Page–Wootters kısıtıyla 10¹⁰ kat çeliştiği teorem düzeyinde gösterilir; bu yaklaşımın iddiaları tek tek geri çekilir.",
       ],
       en: [
-        "The Planck mass emerges as the natural quantum–classical threshold via λₘ = ħ/mc².",
-        "Nine structural weaknesses (Z1–Z9) are diagnosed and closed at theorem level.",
-        "Dark energy is identified with the fibre scale: c·ℓξ ≈ 88 µm.",
-        "Experimental bounds: Θ* ≥ 2.6×10⁻⁹ s and αξ ≲ 1.1×10⁻⁴; primary test is the ²²⁹Th coherence band [4.3 – 66] s.",
+        "Parameter-free relations: t(revival) / t(decoherence) = 2π·nᵣₘₛ, and across species t(revival) ∝ 1/ΔE.",
+        "No continuously distributed noise source can produce a revival (Riemann–Lebesgue); the channel is CP-indivisible, so revival is a measurable non-Markovianity signature.",
+        "From the ⁸⁷Sr error budget: Θ* ≥ 7.4×10⁻⁹ s; for nᵣₘₛ ≈ 0.1 a revival is expected near 210 s with ≈2% modulation depth.",
+        "Published data are blind to this signature (Δχ² ≈ 1.6); the discrimination threshold is N ≳ 20–30 points, Tₘₐₓ ≳ 250–300 s, σ ≲ 1%.",
+        "Deriving the structure from a five-dimensional geometry is shown, at theorem level, to contradict its own Page–Wootters constraint by a factor of 10¹⁰; that approach’s claims are retracted one by one.",
       ],
     },
     tags: [
-      "Quantum gravity",
-      "Proper time",
-      "Decoherence",
-      "Quantum information",
-      "Cosmology",
+      "Discrete time",
+      "Coherence revival",
+      "Optical clocks",
+      "Non-Markovian dynamics",
+      "Falsifiability",
     ],
+    // First link is the canonical one (used as the ScholarlyArticle url).
     links: [
       {
-        href: "/papers/zmut/zmut-tr.pdf",
-        label: { tr: "Makale (TR, PDF)", en: "Paper (TR, PDF)" },
+        href: "https://osf.io/ewmsf/files/b6cre",
+        label: { tr: "Makaleyi oku (OSF)", en: "Read the paper (OSF)" },
       },
       {
-        href: "/papers/zmut/zmut-en.pdf",
-        label: { tr: "Paper (EN, PDF)", en: "Paper (EN, PDF)" },
+        href: "https://osf.io/download/b6cre/",
+        label: { tr: "PDF indir", en: "Download PDF" },
+      },
+      {
+        href: "https://osf.io/ewmsf/",
+        label: { tr: "OSF projesi", en: "OSF project" },
       },
     ],
   },

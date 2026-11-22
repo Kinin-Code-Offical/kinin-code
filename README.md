@@ -182,3 +182,9 @@ Default range: `Contacts!A:D` (timestamp, name, email, message).
 - Validate canonical + hreflang tags.
 - Test structured data with Google Rich Results / Schema validator.
 - For preview/staging set `NEXT_PUBLIC_NO_INDEX=1` to prevent indexing.
+
+## License
+
+The code is released under the [MIT License](LICENSE): anyone may use, copy, modify and redistribute it, including commercially, as long as the copyright notice is kept.
+
+The HELLRUN sprites and textures in `public/hellrun/freedoom/` come from [Freedoom](https://freedoom.github.io/) and stay under its BSD 3-Clause licence (see `public/hellrun/freedoom/COPYING.adoc`).

@@ -49,10 +49,10 @@ export const translations = {
     },
     sections: {
       intro: {
-        eyebrow: "Portfolyo",
-        title: "Elektronik ve yazılımı birleştiren ürünler",
+        eyebrow: "Elektrik-Elektronik · Full-Stack",
+        title: "Devreden karta, karttan koda",
         subtitle:
-          "Odak: deneyim tasarımı, sistem mimarisi ve sorun çözümü. Detaylı hikaye ve teknik birikim hakkında aşağıda bilgi var.",
+          "Elektrik-elektronik mühendisliği öğrencisiyim: devre ve PCB tasarlıyor, sinyalizasyon ve gömülü sistemler üzerinde çalışıyor, bunları yazılım ve bulutla uçtan uca ürüne dönüştürüyorum.",
         primaryCta: "Projeleri gör",
         secondaryCta: "İletişime geç",
       },
@@ -413,6 +413,15 @@ export const translations = {
         botColor: "Bot rengi: {color}",
         header: "SATRANÇ {mode}  SIRA {turn}  HAMLE {count}",
         promoteOptions: "Terfi: {options}  (Yönler/1-4/Enter)",
+        checkmateTitle: "ŞAH MAT!",
+        stalemateTitle: "PAT",
+        drawTitle: "BERABERE",
+        youWin: "KAZANDIN!",
+        botWins: "BOT KAZANDI",
+        whiteWins: "BEYAZ KAZANDI",
+        blackWins: "SİYAH KAZANDI",
+        drawResult: "Kazanan yok: oyun berabere",
+        newGameHint: "Enter / R: yeni oyun · Q: çıkış",
       },
       solitaire: {
         hint: "D: çek  W: atık  1-7: tablo  F: temele",
@@ -623,10 +632,10 @@ export const translations = {
     },
     sections: {
       intro: {
-        eyebrow: "Portfolio",
-        title: "Products where electronics meets software",
+        eyebrow: "Electrical & Electronics · Full-stack",
+        title: "From circuit to board, from board to code",
         subtitle:
-          "Focus: experience design, system architecture, and problem solving. The full story and technical background are below.",
+          "I'm an Electrical & Electronics Engineering student: I design circuits and PCBs, work on signalling and embedded systems, and turn them into end-to-end products with software and the cloud.",
         primaryCta: "View projects",
         secondaryCta: "Get in touch",
       },
@@ -975,6 +984,15 @@ export const translations = {
         botColor: "Bot color: {color}",
         header: "CHESS {mode}  TURN {turn}  MOVE {count}",
         promoteOptions: "Promote: {options}  (Arrows/1-4/Enter)",
+        checkmateTitle: "CHECKMATE!",
+        stalemateTitle: "STALEMATE",
+        drawTitle: "DRAW",
+        youWin: "YOU WIN!",
+        botWins: "THE BOT WINS",
+        whiteWins: "WHITE WINS",
+        blackWins: "BLACK WINS",
+        drawResult: "No winner: the game is drawn",
+        newGameHint: "Enter / R: new game · Q: quit",
       },
       solitaire: {
         hint: "D: draw  W: waste  1-7: tableau  F: to foundation",

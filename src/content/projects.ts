@@ -2,24 +2,26 @@ export const projects = [
   {
     title: "RobotWin Studio",
     year: "2026",
-    createdAt: "2026-01",
-    tags: ["Robotics", "Simulation", "Unity", "C++", ".NET"],
+    createdAt: "2025-12",
+    order: 1,
+    tags: ["Circuit Sim", "PCB", "Arduino", "ESP32", "C#/.NET", "Physics"],
     featured: true,
     summary: {
       tr:
-        "Windows için deterministik robotik simülasyon platformu. Unity 3D, .NET orkestrasyonu ve C++ fizik/firmware motorlarıyla HIL odaklı.",
+        "Robot ve elektronik projelerini baştan sona yapan Windows uygulaması (v1.2.0, MIT): devreyi çiz ve canlı simüle et, 2/4/6 katmanlı PCB'sini çıkar, Arduino/ESP32 kodunu emüle et, şasesini modelle, hepsini gerçek fizikli bir dünyada kablolayıp çalıştır.",
       en:
-        "Deterministic robotics simulation platform for Windows, combining Unity visuals, .NET orchestration, and C++ physics/firmware engines.",
+        "A Windows app for robot and electronics projects end to end (v1.2.0, MIT): draw and live-simulate the circuit, lay out a 2/4/6-layer PCB, emulate the Arduino/ESP32 code, model the chassis, then wire and run it all in a physics world.",
     },
     detailsMd: {
       tr:
-        "### Özellikler\n- Deterministik sabit zaman adımlı scheduler\n- C++ fizik ve rigidbody motoru (AVX2 optimizasyonu)\n- ATmega328P firmware emülasyonu\n- Unity 3D görünüm ve debug araçları\n- IPC ile HIL bağlantısı",
+        "### Özellikler\n- **Devre:** 256 gerçek parça, MNA + Newton-Raphson analog çözücüyle canlı simülasyon; osiloskop, multimetre, Monte Carlo, arıza tespiti (\"Neden yandı?\")\n- **PCB:** 2/4/6 katman, bakır alanlar, etkileşimli ve otomatik yol çizimi, DRC; Gerber/Excellon/BOM/CPL ve KiCad 8 dışa aktarımı\n- **Kod:** Arduino Uno/Nano (ATmega328P) derlenmiş HEX olarak emüle edilir, ESP32 devreyle eş zamanlı (co-simulation) çalışır\n- **Modelle:** Blender benzeri 3D modelleyici (bıçak, halka kesim, pah, Boolean)\n- **Dünya:** motorlar, servolar, sensörler, kablolar ve parçalar gerçek fizikle birbirini etkiler; roket motoru, paraşüt, hava sürtünmesi\n- .NET 9 + WPF, C++ ESP32 HAL, xUnit testleri, kurulum paketi ve belge sitesi",
       en:
-        "### Highlights\n- Deterministic fixed-step scheduler\n- C++ physics + rigid body engine (AVX2 optimized)\n- ATmega328P firmware emulation\n- Unity 3D visualization with debug tools\n- IPC-based HIL integration",
+        "### Highlights\n- **Circuit:** 256 real parts, live simulation with an MNA + Newton-Raphson analog solver; oscilloscope, multimeter, Monte Carlo, fault finding (\"why did it burn?\")\n- **PCB:** 2/4/6 layers, copper pours, interactive and automatic routing, DRC; Gerber/Excellon/BOM/CPL and KiCad 8 export\n- **Code:** Arduino Uno/Nano (ATmega328P) runs as compiled HEX, ESP32 code is co-simulated with the circuit\n- **Model:** Blender-like 3D modeller (knife, loop cut, bevel, Boolean)\n- **World:** motors, servos, sensors, wires and parts interact through real physics; rocket motors, parachutes, air drag\n- .NET 9 + WPF, C++ ESP32 HAL, xUnit tests, installer and documentation site",
     },
     media: [],
     links: {
       repo: "https://github.com/Kinin-Code-Offical/robotwin-studio",
+      live: "https://kinin-code-offical.github.io/robotwin-studio/",
     },
   },
   {
@@ -97,6 +99,7 @@ export const projects = [
     title: "ESP-FIND",
     year: "2026",
     createdAt: "2026-01",
+    order: 2,
     tags: ["ESP32", "IoT", "RFID", "MQTT"],
     featured: true,
     summary: {
@@ -206,6 +209,7 @@ export const projects = [
     title: "Embedded Sim Kernel",
     year: "2026",
     createdAt: "2026-01",
+    order: 3,
     tags: ["ESP32", "Arduino", "Simulation", "Kernel"],
     featured: true,
     summary: {

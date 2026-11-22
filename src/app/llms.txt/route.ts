@@ -42,7 +42,9 @@ export async function GET() {
       `- **${paper.title.en}** — ${paper.subtitle.en} (${paper.dateLabel.en}, ${paper.role.en}).`,
       `  ${paper.summary.en}`,
       ...paper.highlights.en.map((item) => `  - ${item}`),
-      ...paper.links.map((link) => `  - [${link.label.en}](${base}${link.href})`),
+      ...paper.links.map(
+        (link) => `  - [${link.label.en}](${new URL(link.href, base).toString()})`,
+      ),
     ]),
     "",
     "## Capabilities",
