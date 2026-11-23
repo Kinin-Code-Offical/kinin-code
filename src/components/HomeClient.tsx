@@ -2633,7 +2633,7 @@ export default function HomeClient({
                 <li key={item.id}>
                   <button
                     type="button"
-                    className={`intro-focus__item${item.id === "full-stack" ? "" : " is-hardware"}`}
+                    className="intro-focus__item"
                     onClick={() => scrollToSection("capabilities")}>
                     <span className="capability-icon">
                       {capabilityIcons[item.icon] ?? capabilityIcons.layers}

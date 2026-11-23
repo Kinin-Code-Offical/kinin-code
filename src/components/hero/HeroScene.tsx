@@ -2437,8 +2437,6 @@ export default function HeroScene(props: HeroSceneProps) {
         height: "100%",
         touchAction: "pan-y",
         pointerEvents: "none",
-        background:
-          "radial-gradient(circle at 20% 0%, rgb(var(--hero-accent-rgb) / .08), transparent 55%), var(--content-bg)",
       }}>
       {/* Stays mounted when the hero scrolls out: unmounting tore down the
           model/materials and remounting recompiled every shader, a long

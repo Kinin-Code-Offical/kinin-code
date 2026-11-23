@@ -183,7 +183,7 @@ textarea {
   height: 40px;
   border-radius: 10px;
   border: 1px solid var(--dock-border);
-  background: linear-gradient(160deg, rgb(var(--hero-accent-rgb) / 0.14), var(--dock-bg));
+  background: none;
   color: var(--hero-accent);
   display: none;
   place-items: center;
@@ -200,13 +200,13 @@ textarea {
 }
 
 .mobile-menu-toggle:hover {
-  border-color: rgb(var(--hero-accent-rgb) / 0.5);
+  border-color: currentColor;
   transform: translateY(-1px);
   box-shadow: 0 18px 50px var(--dock-glow);
 }
 
 .mobile-menu-toggle.is-active {
-  border-color: rgb(var(--hero-accent-rgb) / 0.7);
+  border-color: currentColor;
   box-shadow: 0 18px 50px var(--dock-glow);
 }
 
@@ -238,7 +238,7 @@ textarea {
   height: 38px;
   border-radius: 10px;
   border: 1px solid var(--dock-border);
-  background: linear-gradient(160deg, rgb(var(--hero-accent-rgb) / 0.14), var(--dock-bg));
+  background: none;
   color: var(--hero-accent);
   font-family: var(--font-mono), monospace;
   font-size: 12px;
@@ -252,14 +252,14 @@ textarea {
 }
 
 .dock-button:hover {
-  border-color: rgb(var(--hero-accent-rgb) / 0.4);
+  border-color: currentColor;
   box-shadow: 0 18px 50px var(--dock-glow);
   transform: translateY(-1px);
 }
 
 .dock-button.is-active {
-  border-color: rgb(var(--hero-accent-rgb) / 0.7);
-  box-shadow: 0 18px 50px rgb(var(--hero-accent-rgb) / 0.35);
+  border-color: currentColor;
+  box-shadow: none;
 }
 
 .dock-button:active {
@@ -364,7 +364,7 @@ textarea {
   height: 30px;
   border-radius: 8px;
   border: 1px solid var(--dock-border);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
+  background: none;
   color: var(--hero-accent);
   display: grid;
   place-items: center;
@@ -401,7 +401,6 @@ textarea {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at top, rgb(var(--hero-accent-rgb) / 0.12), transparent 70%);
   opacity: 0.4;
   pointer-events: none;
 }
@@ -425,7 +424,6 @@ textarea {
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--dock-border);
-  background: rgb(var(--hero-accent-rgb) / 0.12);
   color: var(--hero-accent);
   display: grid;
   place-items: center;
@@ -451,13 +449,6 @@ textarea {
 
 .sidebar-separator {
   height: 1px;
-  background: repeating-linear-gradient(
-    to right,
-    rgb(var(--hero-accent-rgb) / 0.4),
-    rgb(var(--hero-accent-rgb) / 0.4) 6px,
-    transparent 6px,
-    transparent 12px
-  );
   opacity: 0.6;
 }
 
@@ -498,14 +489,14 @@ textarea {
 
 .sidebar-link:hover {
   color: var(--hero-accent);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
-  border-color: rgb(var(--hero-accent-rgb) / 0.25);
+  background: none;
+  border-color: currentColor;
 }
 
 .sidebar-link.active {
   color: var(--hero-accent);
-  background: rgb(var(--hero-accent-rgb) / 0.12);
-  border-color: rgb(var(--hero-accent-rgb) / 0.35);
+  background: none;
+  border-color: currentColor;
 }
 
 .sidebar-link.active::before {
@@ -539,7 +530,7 @@ textarea {
   gap: 10px;
   border-radius: 10px;
   border: 1px solid var(--dock-border);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
+  background: none;
   color: var(--hero-accent);
   padding: 8px 10px;
   cursor: pointer;
@@ -558,8 +549,8 @@ textarea {
 
 .sidebar-action:hover {
   transform: translateY(-1px);
-  border-color: rgb(var(--hero-accent-rgb) / 0.5);
-  box-shadow: 0 14px 30px rgb(var(--hero-accent-rgb) / 0.18);
+  border-color: currentColor;
+  box-shadow: none;
 }
 
 .sidebar-action:focus-visible {
@@ -594,8 +585,8 @@ textarea {
 .sidebar-lang button.active,
 .sidebar-lang button:hover {
   color: var(--hero-accent);
-  border-color: rgb(var(--hero-accent-rgb) / 0.4);
-  background: rgb(var(--hero-accent-rgb) / 0.1);
+  border-color: currentColor;
+  background: none;
 }
 
 .sidebar-socials {
@@ -619,8 +610,8 @@ textarea {
 
 .sidebar-socials a:hover {
   color: var(--hero-accent);
-  border-color: rgb(var(--hero-accent-rgb) / 0.25);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
+  border-color: currentColor;
+  background: none;
 }
 
 .social-glyph {
@@ -642,8 +633,6 @@ textarea {
   /* Scroll distance of the camera zoom-out = height - 100vh. Too short and a
      few wheel notches jump through the whole move. */
   min-height: 240vh;
-  background: radial-gradient(circle at top, rgb(var(--hero-accent-rgb) / 0.08), transparent 60%),
-    linear-gradient(180deg, var(--hero-bg) 0%, var(--hero-bg-mid) 40%, var(--hero-bg-deep) 100%);
   color: var(--hero-text);
   position: relative;
   touch-action: pan-y;
@@ -653,7 +642,6 @@ textarea {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 30% 20%, rgb(var(--hero-accent-rgb) / 0.2), transparent 45%);
   opacity: calc(var(--hero-fade) * (1 - var(--content-reveal)) * 0.6);
   pointer-events: none;
 }
@@ -726,7 +714,7 @@ textarea {
   justify-items: center;
   padding: 10px;
   border-radius: 14px;
-  background: linear-gradient(160deg, rgb(var(--hero-accent-rgb) / 0.14), var(--dock-bg));
+  background: none;
   border: 1px solid var(--dock-border);
   box-shadow: var(--shadow);
   pointer-events: auto;
@@ -742,10 +730,9 @@ textarea {
   position: absolute;
   inset: -6px;
   border-radius: 18px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.25);
+  border: none;
   box-shadow:
-    0 0 12px rgb(var(--hero-accent-rgb) / 0.18),
-    inset 0 0 8px rgb(var(--hero-accent-rgb) / 0.12);
+    none;
   opacity: 0.6;
   pointer-events: none;
   z-index: 0;
@@ -760,11 +747,10 @@ textarea {
   position: absolute;
   inset: -14px;
   border-radius: 24px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.3);
-  background: radial-gradient(circle at 20% 20%, rgb(var(--hero-accent-rgb) / 0.04), transparent 60%);
+  border: none;
+  background: none;
   box-shadow:
-    0 0 16px rgb(var(--hero-accent-rgb) / 0.18),
-    inset 0 0 8px rgb(var(--hero-accent-rgb) / 0.1);
+    none;
   pointer-events: none;
   z-index: 0;
 }
@@ -779,9 +765,9 @@ textarea {
   font-family: "JetBrains Mono", monospace;
   font-size: 16px;
   color: var(--hero-accent);
-  background: linear-gradient(160deg, rgb(var(--hero-accent-rgb) / 0.14), var(--dock-bg));
+  background: none;
   border: 1px solid var(--dock-border);
-  outline: 1px solid rgb(var(--hero-accent-rgb) / 0.25);
+  outline: none;
   outline-offset: -2px;
   border-radius: 8px;
   cursor: pointer;
@@ -800,21 +786,15 @@ textarea {
 }
 
 .hero-key-button.is-active {
-  background: linear-gradient(
-    160deg,
-    rgb(var(--hero-accent-rgb) / 0.4),
-    rgb(var(--hero-accent-rgb) / 0.14)
-  );
+  background: none;
   box-shadow:
-    inset 0 0 12px rgb(var(--hero-accent-rgb) / 0.45),
-    0 0 16px rgb(var(--hero-accent-rgb) / 0.35);
+    none;
 }
 
 .hero-key-button:active {
   transform: translateY(1px) scale(0.95);
   box-shadow:
-    inset 0 0 16px rgb(var(--hero-accent-rgb) / 0.55),
-    0 0 20px rgb(var(--hero-accent-rgb) / 0.45);
+    none;
   filter: brightness(1.15);
 }
 
@@ -906,11 +886,9 @@ textarea {
 .hero-tag {
   font-family: var(--font-mono), monospace;
   font-size: 14px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.4);
   padding: 6px 10px;
   border-radius: 10px;
   color: var(--hero-accent);
-  background: rgb(var(--hero-accent-rgb) / 0.1);
 }
 
 .hero-name {
@@ -926,22 +904,20 @@ textarea {
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgb(var(--hero-text-rgb) / 0.7);
 }
 
 .hero-hint {
   font-family: var(--font-mono), monospace;
   font-size: 12px;
-  color: rgb(var(--hero-text-rgb) / 0.6);
 }
 
 .hero-shell.focused .hero-sticky::after {
   content: "";
   position: absolute;
   inset: 10%;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.25);
+  border: none;
   border-radius: 24px;
-  box-shadow: 0 0 20px rgb(var(--hero-accent-rgb) / 0.2);
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -1134,7 +1110,7 @@ textarea {
 
 .project-toggle {
   border: 1px solid var(--content-border);
-  background: rgb(var(--hero-accent-rgb) / 0.1);
+  background: none;
   font-family: var(--font-mono), monospace;
   color: var(--hero-accent);
   cursor: pointer;
@@ -1153,8 +1129,8 @@ textarea {
 }
 
 .project-toggle:hover {
-  border-color: rgb(var(--hero-accent-rgb) / 0.45);
-  box-shadow: 0 12px 24px rgb(var(--hero-accent-rgb) / 0.18);
+  border-color: currentColor;
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -1175,7 +1151,7 @@ textarea {
   width: 0;
   height: 1.1em;
   border-left: 2px solid var(--hero-accent);
-  box-shadow: 0 0 10px rgb(var(--hero-accent-rgb) / 0.45);
+  box-shadow: none;
   animation: caret-blink 1s steps(1, end) infinite;
   display: inline-block;
   margin-left: 1px;
@@ -1288,7 +1264,7 @@ textarea {
 .form-field textarea:focus {
   outline: none;
   border-color: var(--hero-accent);
-  box-shadow: 0 0 0 3px rgb(var(--hero-accent-rgb) / 0.1);
+  box-shadow: none;
 }
 
 .contact-form input:disabled,
@@ -1369,8 +1345,7 @@ textarea {
   display: grid;
   place-items: center;
   padding: 48px 20px;
-  background: radial-gradient(circle at top, rgb(var(--hero-accent-rgb) / 0.12), transparent 55%),
-    linear-gradient(180deg, var(--content-bg) 0%, var(--surface) 100%);
+  background: none;
   position: relative;
   overflow: hidden;
 }
@@ -1379,7 +1354,7 @@ textarea {
   content: "";
   position: absolute;
   inset: -20%;
-  background: radial-gradient(circle at 20% 20%, rgb(var(--hero-accent-rgb) / 0.15), transparent 45%);
+  background: none;
   opacity: 0.6;
   pointer-events: none;
   animation: error-glow 6s ease-in-out infinite;
@@ -1408,7 +1383,7 @@ textarea {
   background: linear-gradient(120deg, var(--hero-accent), var(--hero-accent-soft));
   -webkit-background-clip: text;
   background-clip: text;
-  text-shadow: 0 12px 40px rgb(var(--hero-accent-rgb) / 0.35);
+  text-shadow: none;
   animation: error-float 5s ease-in-out infinite;
 }
 
@@ -1473,8 +1448,7 @@ textarea {
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at top, rgb(var(--hero-accent-rgb) / 0.12), transparent 60%),
-    linear-gradient(180deg, var(--hero-bg) 0%, var(--hero-bg-mid) 60%, var(--hero-bg-deep) 100%);
+  background: none;
   color: var(--hero-text);
   z-index: 80;
   transition: opacity 0.4s ease;
@@ -1534,7 +1508,7 @@ textarea {
   margin-top: 16px;
   height: 4px;
   border-radius: 999px;
-  background: rgb(var(--hero-accent-rgb) / 0.18);
+  background: none;
   overflow: hidden;
   --boot-progress: 0;
 }
@@ -1693,7 +1667,7 @@ textarea {
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--dock-border);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
+  background: none;
   color: var(--hero-accent);
   display: grid;
   place-items: center;
@@ -1741,8 +1715,8 @@ textarea {
 
 .mobile-links button:hover {
   color: var(--hero-accent);
-  border-color: rgb(var(--hero-accent-rgb) / 0.4);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
+  border-color: currentColor;
+  background: none;
   transform: translateX(2px);
 }
 
@@ -1753,8 +1727,8 @@ textarea {
 
 .mobile-links button.active {
   color: var(--hero-accent);
-  border-color: rgb(var(--hero-accent-rgb) / 0.5);
-  background: rgb(var(--hero-accent-rgb) / 0.12);
+  border-color: currentColor;
+  background: none;
 }
 
 .mobile-actions {
@@ -1787,23 +1761,6 @@ textarea {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background:
-    radial-gradient(
-      circle at 10% 10%,
-      var(--section-overlay-a, rgb(var(--hero-accent-rgb) / 0.12)),
-      transparent 48%
-    ),
-    radial-gradient(
-      circle at 90% 0%,
-      var(--section-overlay-b, rgba(255, 211, 138, 0.08)),
-      transparent 52%
-    ),
-    linear-gradient(
-      180deg,
-      var(--section-overlay-c, rgba(10, 8, 6, 0.6)),
-      transparent 40%
-    ),
-    var(--section-bg, var(--content-bg));
 }
 
 .section > * {
@@ -1813,7 +1770,6 @@ textarea {
 
 .site-content > section.section {
   --section-bg: var(--content-bg);
-  --section-overlay-a: rgb(var(--hero-accent-rgb) / 0.12);
   --section-overlay-b: rgba(255, 211, 138, 0.08);
   --section-overlay-c: rgba(10, 8, 6, 0.6);
 }
@@ -1866,7 +1822,6 @@ textarea {
   width: 0;
   height: 1.2em;
   border-left: 2px solid var(--hero-accent);
-  box-shadow: 0 0 12px rgb(var(--hero-accent-rgb) / 0.45);
   animation: caret-blink 1s steps(1, end) infinite;
 }
 
@@ -1988,12 +1943,6 @@ textarea {
   display: block;
   height: 100%;
   width: calc(var(--featured-progress, 0) * 100%);
-  background: linear-gradient(
-    90deg,
-    rgb(var(--hero-accent-rgb) / 1),
-    rgba(255, 211, 138, 0.95)
-  );
-  box-shadow: 0 0 10px rgb(var(--hero-accent-rgb) / 0.6);
   position: relative;
   transition: width 0.35s ease;
 }
@@ -2014,7 +1963,7 @@ textarea {
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   background: rgba(0, 0, 0, 0.72);
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.45);
+  border: none;
   border-radius: 10px;
   padding: 10px 12px;
   color: rgba(255, 255, 255, 0.9);
@@ -2147,7 +2096,6 @@ textarea {
   .featured-links {
     justify-content: space-between;
     padding-top: 16px;
-    border-top: 1px dashed rgb(var(--hero-accent-rgb) / 0.2);
   }
   
   /* Mobilde ortalamayı garantiye al */
@@ -2215,11 +2163,7 @@ textarea {
   left: 50%;
   transform: translate(-50%, -50%);
   border-radius: 32px;
-  background: radial-gradient(
-    circle at top,
-    rgb(var(--hero-accent-rgb) / 0.08),
-    transparent 70%
-  );
+  background: none;
   opacity: 0.7;
   pointer-events: none;
   z-index: 0;
@@ -2236,7 +2180,6 @@ textarea {
 }
 
 .featured-card {
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.32);
   padding: 28px;
   border-radius: 24px;
   background: linear-gradient(
@@ -2261,7 +2204,7 @@ textarea {
 }
 
 :root[data-theme="light"] .featured-card {
-  border-color: rgb(var(--hero-accent-rgb) / 0.35);
+  border-color: currentColor;
   background: linear-gradient(160deg, rgba(255, 245, 227, 0.98), rgba(247, 231, 201, 0.98));
   box-shadow: 0 20px 48px rgba(70, 40, 15, 0.18);
 }
@@ -2269,7 +2212,7 @@ textarea {
 @media (hover: hover) {
   .featured-card:hover {
     transform: translateY(-2px);
-    border-color: rgb(var(--hero-accent-rgb) / 0.6);
+    border-color: currentColor;
     box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55);
   }
 }
@@ -2419,7 +2362,7 @@ textarea {
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.4);
+  border: none;
   background: rgba(12, 10, 8, 0.75);
   color: var(--hero-accent);
   display: grid;
@@ -2431,7 +2374,7 @@ textarea {
 
 :root[data-theme="light"] .featured-arrow {
   background: rgba(255, 246, 230, 0.9);
-  border-color: rgb(var(--hero-accent-rgb) / 0.45);
+  border-color: currentColor;
   color: #4b2e18;
 }
 
@@ -2571,7 +2514,7 @@ textarea {
   transform: translate(-50%, -50%) scale(0.92);
   opacity: 0.55;
   border-radius: 24px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.32);
+  border: none;
   background: linear-gradient(
       160deg,
       rgba(18, 13, 9, 0.6),
@@ -2587,7 +2530,7 @@ textarea {
 }
 
 :root[data-theme="light"] .featured-ghost {
-  border-color: rgb(var(--hero-accent-rgb) / 0.25);
+  border-color: currentColor;
   background: linear-gradient(160deg, rgba(255, 245, 227, 0.78), rgba(247, 231, 201, 0.78));
   color: rgba(50, 30, 16, 0.7);
 }
@@ -2597,7 +2540,7 @@ textarea {
 }
 
 :root[data-theme="light"] .featured-ghost-tags span {
-  border-color: rgb(var(--hero-accent-rgb) / 0.35);
+  border-color: currentColor;
 }
 
 .featured-ghost-content {
@@ -2613,7 +2556,7 @@ textarea {
 .featured-ghost-year {
   font-family: var(--font-mono), monospace;
   font-size: 11px;
-  color: rgb(var(--hero-accent-rgb) / 0.7);
+  color: inherit;
 }
 
 .featured-ghost h4 {
@@ -2645,7 +2588,7 @@ textarea {
 }
 
 .featured-ghost-tags span {
-  border: 1px dashed rgb(var(--hero-accent-rgb) / 0.3);
+  border: none;
   border-radius: 8px;
   padding: 2px 8px;
 }
@@ -2690,7 +2633,7 @@ textarea {
   left: 16px;
   bottom: 16px;
   background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.4);
+  border: none;
   padding: 8px 10px;
   border-radius: 8px;
   font-family: var(--font-mono), monospace;
@@ -2724,14 +2667,14 @@ textarea {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.35);
+  border: none;
   background: transparent;
   transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
 .featured-step.is-active {
-  background: rgb(var(--hero-accent-rgb) / 0.9);
-  border-color: rgb(var(--hero-accent-rgb) / 0.9);
+  background: none;
+  border-color: currentColor;
   transform: scale(1.2);
 }
 
@@ -2782,7 +2725,7 @@ textarea {
   background: var(--hero-accent);
   border-color: var(--hero-accent);
   transform: scale(1.15);
-  box-shadow: 0 0 0 3px rgb(var(--hero-accent-rgb) / 0.35);
+  box-shadow: none;
 }
 
 :root[data-theme="light"] .featured-dot {
@@ -2794,7 +2737,7 @@ textarea {
 :root[data-theme="light"] .featured-dot.is-active {
   background: var(--hero-accent);
   border-color: var(--hero-accent);
-  box-shadow: 0 0 0 3px rgb(var(--hero-accent-rgb) / 0.35);
+  box-shadow: none;
 }
 
 /* Capabilities: a 3-column grid of equal cards (was a single column of wide
@@ -2822,10 +2765,6 @@ textarea {
   position: relative;
   padding: 22px 22px 20px;
   border-radius: 18px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.22);
-  background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.05), transparent 38%),
-    rgba(12, 10, 8, 0.55);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
@@ -2837,13 +2776,12 @@ textarea {
 :root[data-theme="light"] .capability-card {
   border-color: var(--border-strong);
   background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.08), transparent 38%),
-    var(--surface);
+    none;
   box-shadow: var(--shadow);
 }
 
 .capability-card:hover {
-  border-color: rgb(var(--hero-accent-rgb) / 0.5);
+  border-color: currentColor;
   transform: translateY(-2px);
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.38);
 }
@@ -2868,8 +2806,6 @@ textarea {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.3);
-  background: rgb(var(--hero-accent-rgb) / 0.08);
   color: var(--hero-accent);
   display: inline-flex;
   align-items: center;
@@ -2911,7 +2847,6 @@ textarea {
   list-style: none;
   display: grid;
   gap: 7px;
-  border-top: 1px dashed rgb(var(--hero-accent-rgb) / 0.22);
 }
 
 .capability-points li {
@@ -2943,7 +2878,6 @@ textarea {
 .capability-tags li {
   padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.25);
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   color: var(--content-muted);
@@ -2968,7 +2902,7 @@ textarea {
 
 .about-toggle {
   border: 1px solid var(--content-border);
-  background: rgb(var(--hero-accent-rgb) / 0.1);
+  background: none;
   font-family: var(--font-mono), monospace;
   color: var(--hero-accent);
   cursor: pointer;
@@ -2981,8 +2915,8 @@ textarea {
 }
 
 .about-toggle:hover {
-  border-color: rgb(var(--hero-accent-rgb) / 0.45);
-  box-shadow: 0 12px 24px rgb(var(--hero-accent-rgb) / 0.18);
+  border-color: currentColor;
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -3101,7 +3035,7 @@ textarea {
 
 .button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 32px rgb(var(--hero-accent-rgb) / 0.18);
+  box-shadow: none;
 }
 
 .button:active {
@@ -3138,12 +3072,6 @@ textarea {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: radial-gradient(
-      circle at 10% 0%,
-      rgb(var(--hero-accent-rgb) / 0.08),
-      transparent 55%
-    ),
-    var(--content-bg);
 }
 
 .site-footer > * {
@@ -3546,10 +3474,6 @@ textarea {
   gap: 22px 36px;
   padding: clamp(20px, 3vw, 36px);
   border-radius: 20px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.28);
-  background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.06), transparent 42%),
-    rgba(12, 10, 8, 0.6);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   min-width: 0;
 }
@@ -3557,14 +3481,12 @@ textarea {
 :root[data-theme="light"] .research-card {
   border-color: var(--border-strong);
   background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.08), transparent 42%),
-    var(--surface);
+    none;
   box-shadow: var(--shadow);
 }
 
 .research-card__head {
   grid-area: head;
-  border-bottom: 1px dashed rgb(var(--hero-accent-rgb) / 0.25);
   padding-bottom: 18px;
 }
 
@@ -3624,8 +3546,6 @@ textarea {
 .research-stats div {
   padding: 12px 12px 10px;
   border-radius: 12px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.22);
-  background: rgb(var(--hero-accent-rgb) / 0.05);
   min-width: 0;
 }
 
@@ -3691,7 +3611,6 @@ textarea {
   justify-content: space-between;
   gap: 14px;
   padding-top: 18px;
-  border-top: 1px dashed rgb(var(--hero-accent-rgb) / 0.25);
 }
 
 .research-tags {
@@ -3706,7 +3625,6 @@ textarea {
 .research-tags li {
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.25);
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   color: var(--content-muted);
@@ -3724,7 +3642,6 @@ textarea {
   gap: 8px;
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.45);
   font-family: var(--font-mono), monospace;
   font-size: 13px;
   color: var(--content-ink);
@@ -3781,10 +3698,6 @@ textarea {
   margin-top: 28px;
   padding: clamp(20px, 3vw, 36px);
   border-radius: 20px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.28);
-  background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.06), transparent 40%),
-    rgba(12, 10, 8, 0.6);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   min-width: 0;
 }
@@ -3792,8 +3705,7 @@ textarea {
 :root[data-theme="light"] .experience-card {
   border-color: var(--border-strong);
   background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.08), transparent 40%),
-    var(--surface);
+    none;
   box-shadow: var(--shadow);
 }
 
@@ -3804,7 +3716,6 @@ textarea {
   justify-content: space-between;
   gap: 14px 24px;
   padding-bottom: 18px;
-  border-bottom: 1px dashed rgb(var(--hero-accent-rgb) / 0.25);
 }
 
 .experience-card__company {
@@ -3838,7 +3749,6 @@ textarea {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 10px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.45);
   color: var(--content-ink);
   text-decoration: none;
 }
@@ -3884,8 +3794,6 @@ textarea {
   gap: 10px;
   padding: 16px 16px 14px;
   border-radius: 14px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.18);
-  background: rgb(var(--hero-accent-rgb) / 0.035);
   min-width: 0;
 }
 
@@ -3898,7 +3806,6 @@ textarea {
 .experience-project h5 a {
   color: inherit;
   text-decoration: none;
-  border-bottom: 1px dashed rgb(var(--hero-accent-rgb) / 0.5);
 }
 
 .experience-project p {
@@ -3908,14 +3815,15 @@ textarea {
   color: var(--content-muted);
 }
 
-/* Intro focus strip: electrical-electronics areas first, full-stack last. */
+/* Intro focus strip: electrical-electronics areas first, full-stack last.
+   Plain text links on purpose: no boxes, fills or glows. */
 .intro-focus {
   list-style: none;
   margin-top: 28px;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 16px 28px;
 }
 
 @media (max-width: 1100px) {
@@ -3932,40 +3840,25 @@ textarea {
 
 .intro-focus__item {
   width: 100%;
-  height: 100%;
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid rgb(var(--hero-accent-rgb) / 0.18);
-  background: rgba(12, 10, 8, 0.45);
+  padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-.intro-focus__item.is-hardware {
-  border-color: rgb(var(--hero-accent-rgb) / 0.45);
-  background:
-    linear-gradient(180deg, rgb(var(--hero-accent-rgb) / 0.1), transparent 70%),
-    rgba(12, 10, 8, 0.5);
-}
-
-:root[data-theme="light"] .intro-focus__item {
-  background: var(--surface);
-}
-
-.intro-focus__item:hover {
-  border-color: var(--hero-accent);
-  transform: translateY(-2px);
+.intro-focus__item:hover strong {
+  color: var(--hero-accent);
 }
 
 .intro-focus__item:focus-visible {
   outline: 2px solid rgb(var(--hero-accent-rgb) / 0.7);
-  outline-offset: 2px;
+  outline-offset: 4px;
 }
 
 .intro-focus__text {
@@ -3977,6 +3870,7 @@ textarea {
 .intro-focus__text strong {
   font-size: 15px;
   color: var(--content-ink);
+  transition: color 0.2s ease;
 }
 
 .intro-focus__text span {
