@@ -21,6 +21,7 @@ import {
 } from "./media/music";
 import { DEMOS, demoForFile, renderDemo, type DemoId } from "./media/asciiDemos";
 import { HellrunGame } from "./hellrun";
+import type { TerminalAppId } from "./virtualKeys";
 import {
   getGameStatus,
   positionKey,
@@ -340,6 +341,8 @@ type TerminalCanvasProps = {
   onReadyAction: (api: TerminalApi) => void;
   onBootReadyAction?: () => void;
   onFocusChangeAction: (focused: boolean) => void;
+  /** Which app runs in the terminal (null = shell), for the on-screen keys. */
+  onAppChangeAction?: (app: TerminalAppId | null) => void;
   onDebugAction?: (info: TerminalDebugInfo) => void;
 };
 
@@ -995,6 +998,7 @@ export default function TerminalCanvas({
   onReadyAction,
   onBootReadyAction,
   onFocusChangeAction,
+  onAppChangeAction,
   onDebugAction,
 }: TerminalCanvasProps) {
   const userName = useMemo(
@@ -1192,6 +1196,29 @@ export default function TerminalCanvas({
   >(null);
   const solitaireMessageRef = useRef<string | null>(null);
   const playerModeRef = useRef<"mp3" | "video" | "image" | null>(null);
+  // Tells the page which app is running so the on-screen keys can follow it.
+  const onAppChangeRef = useRef(onAppChangeAction);
+  const reportedAppRef = useRef<TerminalAppId | null>(null);
+  useEffect(() => {
+    onAppChangeRef.current = onAppChangeAction;
+  }, [onAppChangeAction]);
+  const reportApp = useCallback(() => {
+    const mode = appModeRef.current;
+    let next: TerminalAppId | null = null;
+    if (mode === "doom") {
+      next = "hellrun";
+    } else if (mode === "player") {
+      const media = playerModeRef.current;
+      next = media === "mp3" ? "audio" : media;
+    } else if (mode) {
+      next = mode;
+    }
+    if (next === reportedAppRef.current) {
+      return;
+    }
+    reportedAppRef.current = next;
+    onAppChangeRef.current?.(next);
+  }, []);
   const playerFramesRef = useRef<string[]>([]);
   const playerFrameIndexRef = useRef(0);
   const playerTitleRef = useRef("");
@@ -2975,6 +3002,7 @@ export default function TerminalCanvas({
       appModeRef.current = "player";
       hasTerminalContentRef.current = true;
       playerModeRef.current = mode;
+      reportApp();
       playerTitleRef.current = title;
       playerFrameIndexRef.current = 0;
       playerProgressRef.current = 0;
@@ -3015,6 +3043,7 @@ export default function TerminalCanvas({
       dirtyRef.current = true;
     },
     [
+      reportApp,
       resolveImagePlaylist,
       startGameLoop,
       startSynthAudio,
@@ -3125,6 +3154,7 @@ export default function TerminalCanvas({
     (mode: AppMode) => {
       stopGameLoop();
       appModeRef.current = mode;
+      reportApp();
       hasTerminalContentRef.current = true;
       if (mode === "snake") {
         resetSnake();
@@ -3157,6 +3187,7 @@ export default function TerminalCanvas({
       dirtyRef.current = true;
     },
     [
+      reportApp,
       placeSnakeFood,
       resetCalc,
       resetChess,
@@ -3619,6 +3650,7 @@ export default function TerminalCanvas({
       }
       const ended = appModeRef.current;
       appModeRef.current = null;
+      reportApp();
       if (ended) {
         appendLine(
           message ?? formatMessage(messages.system.exit, { app: ended }),
@@ -3627,6 +3659,7 @@ export default function TerminalCanvas({
       dirtyRef.current = true;
     },
     [
+      reportApp,
       appendLine,
       formatMessage,
       messages.system.exit,

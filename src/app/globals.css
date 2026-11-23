@@ -3878,3 +3878,107 @@ textarea {
   line-height: 1.45;
   color: var(--content-muted);
 }
+
+/* Touch keys while a terminal app runs (layouts: virtualKeys.ts). A slim
+   top bar sits in the empty space above the monitor; the bottom dock holds
+   the controls and stays below the screen. Flat on purpose: page-coloured
+   panel, thin key borders, no glows. */
+.vkey-bar,
+.vkey-dock {
+  position: fixed;
+  z-index: 3;
+  opacity: calc(var(--hero-fade) * (1 - var(--content-reveal)));
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.vkey-bar {
+  top: calc(18px + env(safe-area-inset-top, 0px));
+  left: 76px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  /* The title takes the free space, so keys sit on the right; if a narrow
+     phone can't fit them, the bar scrolls instead of covering the menu. */
+  justify-content: flex-start;
+  gap: 4px;
+  height: 44px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.vkey-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.vkey-bar__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+}
+
+.vkey-dock {
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  margin: 0 auto;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--content-bg);
+  border: 1px solid var(--dock-border);
+}
+
+.vkey {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--hero-accent);
+  background: none;
+  border: 1px solid var(--dock-border);
+  border-radius: 10px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vkey:active {
+  transform: translateY(1px) scale(0.97);
+  filter: brightness(1.15);
+}
+
+.vkey--main {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.vkey--small {
+  font-size: 12px;
+}
+
+.vkey--bar {
+  flex: 0 0 auto;
+  height: 36px;
+  min-width: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: var(--content-bg);
+}

@@ -16,6 +16,11 @@ import Markdown from "@/components/Markdown";
 import TerminalCanvas, {
   TerminalApi,
 } from "@/components/terminal/TerminalCanvas";
+import VirtualKeyDock from "@/components/terminal/VirtualKeyDock";
+import {
+  getVirtualLayout,
+  type TerminalAppId,
+} from "@/components/terminal/virtualKeys";
 import type { SceneDebugInfo } from "@/components/hero/HeroScene";
 import { usePreferences } from "@/components/PreferencesProvider";
 import type { ContentData } from "@/lib/content";
@@ -724,6 +729,8 @@ export default function HomeClient({
   const [aboutOpen, setAboutOpen] = useState(false);
   const [terminalApi, setTerminalApi] = useState<TerminalApi | null>(null);
   const [terminalFocused, setTerminalFocused] = useState(false);
+  const [terminalApp, setTerminalApp] = useState<TerminalAppId | null>(null);
+  const appKeyLayout = getVirtualLayout(terminalApp);
   const pendingTerminalFocusRef = useRef(false);
   const [screenAspect, setScreenAspect] = useState(1.33);
   const [screenAspectReady, setScreenAspectReady] = useState(false);
@@ -2435,7 +2442,14 @@ export default function HomeClient({
               ) : null}
             </div>
           </div>
-          {showVirtualKeys ? (
+          {showVirtualKeys && appKeyLayout ? (
+            <VirtualKeyDock
+              layout={appKeyLayout}
+              language={language}
+              onOpenKeyboardAction={handleTerminalInputFocus}
+            />
+          ) : null}
+          {showVirtualKeys && !appKeyLayout ? (
             <div className="hero-mobile-keys" aria-hidden="true">
               <button
                 type="button"
@@ -2568,6 +2582,7 @@ export default function HomeClient({
             onReadyAction={setTerminalApi}
             onBootReadyAction={handleTerminalBootReady}
             onFocusChangeAction={setTerminalFocused}
+            onAppChangeAction={setTerminalApp}
           />
         </section>
 
