@@ -241,7 +241,10 @@ export const VIRTUAL_LAYOUTS: Record<TerminalAppId, VirtualLayout> = {
     ],
     rowHeight: 46,
     maxWidth: 440,
-    bar: [restart],
+    bar: [
+      { area: "clear", key: "x", code: "KeyX", label: L("Bırak", "Clear"), aria: L("Seçimi bırak", "Clear the selection") },
+      restart,
+    ],
     exit: quit,
     keys: [
       ...[1, 2, 3, 4, 5, 6, 7].map((n) => ({

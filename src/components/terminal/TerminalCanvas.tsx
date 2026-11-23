@@ -23,6 +23,23 @@ import { DEMOS, demoForFile, renderDemo, type DemoId } from "./media/asciiDemos"
 import { HellrunGame } from "./hellrun";
 import type { TerminalAppId } from "./virtualKeys";
 import {
+  SOLITAIRE_SUITS,
+  canStackOnFoundation,
+  canStackOnTableau,
+  cardLabel,
+  deal,
+  emptyFoundations,
+  faceUpStart,
+  findFoundationMove,
+  findMovableRun,
+  isRedSuit,
+  isWon,
+  revealTop,
+  shuffledDeck,
+  type SolitaireCard,
+  type SolitaireSource,
+} from "./solitaire/rules";
+import {
   getGameStatus,
   positionKey,
   type ChessState,
@@ -301,6 +318,11 @@ type TerminalCanvasProps = {
       selectedPile: string;
       cannotStack: string;
       movedCard: string;
+      movedRun: string;
+      deselected: string;
+      noFoundationMove: string;
+      won: string;
+      wonTitle: string;
     };
     ui: {
       player: string;
@@ -372,29 +394,12 @@ type ChessOutcome = {
   reason: "checkmate" | "stalemate" | "draw";
 } | null;
 type Vector2 = { x: number; y: number };
-type SolitaireCard = { rank: string; suit: string; faceUp: boolean };
 type PyodideInterface = {
   runPythonAsync: (code: string) => Promise<unknown>;
   runPython: (code: string) => unknown;
   globals: { set: (name: string, value: unknown) => void };
 };
 
-const SOLITAIRE_RANKS = [
-  "A",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "J",
-  "Q",
-  "K",
-];
-const SOLITAIRE_SUITS = ["♠", "♥", "♦", "♣"] as const;
 const CALC_BUTTONS: string[][] = [
   ["7", "8", "9", "/", "C"],
   ["4", "5", "6", "*", "("],
@@ -1184,16 +1189,9 @@ export default function TerminalCanvas({
   const chessPromotionChoiceRef = useRef(0);
   const solitaireStockRef = useRef<SolitaireCard[]>([]);
   const solitaireWasteRef = useRef<SolitaireCard[]>([]);
-  const solitaireFoundationsRef = useRef<Record<string, SolitaireCard[]>>({
-    "♠": [],
-    "♥": [],
-    "♦": [],
-    "♣": [],
-  });
+  const solitaireFoundationsRef = useRef(emptyFoundations());
   const solitaireTableauRef = useRef<SolitaireCard[][]>([]);
-  const solitaireSelectionRef = useRef<
-    { type: "waste" } | { type: "tableau"; index: number } | null
-  >(null);
+  const solitaireSelectionRef = useRef<SolitaireSource | null>(null);
   const solitaireMessageRef = useRef<string | null>(null);
   const playerModeRef = useRef<"mp3" | "video" | "image" | null>(null);
   // Tells the page which app is running so the on-screen keys can follow it.
@@ -2575,56 +2573,15 @@ export default function TerminalCanvas({
   );
 
   const resetSolitaire = useCallback(() => {
-    const deck: SolitaireCard[] = [];
-    SOLITAIRE_SUITS.forEach((suit) => {
-      SOLITAIRE_RANKS.forEach((rank) =>
-        deck.push({ rank, suit, faceUp: false }),
-      );
-    });
-    for (let i = deck.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    const tableau: SolitaireCard[][] = [];
-    for (let i = 0; i < 7; i += 1) {
-      const pile: SolitaireCard[] = [];
-      for (let j = 0; j <= i; j += 1) {
-        const card = deck.pop() as SolitaireCard;
-        pile.push({ ...card, faceUp: j === i });
-      }
-      tableau.push(pile);
-    }
+    const { tableau, stock } = deal(shuffledDeck());
     solitaireTableauRef.current = tableau;
-    solitaireStockRef.current = deck.map((card) => ({
-      ...card,
-      faceUp: false,
-    }));
+    solitaireStockRef.current = stock;
     solitaireWasteRef.current = [];
-    solitaireFoundationsRef.current = {
-      "♠": [],
-      "♥": [],
-      "♦": [],
-      "♣": [],
-    };
+    solitaireFoundationsRef.current = emptyFoundations();
     solitaireSelectionRef.current = null;
     solitaireMessageRef.current = messages.solitaire.hint;
     dirtyRef.current = true;
   }, [messages.solitaire.hint]);
-
-  const getSolitaireRankIndex = useCallback(
-    (rank: string) => SOLITAIRE_RANKS.findIndex((item) => item === rank),
-    [],
-  );
-
-  const isSolitaireRed = useCallback(
-    (suit: string) => suit === "♥" || suit === "♦",
-    [],
-  );
-
-  const solitaireCardLabel = useCallback(
-    (card: SolitaireCard) => `${card.rank}${card.suit}`,
-    [],
-  );
 
   const loadPyodideOnce = useCallback(async () => {
     if (pyodideRef.current) {
@@ -6355,88 +6312,96 @@ export default function TerminalCanvas({
           );
         }
       } else if (mode === "solitaire") {
-        const pad = Math.floor(Math.min(width, height) * 0.1);
+        const font = (size: number) =>
+          `${size}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+        const pad = Math.floor(Math.min(width, height) * 0.06);
         const areaW = width - pad * 2;
-        const cardW = Math.min(90, Math.floor(areaW / 9));
-        const cardH = Math.floor(cardW * 1.35);
-        const gap = Math.max(8, Math.floor(cardW * 0.2));
-        const topRowY = pad + 28;
-        const tableauStartY = topRowY + cardH + gap * 1.4;
+        // Seven columns fill the width: 7 cards + 6 gaps of 14% of a card.
+        const cardW = Math.min(120, Math.floor(areaW / (7 + 6 * 0.14)));
+        const gap = Math.floor((areaW - cardW * 7) / 6);
+        const cardH = Math.floor(cardW * 1.4);
+        const colX = (column: number) => pad + column * (cardW + gap);
+        const rankSize = Math.max(11, Math.floor(cardW * 0.34));
+        const numberSize = Math.max(11, Math.floor(rankSize * 0.85));
+        const topRowY = pad + headerSize + Math.floor(headerSize * 0.6);
+        const numbersY = topRowY + cardH + Math.floor(gap * 1.2);
+        const tableauStartY = numbersY + numberSize + Math.floor(gap * 0.6);
+        const footerLineH = Math.floor(headerSize * 1.5);
+        const footerTop = height - pad - footerLineH * 2;
         const stock = solitaireStockRef.current;
         const waste = solitaireWasteRef.current;
         const wasteCard = waste[waste.length - 1];
         const foundations = solitaireFoundationsRef.current;
         const selection = solitaireSelectionRef.current;
-        const suits = ["♠", "♥", "♦", "♣"] as const;
+        const highlight = "#f4d35e";
+        const ink = "#1f1a14";
+        const red = "#c0392b";
 
         const drawSlot = (x: number, y: number, label?: string) => {
           ctx.strokeStyle = dim;
           ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, cardW, cardH);
+          ctx.strokeRect(x + 1, y + 1, cardW - 2, cardH - 2);
           if (label) {
             ctx.fillStyle = dim;
-            ctx.fillText(label, x + 6, y + 6);
+            ctx.font = font(Math.max(10, Math.floor(rankSize * 0.75)));
+            ctx.textAlign = "center";
+            ctx.fillText(label, x + cardW / 2, y + cardH / 2 - rankSize / 2);
+            ctx.textAlign = "left";
           }
         };
         const drawCard = (
           x: number,
           y: number,
           card: SolitaireCard,
-          highlight = false,
+          selected = false,
         ) => {
           ctx.fillStyle = card.faceUp ? "#fdf6e3" : "#2b231d";
           ctx.fillRect(x, y, cardW, cardH);
-          ctx.strokeStyle = card.faceUp ? "#c9b29b" : dim;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, cardW, cardH);
+          ctx.strokeStyle = selected ? highlight : card.faceUp ? "#c9b29b" : dim;
+          ctx.lineWidth = selected ? 4 : 2;
+          ctx.strokeRect(x + 1, y + 1, cardW - 2, cardH - 2);
           if (card.faceUp) {
-            const isRed = card.suit === "♥" || card.suit === "♦";
-            ctx.fillStyle = isRed ? "#d6735b" : accent;
-            const labelSize = Math.max(10, Math.floor(cardW * 0.28));
-            ctx.font = `${labelSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
-            ctx.fillText(`${card.rank}${card.suit}`, x + 6, y + 6);
-            ctx.fillText(card.suit, x + 6, y + cardH - labelSize - 6);
-            ctx.font = `${headerSize}px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
+            // Dark ink on the cream card (the terminal amber was unreadable).
+            ctx.fillStyle = isRedSuit(card.suit) ? red : ink;
+            ctx.font = font(rankSize);
+            ctx.fillText(`${card.rank}${card.suit}`, x + 4, y + 3);
+            ctx.font = font(Math.floor(cardW * 0.5));
+            ctx.textAlign = "center";
+            ctx.fillText(card.suit, x + cardW / 2, y + cardH * 0.45);
+            ctx.textAlign = "left";
           } else {
             ctx.strokeStyle = "rgba(246, 194, 122, 0.25)";
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(x + 6, y + 10);
-            ctx.lineTo(x + cardW - 6, y + cardH - 10);
+            ctx.moveTo(x + 6, y + 8);
+            ctx.lineTo(x + cardW - 6, y + cardH - 8);
             ctx.stroke();
-          }
-          if (highlight) {
-            ctx.strokeStyle = "#f4d35e";
-            ctx.lineWidth = 3;
-            ctx.strokeRect(x + 2, y + 2, cardW - 4, cardH - 4);
           }
         };
 
         ctx.fillStyle = accent;
+        ctx.font = font(headerSize);
         ctx.fillText(messages.ui.solitaireTitle, pad, pad);
 
-        const stockX = pad;
-        const wasteX = pad + cardW + gap;
-        const foundationStartX = pad + areaW - (cardW * 4 + gap * 3);
-
+        // Top row: stock (with its count), waste, gap, four foundations.
         if (stock.length) {
-          drawCard(stockX, topRowY, {
-            ...stock[stock.length - 1],
-            faceUp: false,
-          });
+          drawCard(colX(0), topRowY, { ...stock[stock.length - 1], faceUp: false });
+          ctx.fillStyle = accent;
+          ctx.font = font(Math.max(10, Math.floor(rankSize * 0.8)));
+          ctx.textAlign = "center";
+          ctx.fillText(String(stock.length), colX(0) + cardW / 2, topRowY + cardH / 2 - rankSize / 2);
+          ctx.textAlign = "left";
         } else {
-          drawSlot(stockX, topRowY, messages.ui.solitaireStock);
+          drawSlot(colX(0), topRowY, "↻");
         }
-
         if (wasteCard) {
-          drawCard(wasteX, topRowY, wasteCard, selection?.type === "waste");
+          drawCard(colX(1), topRowY, wasteCard, selection?.type === "waste");
         } else {
-          drawSlot(wasteX, topRowY, messages.ui.solitaireWaste);
+          drawSlot(colX(1), topRowY);
         }
-
-        suits.forEach((suit, index) => {
-          const x = foundationStartX + index * (cardW + gap);
-          const pile = foundations[suit];
-          const top = pile[pile.length - 1];
+        SOLITAIRE_SUITS.forEach((suit, index) => {
+          const x = colX(3 + index);
+          const top = foundations[suit][foundations[suit].length - 1];
           if (top) {
             drawCard(x, topRowY, top);
           } else {
@@ -6444,41 +6409,76 @@ export default function TerminalCanvas({
           }
         });
 
-        const tableau = solitaireTableauRef.current;
-        const availableHeight = height - pad - 70 - tableauStartY;
-        tableau.forEach((pile, index) => {
-          const x = pad + index * (cardW + gap);
-          const maxStack = Math.max(1, pile.length);
-          const defaultOffset = Math.max(8, Math.floor(cardH * 0.24));
-          const offset =
-            maxStack * defaultOffset + cardH > availableHeight
-              ? Math.max(
-                  6,
-                  Math.floor(
-                    (availableHeight - cardH) / Math.max(1, maxStack - 1),
-                  ),
-                )
-              : defaultOffset;
-          pile.forEach((card, cardIndex) => {
-            const y = tableauStartY + cardIndex * offset;
-            const highlight =
-              selection?.type === "tableau" &&
-              selection.index === index &&
-              cardIndex === pile.length - 1 &&
-              card.faceUp;
-            drawCard(x, y, card, highlight);
-          });
+        // Pile numbers: the keys 1-7 pick these piles.
+        ctx.font = font(numberSize);
+        ctx.textAlign = "center";
+        for (let column = 0; column < 7; column += 1) {
+          const picked = selection?.type === "tableau" && selection.index === column;
+          ctx.fillStyle = picked ? highlight : dim;
+          ctx.fillText(String(column + 1), colX(column) + cardW / 2, numbersY);
+        }
+        ctx.textAlign = "left";
+
+        // Tableau: face-down cards packed tight, face-up cards far enough
+        // apart to read each rank; squeezed when a pile gets too tall.
+        const available = footerTop - gap - tableauStartY;
+        solitaireTableauRef.current.forEach((pile, column) => {
+          const x = colX(column);
           if (!pile.length) {
-            drawSlot(x, tableauStartY, `T${index + 1}`);
+            drawSlot(x, tableauStartY, "K");
+            return;
           }
+          const firstUp = faceUpStart(pile);
+          const downCount = firstUp;
+          const upGaps = Math.max(0, pile.length - firstUp - 1);
+          let downOffset = Math.max(6, Math.floor(cardH * 0.12));
+          let upOffset = Math.max(rankSize + 8, Math.floor(cardH * 0.28));
+          const needed = () => downCount * downOffset + upGaps * upOffset + cardH;
+          if (needed() > available) {
+            downOffset = Math.max(3, Math.floor(downOffset / 2));
+          }
+          if (needed() > available && upGaps > 0) {
+            upOffset = Math.max(
+              6,
+              Math.floor((available - cardH - downCount * downOffset) / upGaps),
+            );
+          }
+          const picked = selection?.type === "tableau" && selection.index === column;
+          let y = tableauStartY;
+          pile.forEach((card, cardIndex) => {
+            drawCard(x, y, card, picked && cardIndex >= firstUp);
+            y += cardIndex < firstUp ? downOffset : upOffset;
+          });
         });
 
+        // Footer: last message, then the controls (shrunk to fit narrow screens).
+        const fitLine = (text: string, size: number, color: string, y: number) => {
+          let fontPx = size;
+          ctx.font = font(fontPx);
+          while (fontPx > 9 && ctx.measureText(text).width > areaW) {
+            fontPx -= 1;
+            ctx.font = font(fontPx);
+          }
+          ctx.fillStyle = color;
+          ctx.fillText(text, pad, y);
+        };
         if (solitaireMessageRef.current) {
-          ctx.fillStyle = accent;
-          ctx.fillText(solitaireMessageRef.current, pad, height - pad - 44);
+          fitLine(solitaireMessageRef.current, headerSize, accent, footerTop);
         }
-        ctx.fillStyle = dim;
-        ctx.fillText(messages.ui.solitaireControls, pad, height - pad - 20);
+        fitLine(messages.ui.solitaireControls, headerSize, dim, footerTop + footerLineH);
+
+        if (isWon(foundations)) {
+          ctx.fillStyle = "rgba(10, 9, 8, 0.78)";
+          ctx.fillRect(0, 0, width, height);
+          ctx.textAlign = "center";
+          ctx.fillStyle = "#ff8a1e";
+          ctx.font = font(Math.max(18, Math.floor(headerSize * 2.2)));
+          ctx.fillText(messages.solitaire.wonTitle, width / 2, height * 0.38);
+          ctx.fillStyle = accent;
+          ctx.font = font(headerSize);
+          ctx.fillText(messages.solitaire.won, width / 2, height * 0.38 + headerSize * 3);
+          ctx.textAlign = "left";
+        }
       } else {
         const grid =
           mode === "snake"
@@ -7634,173 +7634,154 @@ export default function TerminalCanvas({
       }
       if (mode === "solitaire") {
         const tableau = solitaireTableauRef.current;
-        const stock = solitaireStockRef.current;
         const waste = solitaireWasteRef.current;
         const foundations = solitaireFoundationsRef.current;
         const selection = solitaireSelectionRef.current;
-        const canStackOnTableau = (
-          moving: SolitaireCard,
-          target?: SolitaireCard,
-        ) => {
-          if (!target) {
-            return moving.rank === "K";
-          }
-          const rankDelta =
-            getSolitaireRankIndex(target.rank) -
-            getSolitaireRankIndex(moving.rank);
-          if (rankDelta !== 1) {
-            return false;
-          }
-          return isSolitaireRed(moving.suit) !== isSolitaireRed(target.suit);
-        };
-        const canStackOnFoundation = (moving: SolitaireCard) => {
-          const foundation = foundations[moving.suit];
-          if (!foundation.length) {
-            return moving.rank === "A";
-          }
-          const top = foundation[foundation.length - 1];
-          return (
-            getSolitaireRankIndex(moving.rank) ===
-            getSolitaireRankIndex(top.rank) + 1
-          );
-        };
-        const revealTop = (pile: SolitaireCard[]) => {
-          const top = pile[pile.length - 1];
-          if (top && !top.faceUp) {
-            top.faceUp = true;
-          }
-        };
-
-        if (lower === "d") {
-          if (stock.length === 0) {
-            if (waste.length) {
-              solitaireStockRef.current = waste
-                .slice()
-                .reverse()
-                .map((card) => ({ ...card, faceUp: false }));
-              solitaireWasteRef.current = [];
-              solitaireMessageRef.current = messages.solitaire.stockRecycled;
-            } else {
-              solitaireMessageRef.current = messages.solitaire.noCardsLeft;
-            }
-          } else {
-            const card = stock.pop();
-            if (card) {
-              solitaireWasteRef.current.push({ ...card, faceUp: true });
-              solitaireMessageRef.current = formatMessage(
-                messages.solitaire.drawCard,
-                { card: solitaireCardLabel(card) },
-              );
-            }
-          }
+        const say = (text: string) => {
+          solitaireMessageRef.current = text;
           dirtyRef.current = true;
           event.preventDefault();
           return true;
+        };
+        // After a move: turn the source pile's new top card up, drop the selection.
+        const finishMove = (sourcePile: SolitaireCard[] | null) => {
+          if (sourcePile && sourcePile !== solitaireWasteRef.current) {
+            revealTop(sourcePile);
+          }
+          solitaireSelectionRef.current = null;
+        };
+
+        if (isWon(foundations)) {
+          // Finished: only R (new game) and Q (quit), handled above, matter.
+          return say(messages.solitaire.won);
+        }
+
+        if (lower === "d") {
+          const stock = solitaireStockRef.current;
+          if (selection?.type === "waste") {
+            solitaireSelectionRef.current = null;
+          }
+          if (!stock.length) {
+            if (!waste.length) {
+              return say(messages.solitaire.noCardsLeft);
+            }
+            solitaireStockRef.current = waste
+              .slice()
+              .reverse()
+              .map((card) => ({ ...card, faceUp: false }));
+            solitaireWasteRef.current = [];
+            return say(messages.solitaire.stockRecycled);
+          }
+          const card = stock.pop() as SolitaireCard;
+          waste.push({ ...card, faceUp: true });
+          return say(
+            formatMessage(messages.solitaire.drawCard, { card: cardLabel(card) }),
+          );
         }
 
         if (lower === "w") {
-          if (!waste.length) {
-            solitaireMessageRef.current = messages.solitaire.wasteEmpty;
-          } else {
-            solitaireSelectionRef.current = { type: "waste" };
-            solitaireMessageRef.current = messages.solitaire.selectedWaste;
+          if (selection?.type === "waste") {
+            solitaireSelectionRef.current = null;
+            return say(messages.solitaire.deselected);
           }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
+          if (!waste.length) {
+            return say(messages.solitaire.wasteEmpty);
+          }
+          solitaireSelectionRef.current = { type: "waste" };
+          return say(messages.solitaire.selectedWaste);
+        }
+
+        if (lower === "x") {
+          solitaireSelectionRef.current = null;
+          return say(messages.solitaire.deselected);
         }
 
         if (lower === "f") {
-          let moving: SolitaireCard | undefined;
-          let sourcePile: SolitaireCard[] | null = null;
-          if (selection?.type === "waste") {
-            moving = waste[waste.length - 1];
-            sourcePile = waste;
-          } else if (selection?.type === "tableau") {
-            const pile = tableau[selection.index];
-            const top = pile?.[pile.length - 1];
-            if (top?.faceUp) {
-              moving = top;
-              sourcePile = pile;
-            }
+          // With a selection its top card goes up; without one, the first
+          // card that fits (waste first, then the piles left to right).
+          const source =
+            selection ?? findFoundationMove(waste, tableau, foundations);
+          if (!source) {
+            return say(messages.solitaire.noFoundationMove);
           }
-          if (!moving || !sourcePile) {
-            solitaireMessageRef.current = messages.solitaire.selectCardFirst;
-          } else if (!canStackOnFoundation(moving)) {
-            solitaireMessageRef.current =
-              messages.solitaire.cannotMoveFoundation;
-          } else {
-            foundations[moving.suit].push({ ...moving, faceUp: true });
-            sourcePile.pop();
-            if (sourcePile !== waste) {
-              revealTop(sourcePile);
-            }
-            solitaireSelectionRef.current = null;
-            solitaireMessageRef.current = formatMessage(
-              messages.solitaire.placedCard,
-              { card: solitaireCardLabel(moving) },
-            );
+          const pile = source.type === "waste" ? waste : tableau[source.index];
+          const card = pile?.[pile.length - 1];
+          if (!card?.faceUp || !canStackOnFoundation(card, foundations)) {
+            return say(messages.solitaire.cannotMoveFoundation);
           }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
+          pile.pop();
+          foundations[card.suit].push({ ...card, faceUp: true });
+          finishMove(pile);
+          return say(
+            isWon(foundations)
+              ? messages.solitaire.won
+              : formatMessage(messages.solitaire.placedCard, {
+                  card: cardLabel(card),
+                }),
+          );
         }
 
         if (/^[1-7]$/.test(key)) {
           const index = Number(key) - 1;
           const targetPile = tableau[index];
-          if (!targetPile) {
-            return true;
-          }
           if (!selection) {
             const top = targetPile[targetPile.length - 1];
             if (!top) {
-              solitaireMessageRef.current = messages.solitaire.emptyPile;
-            } else if (!top.faceUp) {
+              return say(messages.solitaire.emptyPile);
+            }
+            if (!top.faceUp) {
               top.faceUp = true;
-              solitaireMessageRef.current = messages.solitaire.flippedCard;
-            } else {
-              solitaireSelectionRef.current = { type: "tableau", index };
-              solitaireMessageRef.current = formatMessage(
-                messages.solitaire.selectedPile,
-                { index: String(index + 1) },
-              );
+              return say(messages.solitaire.flippedCard);
             }
-          } else {
-            let moving: SolitaireCard | undefined;
-            let sourcePile: SolitaireCard[] | null = null;
-            if (selection.type === "waste") {
-              moving = waste[waste.length - 1];
-              sourcePile = waste;
-            } else if (selection.type === "tableau") {
-              const fromPile = tableau[selection.index];
-              const top = fromPile?.[fromPile.length - 1];
-              if (top?.faceUp) {
-                moving = top;
-                sourcePile = fromPile;
-              }
-            }
-            const targetTop = targetPile[targetPile.length - 1];
-            if (!moving || !sourcePile) {
-              solitaireMessageRef.current = messages.solitaire.selectCardFirst;
-            } else if (!canStackOnTableau(moving, targetTop)) {
-              solitaireMessageRef.current = messages.solitaire.cannotStack;
-            } else {
-              targetPile.push({ ...moving, faceUp: true });
-              sourcePile.pop();
-              if (sourcePile !== waste) {
-                revealTop(sourcePile);
-              }
-              solitaireSelectionRef.current = null;
-              solitaireMessageRef.current = formatMessage(
-                messages.solitaire.movedCard,
-                { card: solitaireCardLabel(moving) },
-              );
-            }
+            solitaireSelectionRef.current = { type: "tableau", index };
+            return say(
+              formatMessage(messages.solitaire.selectedPile, {
+                index: String(index + 1),
+              }),
+            );
           }
-          dirtyRef.current = true;
-          event.preventDefault();
-          return true;
+          if (selection.type === "tableau" && selection.index === index) {
+            solitaireSelectionRef.current = null;
+            return say(messages.solitaire.deselected);
+          }
+          const targetTop = targetPile[targetPile.length - 1];
+          if (selection.type === "waste") {
+            const card = waste[waste.length - 1];
+            if (!card) {
+              solitaireSelectionRef.current = null;
+              return say(messages.solitaire.wasteEmpty);
+            }
+            if (!canStackOnTableau(card, targetTop)) {
+              return say(messages.solitaire.cannotStack);
+            }
+            waste.pop();
+            targetPile.push({ ...card, faceUp: true });
+            finishMove(null);
+            return say(
+              formatMessage(messages.solitaire.movedCard, {
+                card: cardLabel(card),
+              }),
+            );
+          }
+          // Tableau to tableau: the face-up run moves from the card that fits.
+          const fromPile = tableau[selection.index];
+          const start = findMovableRun(fromPile, targetTop);
+          if (start < 0) {
+            return say(messages.solitaire.cannotStack);
+          }
+          const run = fromPile.splice(start);
+          targetPile.push(...run);
+          finishMove(fromPile);
+          return say(
+            run.length > 1
+              ? formatMessage(messages.solitaire.movedRun, {
+                  card: cardLabel(run[0]),
+                  count: String(run.length),
+                })
+              : formatMessage(messages.solitaire.movedCard, {
+                  card: cardLabel(run[0]),
+                }),
+          );
         }
 
         event.preventDefault();
@@ -7818,8 +7799,6 @@ export default function TerminalCanvas({
       ensureEditorBuffer,
       executeEditorCommand,
       getEditorSelectionText,
-      getSolitaireRankIndex,
-      isSolitaireRed,
       insertEditorNewline,
       insertEditorText,
       placeSnakeFood,
@@ -7833,7 +7812,6 @@ export default function TerminalCanvas({
       moveEditorCursor,
       hasChessLegalMove,
       isChessInCheck,
-      solitaireCardLabel,
       startSynthAudio,
       stopSynthAudio,
       stopApp,
