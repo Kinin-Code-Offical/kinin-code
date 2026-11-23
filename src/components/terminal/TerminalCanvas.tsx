@@ -7775,6 +7775,7 @@ export default function TerminalCanvas({
         metaKey: boolean;
         altKey?: boolean;
         shiftKey?: boolean;
+        isTrusted?: boolean;
         preventDefault: () => void;
       },
       allowCharInput: boolean,
@@ -7785,7 +7786,11 @@ export default function TerminalCanvas({
       if (!focusedRef.current) {
         focusedRef.current = true;
         onFocusChangeAction(true);
-        focusInput(false);
+        // Synthetic keys (the on-screen arrows/Tab) must not focus the hidden
+        // input: on phones that opens the soft keyboard.
+        if (event.isTrusted !== false) {
+          focusInput(false);
+        }
         dirtyRef.current = true;
       }
 

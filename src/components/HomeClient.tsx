@@ -829,14 +829,11 @@ export default function HomeClient({
     terminalApi?.focusInput?.();
   }, [terminalApi]);
 
+  // On-screen keys never focus the hidden input: on phones that pops up the
+  // soft keyboard. The terminal handles these synthetic events without it;
+  // only the ⌨ button opens the keyboard.
   const handleVirtualKey = useCallback(
-    (
-      key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Tab",
-      options?: { focus?: boolean },
-    ) => {
-      if (options?.focus !== false) {
-        handleTerminalFocus();
-      }
+    (key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Tab") => {
       const modifiers = mobileModifiersRef.current;
       const down = new KeyboardEvent("keydown", {
         key,
@@ -855,7 +852,7 @@ export default function HomeClient({
       window.dispatchEvent(down);
       window.dispatchEvent(up);
     },
-    [handleTerminalFocus],
+    [],
   );
 
   const toggleMobileModifier = useCallback((key: "ctrl" | "shift" | "alt") => {
@@ -2456,7 +2453,7 @@ export default function HomeClient({
                 aria-label={t.hero.keys.tabAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("Tab", { focus: true });
+                  handleVirtualKey("Tab");
                 }}>
                 {t.hero.keys.tabLabel}
               </button>
@@ -2466,7 +2463,7 @@ export default function HomeClient({
                 aria-label={t.hero.keys.arrowUpAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowUp", { focus: false });
+                  handleVirtualKey("ArrowUp");
                 }}>
                 ▲
               </button>
@@ -2476,7 +2473,7 @@ export default function HomeClient({
                 aria-label={t.hero.keys.arrowLeftAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowLeft", { focus: false });
+                  handleVirtualKey("ArrowLeft");
                 }}>
                 ◀
               </button>
@@ -2486,7 +2483,7 @@ export default function HomeClient({
                 aria-label={t.hero.keys.arrowRightAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowRight", { focus: false });
+                  handleVirtualKey("ArrowRight");
                 }}>
                 ▶
               </button>
@@ -2496,7 +2493,7 @@ export default function HomeClient({
                 aria-label={t.hero.keys.arrowDownAria}
                 onPointerDown={(event) => {
                   event.preventDefault();
-                  handleVirtualKey("ArrowDown", { focus: false });
+                  handleVirtualKey("ArrowDown");
                 }}>
                 ▼
               </button>
