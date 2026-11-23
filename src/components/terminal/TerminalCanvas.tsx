@@ -3333,12 +3333,54 @@ export default function TerminalCanvas({
     theme.palette.terminalBg,
   ]);
 
+  const autoFocusedRef = useRef(false);
   useEffect(() => {
-    if (!ready) {
+    if (!ready || autoFocusedRef.current) {
+      return;
+    }
+    autoFocusedRef.current = true;
+    // On touch screens the hidden input must not hold DOM focus unless the
+    // user asked for the keyboard (⌨ or a tap on the monitor): once it is
+    // focused, the next on-screen arrow (which moves its caret) pops the soft
+    // keyboard up. The terminal is still marked active so keys work.
+    const touchScreen =
+      isMobile || window.matchMedia("(pointer: coarse)").matches;
+    if (touchScreen) {
+      if (!focusedRef.current) {
+        focusedRef.current = true;
+        onFocusChangeAction(true);
+      }
       return;
     }
     terminalApi.focus();
-  }, [ready, terminalApi]);
+  }, [isMobile, onFocusChangeAction, ready, terminalApi]);
+
+  // Android keeps the input focused when the keyboard is dismissed with the
+  // back button, so a later on-screen key would bring it straight back.
+  // Drop focus once the keyboard closes (iOS already blurs on "Done").
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) {
+      return;
+    }
+    let keyboardOpen = false;
+    const handleViewportResize = () => {
+      const covered = window.innerHeight - viewport.height * viewport.scale;
+      if (covered > 150) {
+        keyboardOpen = true;
+        return;
+      }
+      if (keyboardOpen && covered < 80) {
+        keyboardOpen = false;
+        const input = inputRef.current;
+        if (input && document.activeElement === input) {
+          input.blur();
+        }
+      }
+    };
+    viewport.addEventListener("resize", handleViewportResize);
+    return () => viewport.removeEventListener("resize", handleViewportResize);
+  }, []);
 
   useEffect(() => {
     const handleInteraction = (event: Event) => {
